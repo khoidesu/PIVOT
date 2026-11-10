@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 from .. import models as m
 from .. import schemas as s
 from ..access import (
-    CAN_CREATE_SHIPMENT, can_see_sensitive, get_visible_shipment, visible_shipments_stmt,
+    CAN_CREATE_SHIPMENT, get_visible_shipment, price_visible_ids, visible_shipments_stmt,
     visible_vehicles_stmt,
 )
+from ..assumptions import get_active
 from ..auth import Actor, current_actor
 from ..config import settings
 from ..db import get_session
@@ -21,17 +22,18 @@ router = APIRouter(prefix="/v1")
 REQUIRED = ("cargo_type", "weight_kg", "volume_m3", "pickup_deadline", "cutoff_at")
 
 
-def _active_assumptions(session: Session) -> m.AssumptionSet:
-    return session.execute(select(m.AssumptionSet).order_by(m.AssumptionSet.created_at.desc())).scalars().first()
-
-
-def _shipment_out(session: Session, actor: Actor, ship: m.Shipment) -> s.ShipmentOut:
+def _shipment_out(ship: m.Shipment, show_sensitive: bool) -> s.ShipmentOut:
     out = s.ShipmentOut.model_validate(ship)
-    if not can_see_sensitive(session, actor, ship):
+    if not show_sensitive:
         out.price_vnd = None
         out.customer_name = None
     out.missing_fields = [f for f in REQUIRED if getattr(ship, f) is None]
     return out
+
+
+def shipment_out_many(session: Session, actor: Actor, ships: list[m.Shipment]) -> list[s.ShipmentOut]:
+    visible = price_visible_ids(session, actor, ships)
+    return [_shipment_out(x, x.id in visible) for x in ships]
 
 
 @router.get("/me", response_model=s.MeOut)
@@ -42,7 +44,7 @@ def me(actor: Actor = Depends(current_actor)):
 
 @router.get("/meta", response_model=s.MetaOut)
 def meta(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
-    params = _active_assumptions(session).params
+    params = get_active(session).params
     return s.MetaOut(data_mode=settings.data_mode, is_simulated=True,
                      server_time=datetime.now(timezone.utc),
                      stale_position_minutes=params["stale_position_minutes"])
@@ -70,13 +72,13 @@ def locations(actor: Actor = Depends(current_actor), session: Session = Depends(
 @router.get("/shipments", response_model=list[s.ShipmentOut])
 def list_shipments(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     rows = session.execute(visible_shipments_stmt(actor).order_by(m.Shipment.code)).scalars().all()
-    return [_shipment_out(session, actor, r) for r in rows]
+    return shipment_out_many(session, actor, list(rows))
 
 
 @router.get("/shipments/{shipment_id}", response_model=s.ShipmentOut)
 def get_shipment(shipment_id: uuid.UUID, actor: Actor = Depends(current_actor),
                  session: Session = Depends(get_session)):
-    return _shipment_out(session, actor, get_visible_shipment(session, actor, shipment_id))
+    return shipment_out_many(session, actor, [get_visible_shipment(session, actor, shipment_id)])[0]
 
 
 @router.post("/shipments", response_model=s.ShipmentOut, status_code=201)
@@ -101,7 +103,7 @@ def create_shipment(body: s.ShipmentCreate, actor: Actor = Depends(current_actor
     session.add(m.ShipmentParticipant(shipment_id=ship.id, org_id=actor.org_id, role=actor.role,
                                       can_see_price=True))
     session.commit()
-    return _shipment_out(session, actor, ship)
+    return shipment_out_many(session, actor, [ship])[0]
 
 
 @router.get("/vehicles", response_model=list[s.VehicleOut])

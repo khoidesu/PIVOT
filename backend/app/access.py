@@ -32,17 +32,24 @@ def get_visible_shipment(session: Session, actor: Actor, shipment_id: uuid.UUID)
     return ship
 
 
-def can_see_sensitive(session: Session, actor: Actor, shipment: m.Shipment) -> bool:
-    """Giá + tên khách hàng: chủ lô, hoặc participant được cấp can_see_price."""
-    if shipment.tenant_id == actor.org_id:
-        return True
-    part = session.execute(
-        select(m.ShipmentParticipant).where(
-            m.ShipmentParticipant.shipment_id == shipment.id,
-            m.ShipmentParticipant.org_id == actor.org_id,
-        )
-    ).scalar_one_or_none()
-    return bool(part and part.can_see_price)
+def price_visible_ids(session: Session, actor: Actor, shipments: list[m.Shipment]) -> set[uuid.UUID]:
+    """Id các lô mà actor được xem giá + tên khách hàng: chủ lô, hoặc participant có can_see_price.
+
+    Một truy vấn cho cả danh sách (tránh N+1). Điều phối viên không bao giờ được xem.
+    """
+    if actor.role == "dispatcher":
+        return set()
+    ids = {s.id for s in shipments if s.tenant_id == actor.org_id}
+    others = [s.id for s in shipments if s.id not in ids]
+    if others:
+        ids |= set(session.execute(
+            select(m.ShipmentParticipant.shipment_id).where(
+                m.ShipmentParticipant.shipment_id.in_(others),
+                m.ShipmentParticipant.org_id == actor.org_id,
+                m.ShipmentParticipant.can_see_price.is_(True),
+            )
+        ).scalars())
+    return ids
 
 
 def visible_vehicles_stmt(actor: Actor):

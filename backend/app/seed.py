@@ -26,6 +26,8 @@ def uid(name: str) -> uuid.UUID:
 ASSUMPTIONS_V1 = {
     "rule_version": "rules-v1",
     "stale_position_minutes": 5,  # DRAFT 5.1: ngưỡng pilot, cấu hình — không phải chuẩn chung
+    "stale_shipment_minutes": 60,  # tuổi tối đa của dữ liệu lô (SLA riêng cho sự kiện nghiệp vụ)
+    "max_proposals": 3,
     "hold_seconds": 120,
     "deadhead_minutes": 25,  # thời gian xe tới điểm lấy (ETA luật, rule-based)
     "transit_minutes": 90,  # điểm lấy → ICD (bảng tuyến–khung giờ, rule-based)
@@ -180,8 +182,12 @@ def retime(session: Session, now: datetime | None = None) -> timedelta:
     if settings.data_mode != "mock":
         raise RuntimeError("Refusing to retime: PIVOT_DATA_MODE is not 'mock'")
     now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
-    aset = session.query(m.AssumptionSet).filter_by(version="assume-v1").one()
-    delta = now - datetime.fromisoformat(aset.params["anchor_at"])
+    from .booking.service import reset_open_commitments
+
+    aset = session.query(m.AssumptionSet).filter_by(is_active=True).one()
+    anchor = aset.params.get("anchor_at")
+    delta = now - datetime.fromisoformat(anchor) if anchor else timedelta(0)  # thiếu anchor → chỉ ghi anchor mới
+    reset_open_commitments(session, now)  # hold/đề xuất đang mở được expire thay vì lệch thời gian
     for model, cols in (
         (m.Shipment, ("ready_at", "pickup_deadline", "cutoff_at", "data_updated_at")),
         (m.Vehicle, ("position_updated_at",)),

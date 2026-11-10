@@ -197,6 +197,7 @@ class AssumptionSet(Base):
     id: Mapped[uuid.UUID] = pk()
     version: Mapped[str] = mapped_column(String(30), unique=True)
     params: Mapped[dict] = mapped_column(JSON)  # trọng số, ngưỡng stale, đơn giá... (không hard-code UI)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # bản đang hiệu lực (tường minh, không suy từ created_at)
     is_simulated: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = ts(default_now=True)
 
@@ -256,6 +257,7 @@ class Decision(Base):
     actor_user_id: Mapped[uuid.UUID] = fk("users.id")
     actor_org_id: Mapped[uuid.UUID] = fk("organizations.id")
     action: Mapped[str] = mapped_column(String(20))  # hold|accept|reject|resolve_exception
+    party: Mapped[str | None] = mapped_column(String(10), nullable=True)  # carrier|shipper|node — bên đang xác nhận
     proposal_version: Mapped[int] = mapped_column(Integer)
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     at: Mapped[datetime] = ts(default_now=True)

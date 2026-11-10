@@ -20,6 +20,7 @@ def _db():
     _ensure_test_db()
     from app.db import engine
     from app.models import Base
+    assert engine.url.database.endswith("_test"), "refusing to drop_all on a non-test database"
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield

@@ -21,6 +21,8 @@ VEHICLE_UNAVAILABLE = "VEHICLE_UNAVAILABLE"
 SLOT_FULL = "SLOT_FULL"
 DATA_STALE = "DATA_STALE"
 ID_UNRESOLVED = "ID_UNRESOLVED"
+SLOT_WINDOW_MISSED = "SLOT_WINDOW_MISSED"  # xe tới ICD sau khung giờ của slot
+SLOT_LOCATION_MISMATCH = "SLOT_LOCATION_MISMATCH"  # slot không ở điểm đến của lô
 MISSING_FIELD = "MISSING_FIELD"
 OK = "OK"
 
@@ -58,6 +60,18 @@ def gate_data_fresh(vehicle, now: datetime, params: dict) -> GateResult:
     return GateResult("data_fresh", "PASS", OK, {"age_minutes": round(age, 1), "limit_minutes": limit})
 
 
+def gate_shipment_fresh(shipment, now: datetime, params: dict) -> GateResult:
+    """Tuổi dữ liệu của LÔ (DRAFT 5.1 bắt đầu bằng 'kiểm tra quyền & tuổi dữ liệu')."""
+    if shipment.data_updated_at is None:
+        return _unknown("shipment_fresh", "shipment.data_updated_at")
+    age = max((now - shipment.data_updated_at).total_seconds() / 60, 0.0)  # đồng hồ lệch → coi như 0
+    limit = params["stale_shipment_minutes"]
+    detail = {"age_minutes": round(age, 1), "limit_minutes": limit, "subject": "shipment"}
+    if age > limit:
+        return GateResult("shipment_fresh", "FAIL", DATA_STALE, detail)
+    return GateResult("shipment_fresh", "PASS", OK, detail)
+
+
 def gate_cargo(shipment, vehicle) -> GateResult:
     if not shipment.cargo_type:
         return _unknown("cargo", "shipment.cargo_type")
@@ -80,7 +94,10 @@ def gate_capacity(shipment, vehicle) -> GateResult:
     return GateResult("capacity", "PASS", OK, detail)
 
 
-def gate_vehicle_available(vehicle, window) -> GateResult:
+def gate_vehicle_available(vehicle, window, reserved: bool = False) -> GateResult:
+    if reserved:  # xe đang bị giữ/cam kết bởi một đề xuất khác
+        return GateResult("vehicle_available", "FAIL", VEHICLE_UNAVAILABLE,
+                          {"status": vehicle.status, "reserved": True})
     if vehicle.status != "available":
         return GateResult("vehicle_available", "FAIL", VEHICLE_UNAVAILABLE, {"status": vehicle.status})
     if window is None:
@@ -126,6 +143,10 @@ def gate_slot(slot, shipment, window, now: datetime, params: dict) -> GateResult
     if slot is None:
         return _unknown("slot", "slot")
     detail = {"slot_id": str(slot.id), "remaining": slot.remaining, "source": slot.source}
+    if slot.location_id != shipment.dest_location_id:
+        return GateResult("slot", "FAIL", SLOT_LOCATION_MISMATCH,
+                          detail | {"slot_location_id": str(slot.location_id),
+                                    "dest_location_id": str(shipment.dest_location_id)})
     if slot.remaining <= 0:
         return GateResult("slot", "FAIL", SLOT_FULL, detail)
     eta = pickup_eta(window, shipment, now, params)
@@ -133,16 +154,18 @@ def gate_slot(slot, shipment, window, now: datetime, params: dict) -> GateResult
         arrive_icd = eta + timedelta(minutes=params["transit_minutes"] + params["handling_minutes"])
         detail["eta_icd"] = arrive_icd.isoformat()
         if arrive_icd > slot.end_at:
-            return GateResult("slot", "FAIL", CUTOFF_RISK, detail | {"slot_end_at": slot.end_at.isoformat()})
+            return GateResult("slot", "FAIL", SLOT_WINDOW_MISSED, detail | {"slot_end_at": slot.end_at.isoformat()})
     return GateResult("slot", "PASS", OK, detail)
 
 
-def evaluate(shipment, vehicle, window, slot, now: datetime, params: dict) -> Verdict:
+def evaluate(shipment, vehicle, window, slot, now: datetime, params: dict,
+             vehicle_reserved: bool = False) -> Verdict:
     results = [
         gate_data_fresh(vehicle, now, params),
+        gate_shipment_fresh(shipment, now, params),
         gate_cargo(shipment, vehicle),
         gate_capacity(shipment, vehicle),
-        gate_vehicle_available(vehicle, window),
+        gate_vehicle_available(vehicle, window, vehicle_reserved),
         gate_pickup_window(shipment, window, now, params),
         gate_cutoff(shipment, window, now, params),
         gate_slot(slot, shipment, window, now, params),

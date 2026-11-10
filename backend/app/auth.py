@@ -38,6 +38,7 @@ def current_actor(authorization: str | None = Header(default=None),
         .join(m.Membership, m.Membership.user_id == m.User.id)
         .join(m.Organization, m.Organization.id == m.Membership.org_id)
         .where(m.User.email == f"{key}@demo.local")
+        .order_by(m.Membership.id)  # user nhiều membership → luôn chọn cùng một membership (xác định)
     ).first()
     if row is None:
         raise HTTPException(status_code=401, detail="Unknown user")
