@@ -264,6 +264,13 @@ def accept(session: Session, actor: Actor, proposal_id: uuid.UUID, version: int,
             r.status = "committed"
         veh.status, ship.status = "committed", "matched"
         ship.version += 1
+        # Một lô chỉ có một cam kết: các đề xuất còn mở của cùng lô không còn hiệu lực
+        for sib in session.execute(select(m.Proposal).where(
+                m.Proposal.shipment_id == ship.id, m.Proposal.id != prop.id,
+                m.Proposal.status.in_(OPEN_STATES)).with_for_update()).scalars():
+            release_holds(session, sib.id, "released")
+            sib.status = "cancelled"
+            sib.version += 1
         prop.status = "confirmed"
         prop.version += 1
         session.add(m.OutboxJob(topic="proposal.confirmed", payload={"proposal_id": str(prop.id)},

@@ -205,3 +205,16 @@ def test_retime_expires_open_holds_and_restores_slots(client):
     assert client.post("/v1/demo/retime", headers=auth("dispatch")).status_code == 200
     assert get(client, "shipper_a", held["id"])["status"] == "expired"
     assert slot_remaining(prop["slot"]["id"]) == before
+
+
+def test_confirming_one_proposal_cancels_its_siblings(client):
+    props = match(client, "shipper_a", "LOT-A-001")["proposals"]
+    assert len(props) >= 2
+    held = act(client, "shipper_a", props[0], "hold").json()
+    # một lô chỉ có một bên giữ tại một thời điểm: đề xuất anh em không giữ chồng lên được
+    assert act(client, "shipper_a", props[1], "hold").status_code == 409
+    confirm_all(client, held)
+    for sib in props[1:]:
+        view = get(client, "shipper_a", sib["id"])
+        assert view["status"] == "cancelled" and not any(view["my_actions"].values())
+        assert act(client, "shipper_a", view, "hold").status_code == 409
