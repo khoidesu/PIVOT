@@ -3,12 +3,12 @@ export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '
 
 export type UserKey = 'shipper_a' | 'shipper_a2' | 'carrier_b' | 'node_c' | 'dispatch'
 
-export const DEMO_USERS: { key: UserKey; role: 'shipper' | 'carrier' | 'node_operator' | 'dispatcher' }[] = [
-  { key: 'shipper_a', role: 'shipper' },
-  { key: 'shipper_a2', role: 'shipper' },
-  { key: 'carrier_b', role: 'carrier' },
-  { key: 'node_c', role: 'node_operator' },
-  { key: 'dispatch', role: 'dispatcher' },
+export const DEMO_USERS: { key: UserKey; org: 'A' | 'B' | 'C'; role: 'shipper' | 'carrier' | 'node_operator' | 'dispatcher' }[] = [
+  { key: 'shipper_a', org: 'A', role: 'shipper' },
+  { key: 'shipper_a2', org: 'A', role: 'shipper' },
+  { key: 'carrier_b', org: 'B', role: 'carrier' },
+  { key: 'node_c', org: 'C', role: 'node_operator' },
+  { key: 'dispatch', org: 'C', role: 'dispatcher' },
 ]
 
 export interface Me { user_id: string; user_name: string; org_id: string; org_name: string; org_type: string; role: string }

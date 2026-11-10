@@ -11,6 +11,7 @@ interface AppCtx {
   fatal: ApiError | null
   switchUser: (u: UserKey) => void
   bump: () => void
+  syncClock: () => void // chỉ cập nhật lệch giờ server, không tải lại màn hình
 }
 
 const Ctx = createContext<AppCtx | null>(null)
@@ -39,6 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     user, me, meta, locations, epoch, fatal,
     switchUser: (u) => { persistUser(u); setUserState(u); setEpoch((n) => n + 1) },
     bump: () => setEpoch((n) => n + 1),
+    syncClock: () => { api.meta().then((mt) => { setServerTime(mt.server_time); setMeta(mt) }).catch(() => {}) },
   }), [user, me, meta, locations, epoch, fatal])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

@@ -1,15 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, ApiError, DEMO_USERS, type UserKey } from '../api'
 import { useI18n } from '../i18n'
-import { fmtClock } from '../fmt'
+import { fmtClock, nowMs } from '../fmt'
 import { useApp } from '../store'
 import { Chip } from './ui'
 
 export function TopBar() {
   const { t, lang, setLang } = useI18n()
-  const { user, me, meta, switchUser, bump } = useApp()
+  const { user, me, meta, switchUser, bump, syncClock } = useApp()
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [, tick] = useState(0)
+  useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(id) }, []) // đồng hồ chạy mỗi giây
+  useEffect(() => { const id = setInterval(syncClock, 30_000); return () => clearInterval(id) }, [syncClock]) // đồng bộ lại giờ máy chủ mỗi 30 giây
 
   async function retime() {
     setBusy(true)
@@ -29,12 +32,12 @@ export function TopBar() {
           </div>
           <div className="ctrl">
             <Chip kind={sim ? 'sim' : 'good'}>● {sim ? t('badge.mock') : t('badge.live')}</Chip>
-            {meta && <span className="small">{t('topbar.dataAge', { age: fmtClock(meta.server_time) })}</span>}
+            {meta && <span className="small">{t('topbar.dataAge', { age: fmtClock(new Date(nowMs()).toISOString()) })}</span>}
           </div>
           <label className="ctrl">
             {t('topbar.role')}
             <select value={user} onChange={(e) => switchUser(e.target.value as UserKey)} aria-label={t('topbar.role')}>
-              {DEMO_USERS.map((u) => <option key={u.key} value={u.key}>{t(`user.${u.key}`)} — {t(`role.${u.role}`)}</option>)}
+              {DEMO_USERS.map((u) => <option key={u.key} value={u.key}>{t(`user.${u.key}`)} — {t(`role.${u.role}`)} · {t(`org.${u.org}`)}</option>)}
             </select>
           </label>
           <div className="seg" role="group" aria-label={t('topbar.lang')}>
