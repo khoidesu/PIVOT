@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import models as m
@@ -47,6 +48,20 @@ def meta(actor: Actor = Depends(current_actor), session: Session = Depends(get_s
                      stale_position_minutes=params["stale_position_minutes"])
 
 
+@router.post("/demo/retime")
+def demo_retime(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    """Đưa dữ liệu MÔ PHỎNG về trạng thái tươi trước mỗi kịch bản demo. Chỉ điều phối viên, chỉ khi mock."""
+    from ..seed import retime
+
+    if settings.data_mode != "mock":
+        raise HTTPException(status_code=403, detail="Only available for simulated (mock) data")
+    if actor.role != "dispatcher":
+        raise HTTPException(status_code=403, detail="Dispatcher only")
+    delta = retime(session)
+    session.commit()
+    return {"retimed_by_seconds": int(delta.total_seconds()), "is_simulated": True}
+
+
 @router.get("/locations", response_model=list[s.LocationOut])
 def locations(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     return session.execute(select(m.Location).order_by(m.Location.name)).scalars().all()
@@ -69,14 +84,20 @@ def create_shipment(body: s.ShipmentCreate, actor: Actor = Depends(current_actor
                     session: Session = Depends(get_session)):
     if actor.role not in CAN_CREATE_SHIPMENT:
         raise HTTPException(status_code=403, detail="Role cannot create shipments")
-    if body.pickup_deadline <= body.ready_at:
-        raise HTTPException(status_code=422, detail="pickup_deadline must be after ready_at")
-    if session.execute(select(m.Shipment.id).where(m.Shipment.code == body.code)).first():
-        raise HTTPException(status_code=409, detail="Shipment code already exists")
-    ship = m.Shipment(tenant_id=actor.org_id, status="open", is_simulated=True,
-                      **body.model_dump())
+    known = set(session.execute(
+        select(m.Location.id).where(m.Location.id.in_([body.origin_location_id, body.dest_location_id]))
+    ).scalars())
+    for field in ("origin_location_id", "dest_location_id"):
+        if getattr(body, field) not in known:
+            raise HTTPException(status_code=422, detail=f"{field} does not exist")
+    # mã lô chỉ unique TRONG tenant → không lộ lô của tổ chức khác qua lỗi trùng mã
+    ship = m.Shipment(tenant_id=actor.org_id, status="open", is_simulated=True, **body.model_dump())
     session.add(ship)
-    session.flush()
+    try:
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="Shipment code already exists") from None
     session.add(m.ShipmentParticipant(shipment_id=ship.id, org_id=actor.org_id, role=actor.role,
                                       can_see_price=True))
     session.commit()

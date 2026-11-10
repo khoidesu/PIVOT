@@ -8,11 +8,12 @@ Căn cứ đánh giá kỹ thuật: `DRAFT.md` (đánh giá công nghệ + kế 
 
 ## 0. Trạng thái hiện tại
 
-- **Giai đoạn:** N1 (backend lõi) **xong** — xem "Hiện có" bên dưới; kế tiếp N2: MatchScore + booking + frontend.
-- **Hiện có (10/11/2026):** Postgres (docker, cổng 5433) · 20 bảng + Alembic · seed mô phỏng (3 tổ chức, 4 vai trò, 10 xe, 20 lô, 20 slot) · auth token dev · API `/v1/{me,meta,locations,shipments,vehicles,slots}` · hard gate `app/matching/gates.py` · 19 test pass (`cd backend && .venv/bin/python -m pytest`; chạy: `docker compose up -d`, `python -m app.seed`, `uvicorn app.main:app`).
+- **Giai đoạn:** N1 (backend lõi) **xong + đã review/sửa** — chờ người dùng review trước khi sang N2 (MatchScore + booking + event/outbox + frontend).
+- **Hiện có (10/11/2026):** Postgres (docker, chỉ bind 127.0.0.1:5433) · 20 bảng + Alembic (2 migration) · seed mô phỏng (3 tổ chức, 4 vai trò, 10 xe, 20 lô, 20 slot) + `--retime` · auth token dev · API `/v1/{me,meta,locations,shipments,vehicles,slots}` + `POST /v1/demo/retime` (điều phối viên, chỉ mock) · hard gate `app/matching/gates.py` · ràng buộc DB chống đặt trùng (partial unique index trên reservations, CHECK status) · **36 test pass**.
+- **Chạy:** `docker compose up -d` → `cd backend && .venv/bin/alembic upgrade head` → `.venv/bin/python -m app.seed` → `.venv/bin/uvicorn app.main:app` · test: `.venv/bin/python -m pytest` · **trước mỗi buổi demo:** `.venv/bin/python -m app.seed --retime` (vị trí xe quá 5 phút là bị DATA_STALE).
 - **Mục tiêu gần nhất:** dựng prototype chạy được cho sản phẩm dự thi. **Hạn chót còn 3 ngày (tới ~13/11/2026)**, nên 5 ngày của DRAFT được nén lại — xem "Lịch nén 3 ngày" ở mục 4.
 - **Ngày bắt đầu:** 10/11/2026.
-- **Cập nhật gần nhất:** 10/11/2026 — chốt lịch nén 3 ngày, bắt đầu scaffold backend/frontend.
+- **Cập nhật gần nhất:** 10/11/2026 — N1 xong, sửa theo code review (bind localhost, validate đầu vào, mã lô unique theo tenant, ràng buộc DB, retime).
 
 > Cập nhật mục này mỗi khi kết thúc một ngày làm việc / một hạng mục P0-P1 trong Backlog (mục 9).
 
@@ -85,7 +86,7 @@ Giữ nguyên toàn bộ "điều kiện qua" của DRAFT; chỉ gộp ngày và
 
 Cập nhật checkbox khi hoàn thành. Mỗi ngày có "điều kiện qua" — không tick xong ngày nếu điều kiện qua chưa pass.
 
-- [ ] **Ngày 1 — Nền tảng:** chốt schema, vai trò, seed; dựng UI/API/DB + CI.
+- [x] **Ngày 1 — Nền tảng:** chốt schema, vai trò, seed; dựng UI/API/DB + CI. *(10/11/2026: schema/seed/API/phân quyền xong, test A/B pass; UI từ N2, CI/staging từ xa không làm — demo chạy local)*
   - Deliverable: 20 lô, 10 xe, 20 slot; 3 tài khoản tổ chức.
   - Điều kiện qua: tạo/đọc lô OK; tổ chức A **không** đọc được lô riêng của B.
 - [ ] **Ngày 2 — Hard gate & score:** viết hard gate, MatchScore, phép tính chi phí; giao diện giải thích lý do.
@@ -179,6 +180,7 @@ Thứ tự đầu tư: **dữ liệu & giao dịch đúng → vòng điều ph�
 
 Ghi mỗi quyết định quan trọng ở đây theo thời gian, mới nhất trên đầu. Không xoá lịch sử quyết định cũ — nếu đổi thì thêm dòng mới ghi rõ "thay thế quyết định ngày ...".
 
+- **10/11/2026 (review N1)** — Sau code review backend: (1) DB chỉ bind 127.0.0.1; (2) `ShipmentCreate` bắt buộc múi giờ + `ready_at < pickup_deadline < cutoff_at`, location không tồn tại → 422 (trước đó 500); (3) mã lô unique theo `(tenant_id, code)` thay vì toàn cục để không lộ lô của tenant khác — thay thế thiết kế ban đầu; (4) thêm partial unique index chống đặt trùng xe/lô trên `reservations`, CHECK status cho shipments/proposals/reservations, `decisions.idempotency_key` unique theo tổ chức; (5) seed có chốt chặn `data_mode=mock`, lệnh `--retime` và `POST /v1/demo/retime` để demo không bị DATA_STALE theo thời gian. Còn tồn: gate_slot chưa kiểm slot đúng ICD đích, tuổi dữ liệu của lô, auth nhiều membership, N+1 nhẹ ở danh sách lô.
 - **10/11/2026 (style UI)** — Chốt style "Control Tower tối giản": nền sáng, nhấn teal, bo góc 12px, thẻ rõ ràng, badge PASS/FAIL/UNKNOWN; thanh đầu có bộ chọn vai trò, VI|EN, badge MOCK/LIVE + tuổi dữ liệu. Frontend bắt đầu từ N2, backend lõi xong trước.
 - **10/11/2026 (phạm vi)** — Người dùng xác nhận không cắt hạng mục nào trong lịch nén; P1 vẫn xếp sau P0. Chọn phiên bản công nghệ (Python 3.13, Postgres cổng 5433…) do Claude tự quyết. Thay thế dòng "cắt P1" ngay bên dưới.
 - **10/11/2026 (hạn chót)** — Hạn nộp còn 3 ngày thay vì 5 → nén lịch còn 3 ngày (mục 4). OIDC dùng token dev, bỏ CI/staging từ xa. Giữ nguyên P0 và điều kiện qua của DRAFT. (Phần "cắt P1" của dòng này đã bị thay thế bởi dòng phạm vi phía trên.)

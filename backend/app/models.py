@@ -3,8 +3,8 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    JSON, BigInteger, CheckConstraint, DateTime, Float, ForeignKey, Integer, String,
-    UniqueConstraint, Boolean,
+    JSON, BigInteger, CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String,
+    UniqueConstraint, Boolean, text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -69,9 +69,14 @@ class Location(Base):
 
 class Shipment(Base):
     __tablename__ = "shipments"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "code", name="uq_shipment_tenant_code"),
+        CheckConstraint("status IN ('open','matched','executing','completed','cancelled')",
+                        name="ck_shipment_status"),
+    )
     id: Mapped[uuid.UUID] = pk()
     tenant_id: Mapped[uuid.UUID] = fk("organizations.id")  # tổ chức sở hữu lô
-    code: Mapped[str] = mapped_column(String(40), unique=True)
+    code: Mapped[str] = mapped_column(String(40))
     cargo_type: Mapped[str] = mapped_column(String(30))  # dry | cold | hazmat ...
     weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     volume_m3: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -198,6 +203,11 @@ class AssumptionSet(Base):
 
 class Proposal(Base):
     __tablename__ = "proposals"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('proposed','pending_acceptance','confirmed','executing','completed',"
+            "'rejected','expired','cancelled')", name="ck_proposal_status"),
+    )
     id: Mapped[uuid.UUID] = pk()
     shipment_id: Mapped[uuid.UUID] = fk("shipments.id")
     vehicle_id: Mapped[uuid.UUID] = fk("vehicles.id")
@@ -218,6 +228,14 @@ class Proposal(Base):
 
 class Reservation(Base):
     __tablename__ = "reservations"
+    __table_args__ = (
+        CheckConstraint("status IN ('held','committed','released','expired')", name="ck_reservation_status"),
+        # Chống đặt trùng ở tầng DB (DRAFT 5.4): một tài nguyên chỉ có tối đa 1 reservation đang hiệu lực.
+        # Chỉ áp cho tài nguyên đơn (xe, lô). Slot có capacity > 1 được bảo vệ bằng slots.remaining
+        # (CHECK 0..capacity, cập nhật nguyên tử) — xem booking N2.
+        Index("uq_reservation_active_resource", "resource_type", "resource_id", unique=True,
+              postgresql_where=text("status IN ('held','committed') AND resource_type IN ('vehicle','shipment')")),
+    )
     id: Mapped[uuid.UUID] = pk()
     proposal_id: Mapped[uuid.UUID] = fk("proposals.id")
     resource_type: Mapped[str] = mapped_column(String(20))  # vehicle | slot | shipment
@@ -229,13 +247,17 @@ class Reservation(Base):
 
 class Decision(Base):
     __tablename__ = "decisions"
+    __table_args__ = (
+        # Idempotency-Key unique theo tổ chức gửi (không toàn cục → không đụng key của tenant khác)
+        UniqueConstraint("actor_org_id", "idempotency_key", name="uq_decision_org_idem"),
+    )
     id: Mapped[uuid.UUID] = pk()
     proposal_id: Mapped[uuid.UUID] = fk("proposals.id")
     actor_user_id: Mapped[uuid.UUID] = fk("users.id")
     actor_org_id: Mapped[uuid.UUID] = fk("organizations.id")
     action: Mapped[str] = mapped_column(String(20))  # hold|accept|reject|resolve_exception
     proposal_version: Mapped[int] = mapped_column(Integer)
-    idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     at: Mapped[datetime] = ts(default_now=True)
 
 

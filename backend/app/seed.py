@@ -1,6 +1,8 @@
 """Seed dữ liệu MÔ PHỎNG cho prototype (DRAFT 3.1): 3 tổ chức, 4 vai trò, 10 xe, 20 lô, 20 slot.
 
-Chạy: `python -m app.seed`  (reset toàn bộ rồi seed lại; thời gian tương đối theo "bây giờ").
+Chạy:
+  python -m app.seed            # reset toàn bộ rồi seed lại (thời gian tương đối theo "bây giờ")
+  python -m app.seed --retime   # giữ dữ liệu, chỉ dịch mốc thời gian theo "bây giờ" (đưa demo về trạng thái tươi)
 Mọi bản ghi is_simulated=True. Có chủ ý một số ca để demo hard gate (xe thiếu tải, sai loại hàng,
 trễ giờ, vị trí xe quá hạn, lô thiếu trọng lượng, slot đầy).
 """
@@ -11,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from . import models as m
+from .config import settings
 from .db import SessionLocal, engine
 
 NS = uuid.UUID("6f1c6c1e-0000-4000-8000-00000000a001")
@@ -42,6 +45,8 @@ TABLES = [
 
 
 def reset(session: Session) -> None:
+    if settings.data_mode != "mock":  # chốt chặn: không bao giờ TRUNCATE khi không phải môi trường mô phỏng
+        raise RuntimeError("Refusing to reset: PIVOT_DATA_MODE is not 'mock'")
     session.execute(text("TRUNCATE " + ", ".join(TABLES) + " RESTART IDENTITY CASCADE"))
 
 
@@ -79,7 +84,8 @@ def seed(session: Session, now: datetime | None = None) -> dict:
         "depot": m.Location(id=uid("loc-depot"), name="Depot Thủ Đức (mô phỏng)", kind="depot", lat=10.87, lng=106.77),
     }
     session.add_all(locs.values())
-    session.add(m.AssumptionSet(id=uid("assume-v1"), version="assume-v1", params=ASSUMPTIONS_V1))
+    session.add(m.AssumptionSet(id=uid("assume-v1"), version="assume-v1",
+                                params=ASSUMPTIONS_V1 | {"anchor_at": now.isoformat()}))
     session.flush()
 
     # --- 10 xe (carrier B). Có ca cố ý: thiếu tải, chỉ chở lạnh, trễ giờ, vị trí quá hạn, offline ---
@@ -165,12 +171,45 @@ def seed(session: Session, now: datetime | None = None) -> dict:
     return {"organizations": 3, "users": 4, "vehicles": 10, "shipments": 20, "slots": 20, "now": now.isoformat()}
 
 
+def retime(session: Session, now: datetime | None = None) -> timedelta:
+    """Dịch mọi mốc thời gian của dữ liệu seed theo "bây giờ" mà KHÔNG xoá đề xuất/sự kiện/quyết định.
+
+    Giữ nguyên tuổi tương đối (xe quá hạn vẫn quá hạn, lô gấp vẫn gấp) nên 6 kịch bản demo lặp lại được.
+    Chỉ chạy được với dữ liệu mô phỏng (data_mode = mock).
+    """
+    if settings.data_mode != "mock":
+        raise RuntimeError("Refusing to retime: PIVOT_DATA_MODE is not 'mock'")
+    now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
+    aset = session.query(m.AssumptionSet).filter_by(version="assume-v1").one()
+    delta = now - datetime.fromisoformat(aset.params["anchor_at"])
+    for model, cols in (
+        (m.Shipment, ("ready_at", "pickup_deadline", "cutoff_at", "data_updated_at")),
+        (m.Vehicle, ("position_updated_at",)),
+        (m.AvailabilityWindow, ("free_from", "free_to")),
+        (m.Slot, ("start_at", "end_at")),
+    ):
+        for row in session.query(model).all():
+            for col in cols:
+                value = getattr(row, col)
+                if value is not None:
+                    setattr(row, col, value + delta)
+    aset.params = {**aset.params, "anchor_at": now.isoformat()}  # gán lại để SQLAlchemy nhận ra JSON đổi
+    return delta
+
+
 def main() -> None:
+    import sys
+
     with SessionLocal() as session:
-        reset(session)
-        info = seed(session)
-        session.commit()
-    print("Seed OK (dữ liệu MÔ PHỎNG):", info)
+        if "--retime" in sys.argv:
+            delta = retime(session)
+            session.commit()
+            print(f"Retime OK: dịch mốc thời gian {delta} (dữ liệu MÔ PHỎNG).")
+        else:
+            reset(session)
+            info = seed(session)
+            session.commit()
+            print("Seed OK (dữ liệu MÔ PHỎNG):", info)
     engine.dispose()
 
 

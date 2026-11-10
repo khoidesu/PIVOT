@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 
 class ORM(BaseModel):
@@ -32,11 +32,17 @@ class ShipmentCreate(BaseModel):
     volume_m3: float = Field(gt=0)
     origin_location_id: uuid.UUID
     dest_location_id: uuid.UUID
-    ready_at: datetime
-    pickup_deadline: datetime
-    cutoff_at: datetime
+    ready_at: AwareDatetime  # bắt buộc có múi giờ (lưu UTC, DRAFT mục 4.1)
+    pickup_deadline: AwareDatetime
+    cutoff_at: AwareDatetime
     price_vnd: int | None = Field(default=None, ge=0)
     customer_name: str | None = None
+
+    @model_validator(mode="after")
+    def _time_order(self):
+        if not (self.ready_at < self.pickup_deadline < self.cutoff_at):
+            raise ValueError("require ready_at < pickup_deadline < cutoff_at")
+        return self
 
 
 class ShipmentOut(ORM):
