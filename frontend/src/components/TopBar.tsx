@@ -21,7 +21,6 @@ export function TopBar() {
   const sim = meta ? meta.data_mode === 'mock' || meta.is_simulated : true
   return (
     <>
-      {sim && <div className="sim-banner" role="note">{t('app.simBanner')}</div>}
       <header className="topbar">
         <div className="topbar-in">
           <div className="brand">

@@ -50,7 +50,7 @@ export function Request({ go }: { go: (to: string) => void }) {
   }
 
   return (
-    <div className="split">
+    <div style={{ maxWidth: 860 }}>
       <section className="card">
         <div className="card-h"><h1>{t('req.title')}</h1><span className="muted">{t('req.intro')}</span></div>
         {me && !allowed && <Note kind="warn">{t('req.cannot', { role: t(`role.${me.role}`) })}</Note>}
@@ -89,10 +89,6 @@ export function Request({ go }: { go: (to: string) => void }) {
           </div>
         </form>
       </section>
-      <aside className="card stack aside">
-        <h2>{t('req.reasonsTitle')}</h2>
-        <p className="muted" style={{ margin: 0 }}>{t('req.reasons')}</p>
-      </aside>
     </div>
   )
 }

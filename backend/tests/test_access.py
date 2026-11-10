@@ -79,3 +79,18 @@ def test_node_and_dispatcher_cannot_create(client):
             "cutoff_at": "2030-01-01T05:00:00Z"}
     assert client.post("/v1/shipments", json=body, headers=auth("node_c")).status_code == 403
     assert client.post("/v1/shipments", json=body, headers=auth("dispatch")).status_code == 403
+
+
+def test_second_member_of_same_org_shares_lots_but_not_other_orgs(client):
+    nguyen = client.get("/v1/shipments", headers=auth("shipper_a")).json()
+    phuoc = client.get("/v1/shipments", headers=auth("shipper_a2")).json()
+    assert _ids_from(nguyen) == _ids_from(phuoc) and len(phuoc) == 10          # cùng tổ chức A: cùng lô
+    assert all(s["customer_name"] for s in phuoc)                               # cùng tổ chức: thấy cả tên khách hàng
+    me = client.get("/v1/me", headers=auth("shipper_a2")).json()
+    assert me["role"] == "shipper" and me["user_name"].startswith("Phước")
+    b_lot = client.get("/v1/shipments", headers=auth("carrier_b")).json()[0]["id"]
+    assert client.get(f"/v1/shipments/{b_lot}", headers=auth("shipper_a2")).status_code == 404
+
+
+def _ids_from(rows):
+    return {r["id"] for r in rows}

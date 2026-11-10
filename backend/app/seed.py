@@ -65,10 +65,11 @@ def seed(session: Session, now: datetime | None = None) -> dict:
     }
     session.add_all(orgs.values())
     users = {
-        "shipper_a": ("A", "shipper", "Lan — Shipper A"),
-        "carrier_b": ("B", "carrier", "Minh — Carrier B"),
-        "node_c": ("C", "node_operator", "Hùng — Node ICD C"),
-        "dispatch": ("C", "dispatcher", "Thảo — Điều phối viên"),
+        "shipper_a": ("A", "shipper", "Nguyên — Chủ hàng A"),
+        "shipper_a2": ("A", "shipper", "Phước — Chủ hàng A (nhân viên 2)"),  # cùng tổ chức A: test chia sẻ trong tổ chức
+        "carrier_b": ("B", "carrier", "Minh — Vận tải B"),
+        "node_c": ("C", "node_operator", "Khôi — ICD Cảng C"),
+        "dispatch": ("C", "dispatcher", "Phú — Điều phối viên"),
     }
     for key, (_, _, name) in users.items():
         session.add(m.User(id=uid("user-" + key), email=f"{key}@demo.local", name=name))
@@ -170,7 +171,7 @@ def seed(session: Session, now: datetime | None = None) -> dict:
         session.add(m.ShipmentParticipant(id=uid(f"part-own-{i}"), shipment_id=sid,
                                           org_id=orgs[owner].id, role="shipper", can_see_price=True))
     session.flush()
-    return {"organizations": 3, "users": 4, "vehicles": 10, "shipments": 20, "slots": 20, "now": now.isoformat()}
+    return {"organizations": 3, "users": 5, "vehicles": 10, "shipments": 20, "slots": 20, "now": now.isoformat()}
 
 
 def retime(session: Session, now: datetime | None = None) -> timedelta:

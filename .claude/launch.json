@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "cd \"/Users/harryluong1203/Documents/Personal Project/LIKE_LION/backend\" && PYTHONPATH=\"/Users/harryluong1203/Documents/Personal Project/LIKE_LION/backend/.venv/lib/python3.13/site-packages:/Users/harryluong1203/Documents/Personal Project/LIKE_LION/backend\" exec /opt/homebrew/bin/python3.13 -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "cd \"/Users/harryluong1203/Documents/Personal Project/LIKE_LION/frontend\" && exec npm run dev"
+      ],
+      "port": 5173
+    }
+  ]
+}

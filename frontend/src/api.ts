@@ -1,10 +1,11 @@
 // Client API. Hợp đồng lấy từ OpenAPI của FastAPI (backend/app/schemas.py).
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://127.0.0.1:8000'
 
-export type UserKey = 'shipper_a' | 'carrier_b' | 'node_c' | 'dispatch'
+export type UserKey = 'shipper_a' | 'shipper_a2' | 'carrier_b' | 'node_c' | 'dispatch'
 
 export const DEMO_USERS: { key: UserKey; role: 'shipper' | 'carrier' | 'node_operator' | 'dispatcher' }[] = [
   { key: 'shipper_a', role: 'shipper' },
+  { key: 'shipper_a2', role: 'shipper' },
   { key: 'carrier_b', role: 'carrier' },
   { key: 'node_c', role: 'node_operator' },
   { key: 'dispatch', role: 'dispatcher' },
