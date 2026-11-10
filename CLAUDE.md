@@ -8,10 +8,11 @@ Căn cứ đánh giá kỹ thuật: `DRAFT.md` (đánh giá công nghệ + kế 
 
 ## 0. Trạng thái hiện tại
 
-- **Giai đoạn:** Chưa có code (repo mới có README). Đang ở bước khởi tạo dự án demo.
-- **Mục tiêu gần nhất:** dựng web demo cho sản phẩm dự thi, theo kế hoạch Prototype 5 ngày (xem mục 4).
+- **Giai đoạn:** N1 (backend lõi) **xong** — xem "Hiện có" bên dưới; kế tiếp N2: MatchScore + booking + frontend.
+- **Hiện có (10/11/2026):** Postgres (docker, cổng 5433) · 20 bảng + Alembic · seed mô phỏng (3 tổ chức, 4 vai trò, 10 xe, 20 lô, 20 slot) · auth token dev · API `/v1/{me,meta,locations,shipments,vehicles,slots}` · hard gate `app/matching/gates.py` · 19 test pass (`cd backend && .venv/bin/python -m pytest`; chạy: `docker compose up -d`, `python -m app.seed`, `uvicorn app.main:app`).
+- **Mục tiêu gần nhất:** dựng prototype chạy được cho sản phẩm dự thi. **Hạn chót còn 3 ngày (tới ~13/11/2026)**, nên 5 ngày của DRAFT được nén lại — xem "Lịch nén 3 ngày" ở mục 4.
 - **Ngày bắt đầu:** 10/11/2026.
-- **Cập nhật gần nhất:** 10/11/2026 — tạo CLAUDE.md, chốt stack theo Bảng 2 của DRAFT.md.
+- **Cập nhật gần nhất:** 10/11/2026 — chốt lịch nén 3 ngày, bắt đầu scaffold backend/frontend.
 
 > Cập nhật mục này mỗi khi kết thúc một ngày làm việc / một hạng mục P0-P1 trong Backlog (mục 9).
 
@@ -69,6 +70,18 @@ xe sắp trống → hàng sẵn sàng → kiểm tra khả thi (hard gate)
 ---
 
 ## 4. Kế hoạch 5 ngày (Bảng 3, DRAFT.md) — checklist tiến trình
+
+### Lịch nén 3 ngày (áp dụng từ 10/11/2026, thay cho lịch 5 ngày bên dưới)
+
+Giữ nguyên toàn bộ "điều kiện qua" của DRAFT; chỉ gộp ngày và cắt phần P1.
+
+| Ngày | Gộp từ | Nội dung |
+|---|---|---|
+| N1 (10/11) | Ngày 1 + nửa đầu Ngày 2 | Schema/seed/phân quyền A/B + hard gate + reason_code |
+| N2 (11–12/11) | nửa sau Ngày 2 + Ngày 3 + nửa đầu Ngày 4 | MatchScore + UI giải thích, booking hold/accept/reject + race test, idempotent event |
+| N3 (12–13/11) | nửa sau Ngày 4 + Ngày 5 | Timeline/ngoại lệ, benefit ledger, 6 kịch bản demo, seed/reset, video |
+
+**Không cắt hạng mục nào của prototype** (người dùng đảm bảo đủ thời gian). Làm theo thứ tự DRAFT: lõi P0 trước (hard gate, state machine booking, idempotency, phân quyền A/B, nhãn mô phỏng, timeline, ledger), rồi P1 (AI nhập liệu, ETA baseline, OR-Tools) nếu còn giờ — P1 không bị loại, chỉ xếp sau P0. Đơn giản hoá cho demo local: OIDC dùng token dev + bộ chọn vai trò trên UI; demo chạy local, không CI/staging từ xa.
 
 Cập nhật checkbox khi hoàn thành. Mỗi ngày có "điều kiện qua" — không tick xong ngày nếu điều kiện qua chưa pass.
 
@@ -166,6 +179,9 @@ Thứ tự đầu tư: **dữ liệu & giao dịch đúng → vòng điều ph�
 
 Ghi mỗi quyết định quan trọng ở đây theo thời gian, mới nhất trên đầu. Không xoá lịch sử quyết định cũ — nếu đổi thì thêm dòng mới ghi rõ "thay thế quyết định ngày ...".
 
+- **10/11/2026 (style UI)** — Chốt style "Control Tower tối giản": nền sáng, nhấn teal, bo góc 12px, thẻ rõ ràng, badge PASS/FAIL/UNKNOWN; thanh đầu có bộ chọn vai trò, VI|EN, badge MOCK/LIVE + tuổi dữ liệu. Frontend bắt đầu từ N2, backend lõi xong trước.
+- **10/11/2026 (phạm vi)** — Người dùng xác nhận không cắt hạng mục nào trong lịch nén; P1 vẫn xếp sau P0. Chọn phiên bản công nghệ (Python 3.13, Postgres cổng 5433…) do Claude tự quyết. Thay thế dòng "cắt P1" ngay bên dưới.
+- **10/11/2026 (hạn chót)** — Hạn nộp còn 3 ngày thay vì 5 → nén lịch còn 3 ngày (mục 4). OIDC dùng token dev, bỏ CI/staging từ xa. Giữ nguyên P0 và điều kiện qua của DRAFT. (Phần "cắt P1" của dòng này đã bị thay thế bởi dòng phạm vi phía trên.)
 - **10/11/2026 (bổ sung)** — Chốt loại demo = prototype chạy được (6 màn hình), không phải landing page. Backend = stack thật FastAPI + PostgreSQL local (Docker), không dùng SQLite/mock. UI song ngữ Việt/Anh (thêm vào Bảng stack). Thay thế các tham chiếu `AI4Biz.md` bằng `DRAFT.md` (tên file thực tế); `DRAFT.md` được khai báo bất biến. Repo GitHub là `khoidesu/PIVOT`, chỉ push khi được yêu cầu.
 - **10/11/2026** — Khởi tạo CLAUDE.md. Chốt phạm vi = Prototype 5 ngày theo AI4Biz.md mục 3.1/8 (chưa cắt giảm thêm). Chốt stack = Bảng 2 AI4Biz.md, được phép đề xuất đổi khi có lý do kỹ thuật cụ thể. Build local, GitHub chỉ dùng lưu trữ mã nguồn.
 
