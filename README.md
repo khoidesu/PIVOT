@@ -43,9 +43,19 @@ Bộ chọn vai trò ở thanh trên: **Nguyên / Phước** (Chủ hàng, tổ 
 
 ## Kiểm thử
 ```bash
-cd backend && .venv/bin/python -m pytest      # 93 test (DB test riêng: pivot_test)
+cd backend && .venv/bin/python -m pytest      # 126 test (DB test riêng: pivot_test)
 cd frontend && npm test && npx tsc --noEmit
 ```
 
 ## 7 màn hình
-1. Nhập yêu cầu · 2. Xe & hàng · 3. Khuyến nghị + lý do · 4. Xác nhận & slot · 5. Timeline & ngoại lệ · 6. Lợi ích · 7. Kịch bản demo
+1. Nhập yêu cầu (gõ tay hoặc dán tin nhắn → bản nháp có dẫn nguồn; **sửa/huỷ** ở màn 2) · 2. Xe & hàng · 3. Khuyến nghị + lý do · 4. Xác nhận & slot · 5. Timeline & ngoại lệ · 6. Lợi ích · 7. Kịch bản demo
+
+## Tính năng chính
+- **Yêu cầu**: tạo, **sửa** (khoá lạc quan, bị khoá khi đã giữ/cam kết) và **huỷ** (xoá mềm, giữ audit); nhập từ văn bản dán → bản nháp có trích đoạn nguồn, người dùng duyệt rồi mới tạo.
+- **Ghép**: hard gate trước điểm; không có phương án thì không ép ghép; đội xe của tổ chức khác được che chi tiết.
+- **Booking**: hold có hạn, xác nhận theo từng bên, re-check, chống đặt trùng, `Idempotency-Key`.
+- **Sự kiện**: đầu vào xe (`VEHICLE_POSITION`, `VEHICLE_AVAILABLE`) và chuyến (`TRIP_*`, `ETA_UPDATED`) idempotent qua outbox; chỉ nhà vận tải sở hữu xe được báo.
+- **Lợi ích**: baseline chốt trước, estimated → measured → verified, xác minh phải do bên độc lập.
+
+## AI nhập liệu — đọc kỹ
+Mặc định dùng **bộ phân tích theo luật (không phải AI)**. Để dùng mô hình ngôn ngữ: `PIVOT_INTAKE_EXTRACTOR=llm` và `PIVOT_ANTHROPIC_API_KEY=<khoá của bạn>` (không đưa khoá vào mã/commit). Bộ LLM **chưa được chạy thử với API thật**. Dù dùng bộ nào, kết quả vẫn qua kiểm tra bằng luật và chỉ là bản nháp.

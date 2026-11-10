@@ -23,3 +23,6 @@ export function localInputDefault(offsetHours: number) {
   const d = new Date(nowMs() + offsetHours * 3600_000 + 7 * 3600_000)
   return d.toISOString().slice(0, 16)
 }
+
+/** ISO → giá trị cho <input type="datetime-local"> theo giờ Việt Nam (UTC+7). */
+export const isoToLocalInput = (iso: string) => new Date(new Date(iso).getTime() + 7 * 3600_000).toISOString().slice(0, 16)

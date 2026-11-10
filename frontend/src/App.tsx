@@ -46,7 +46,7 @@ function Shell() {
       </nav>
       <main>
         {fatal && <ErrorNote error={fatal} />}
-        {route === 'request' && <Request go={go} />}
+        {route === 'request' && <Request go={go} query={query} />}
         {route === 'fleet' && <Fleet go={go} />}
         {route === 'recommend' && <Recommend go={go} query={query} />}
         {route === 'confirm' && <Confirm />}

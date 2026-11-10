@@ -45,11 +45,16 @@ def test_only_measured_can_be_verified_by_a_party(client):
     _completed(client, actual=12.5, code="LOT-A-002")
     measured = next(i for i in _ledger(client)["items"] if i["status"] == "measured")
     assert measured["can_verify"] is True
+    carrier_view = next(i for i in _ledger(client, "carrier_b")["items"] if i["id"] == measured["id"])
+    assert carrier_view["can_verify"] is False                       # nhà vận tải không thấy nút xác minh
     assert client.post(f"/v1/benefits/{measured['id']}/verify", headers=auth("dispatch")).status_code == 403
     assert client.post(f"/v1/benefits/{measured['id']}/verify", headers=auth("node_c")).status_code in (403, 404)
-    ok = client.post(f"/v1/benefits/{measured['id']}/verify", headers=auth("carrier_b"))
-    assert ok.status_code == 200 and ok.json()["status"] == "verified" and "Minh" in ok.json()["verifier"]
-    assert client.post(f"/v1/benefits/{measured['id']}/verify", headers=auth("carrier_b")).json()["status"] == "verified"  # idempotent
+    # bên báo số đo (nhà vận tải) KHÔNG được tự xác minh; chỉ đối tác độc lập (chủ hàng) xác minh
+    self_v = client.post(f"/v1/benefits/{measured['id']}/verify", headers=auth("carrier_b"))
+    assert self_v.status_code == 403 and self_v.json()["detail"]["code"] == "NOT_INDEPENDENT"
+    ok = client.post(f"/v1/benefits/{measured['id']}/verify", headers=auth("shipper_a"))
+    assert ok.status_code == 200 and ok.json()["status"] == "verified" and "Nguyên" in ok.json()["verifier"]
+    assert client.post(f"/v1/benefits/{measured['id']}/verify", headers=auth("shipper_a")).json()["status"] == "verified"  # idempotent
     assert _ledger(client)["totals"]["verified"]["count"] == 1
 
 
@@ -145,3 +150,39 @@ def test_demo_endpoints_are_dispatcher_only_and_reset_is_complete(client):
         for model in (m.Proposal, m.Event, m.BenefitLedger, m.OutboxJob, m.Decision):
             assert s.execute(select(func.count()).select_from(model)).scalar_one() == 0, model.__name__
     assert client.get(f"/v1/proposals/{prop['id']}", headers=auth("shipper_a")).status_code == 404
+
+
+def test_forwarder_cannot_self_verify_when_no_independent_party(client):
+    """Lô của B do chính B chở (forwarder): cùng một tổ chức vừa báo vừa hưởng → không có bên độc lập → dừng ở 'measured'."""
+    prop = match(client, "carrier_b", "LOT-B-011")["proposals"][0]
+    act(client, "carrier_b", prop, "hold")
+    act(client, "carrier_b", prop["id"], "accept"); act(client, "node_c", prop["id"], "accept"); run_worker(client)
+    post_event(client, "carrier_b", prop["id"], "TRIP_STARTED"); run_worker(client)
+    post_event(client, "carrier_b", prop["id"], "TRIP_COMPLETED", {"actual_empty_km": 4.0}); run_worker(client)
+    row = _ledger(client, "carrier_b")["items"][0]
+    assert row["status"] == "measured" and row["can_verify"] is False and row["verifier_independent_available"] is False
+    r = client.post(f"/v1/benefits/{row['id']}/verify", headers=auth("carrier_b"))
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "NO_INDEPENDENT_VERIFIER"
+
+
+def test_only_the_carrier_that_owns_the_vehicle_can_report_trip_events(client):
+    prop = match(client, "shipper_a", "LOT-A-001")["proposals"][0]
+    confirm_all(client, prop); run_worker(client)
+    for user in ("shipper_a", "shipper_a2", "node_c", "dispatch"):
+        r = post_event(client, user, prop["id"], "TRIP_COMPLETED", {"actual_empty_km": 0})
+        assert r.status_code == 403, (user, r.status_code)       # không bên nào khác được khai số đo
+    assert get(client, "shipper_a", prop["id"])["status"] == "confirmed"
+    assert _ledger(client)["items"] == []
+
+
+def test_measurements_and_payloads_are_validated_at_ingest(client):
+    prop = match(client, "shipper_a", "LOT-A-001")["proposals"][0]
+    confirm_all(client, prop); run_worker(client)
+    post_event(client, "carrier_b", prop["id"], "TRIP_STARTED"); run_worker(client)
+    for bad in ({"actual_empty_km": -500}, {"actual_empty_km": 99999}, {"actual_empty_km": "abc"}, {"actual_empty_km": True}):
+        assert post_event(client, "carrier_b", prop["id"], "TRIP_COMPLETED", bad).status_code == 422, bad
+    for bad in ({}, {"delay_minutes": "abc"}, {"delay_minutes": -5}, {"delay_minutes": 0}, {"delay_minutes": 99999}):
+        assert post_event(client, "carrier_b", prop["id"], "ETA_UPDATED", bad).status_code == 422, bad
+    from sqlalchemy import func
+    with SessionLocal() as s:  # sự kiện sai không được lưu, không để lại job độc
+        assert s.execute(select(func.count()).select_from(m.OutboxJob).where(m.OutboxJob.status == "failed")).scalar_one() == 0

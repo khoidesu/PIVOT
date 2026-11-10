@@ -145,3 +145,11 @@ tr[aria-selected='true'] td { font-weight: 600; }
 /* không cho phần tử lưới/flex làm tràn ngang (bảng/chuỗi dài tự cuộn trong khung của nó) */
 main > *, .grid2 > *, .grid3 > *, .split > *, .card, .stack > * { min-width: 0; }
 .card-h h1, .card-h h2 { overflow-wrap: anywhere; }
+
+textarea { border: 1px solid #cdd6da; border-radius: 10px; padding: 10px 12px; background: #fff; width: 100%; min-height: 96px; resize: vertical; }
+textarea:focus { border-color: var(--teal); }
+label.review input, label.review select { border-color: #e0a63a; background: var(--unknown-bg); }
+label.review { color: var(--unknown); }
+label.check { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+label.check input { width: 18px; min-height: 18px; }
+q { quotes: '“' '”'; background: #fff8e8; padding: 0 4px; border-radius: 4px; }

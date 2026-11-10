@@ -27,6 +27,21 @@ describe('i18n', () => {
     const reserved = reasonText({ gate: 'vehicle_available', status: 'FAIL', reason_code: 'VEHICLE_UNAVAILABLE', detail: { reserved: true } }, t, (s) => s)
     expect(reserved).toMatch(/held\/committed/)
   })
+  it('chi tiết đội xe đã bị che → dùng template ngắn, không còn placeholder', () => {
+    for (const lang of ['vi', 'en'] as const) {
+      const t = (k: string, p?: Record<string, string | number>) => translate(lang, k, p)
+      const txt = reasonText({ gate: 'capacity', status: 'FAIL', reason_code: 'CAPACITY_EXCEEDED', detail: { weight_kg: 20000, volume_m3: 50, redacted: true } }, t, (x) => x)
+      expect(txt).toContain('20000')
+      expect(txt).not.toMatch(/\{\w+\}/)
+      expect(txt).not.toMatch(/capacity_kg/)
+    }
+  })
+  it('mọi mã ghi chú nhập liệu và mã lỗi mới đều có bản dịch', () => {
+    for (const lang of ['vi', 'en'] as const) {
+      for (const n of ['MISSING', 'AMBIGUOUS', 'QUOTE_NOT_FOUND_IN_SOURCE', 'INVALID_VALUE', 'RELATIVE_DATE_ASSUMED', 'TIME_ORDER_INVALID']) expect(dictionaries[lang][`in.note.${n}`], `${lang}:${n}`).toBeTruthy()
+      for (const c of ['SHIPMENT_LOCKED', 'NOT_INDEPENDENT', 'NO_INDEPENDENT_VERIFIER', 'NOT_MEASURED', 'VERSION_CONFLICT']) expect(dictionaries[lang][`err.${c}`], `${lang}:${c}`).toBeTruthy()
+    }
+  })
   it('mã lỗi không biết vẫn hiển thị được (không vỡ UI)', () => {
     const t = (k: string, p?: Record<string, string | number>) => translate('vi', k, p)
     expect(reasonText({ gate: 'x', status: 'FAIL', reason_code: 'NEW_CODE', detail: {} }, t, (s) => s)).toContain('x')

@@ -88,7 +88,7 @@ export function Benefits({ query }: { query: URLSearchParams }) {
                   ? <Note kind="ok">{t('bf.verified', { who: detail.verifier ?? '', time: fmtTime(detail.verified_at) })}</Note>
                   : <div className="stack">
                       <div><button className="btn primary" disabled={!detail.can_verify || busy} onClick={verify}>{t('bf.verify')}</button></div>
-                      {!detail.can_verify && <span className="footnote">{detail.status === 'estimated' ? t('bf.cantEstimated') : me && !['shipper', 'carrier'].includes(me.role) ? t('bf.cantRole') : ''}</span>}
+                      {!detail.can_verify && <span className="footnote">{detail.status === 'estimated' ? t('bf.cantEstimated') : !detail.verifier_independent_available ? t('bf.noIndependent') : me && !['shipper', 'carrier'].includes(me.role) ? t('bf.cantRole') : t('bf.cantReporter')}</span>}
                     </div>}
                 {detail.proposal_id && <a className="btn sm" href={`#/timeline?p=${detail.proposal_id}`} style={{ textAlign: 'center', textDecoration: 'none' }}>{t('bf.openTimeline')}</a>}
               </>)}

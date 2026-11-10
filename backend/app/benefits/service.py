@@ -58,10 +58,26 @@ def _orgs(session: Session, row: m.BenefitLedger):
     return prop, ship, veh, bk.party_orgs(ship, veh, slot)
 
 
-def can_verify(actor: Actor, orgs: dict, row: m.BenefitLedger) -> bool:
-    """Đối tác xác nhận: chủ lô hoặc nhà vận tải của chuyến (vai shipper/carrier); điều phối viên và node không xác minh."""
+def reporter_org(session: Session, row: m.BenefitLedger):
+    """Tổ chức đã báo số đo (tenant của sự kiện bằng chứng)."""
+    for ref in row.evidence_refs or []:
+        if ref.get("type") == "event":
+            ev = session.get(m.Event, uuid.UUID(ref["id"]))
+            if ev:
+                return ev.tenant_id
+    return None
+
+
+def independent_verifiers(session: Session, orgs: dict, row: m.BenefitLedger) -> set:
+    """Bên xác minh phải ĐỘC LẬP với bên báo số đo: {chủ lô, nhà vận tải} trừ tổ chức đã báo.
+    Forwarder tự sở hữu cả lô lẫn xe → không có bên độc lập → khoản dừng ở 'measured'."""
+    return {o for o in (orgs.get("shipper"), orgs.get("carrier")) if o} - {reporter_org(session, row)}
+
+
+def can_verify(session: Session, actor: Actor, orgs: dict, row: m.BenefitLedger) -> bool:
+    """Đối tác độc lập xác nhận; điều phối viên, node và chính bên báo số đo không xác minh."""
     return (row.status == "measured" and actor.role in ("shipper", "carrier")
-            and actor.org_id in (orgs.get("shipper"), orgs.get("carrier")))
+            and actor.org_id in independent_verifiers(session, orgs, row))
 
 
 def visible(actor: Actor, orgs: dict) -> bool:
@@ -79,7 +95,8 @@ def view(session: Session, actor: Actor, row: m.BenefitLedger, detail: bool = Fa
         "unit": "km", "unit_rate": row.unit_rate, "currency": row.currency, "net_vnd": net_vnd(row),
         "status": row.status, "baseline_id": row.baseline_id, "assumption_version": row.assumption_version,
         "beneficiary_org_name": org.name if org else None, "verifier": row.verifier, "verified_at": row.verified_at,
-        "can_verify": can_verify(actor, orgs, row), "is_simulated": True,
+        "can_verify": can_verify(session, actor, orgs, row),
+        "verifier_independent_available": bool(independent_verifiers(session, orgs, row)), "is_simulated": True,
     }
     if detail:
         aset = session.execute(select(m.AssumptionSet).where(m.AssumptionSet.version == row.assumption_version)).scalar_one_or_none()
@@ -111,6 +128,11 @@ def verify(session: Session, actor: Actor, benefit_id: uuid.UUID, now: datetime)
         return row  # idempotent
     if row.status != "measured":
         raise bk.BookingError("NOT_MEASURED", "Only a measured benefit can be verified (estimates cannot)", 409)
+    independents = independent_verifiers(session, orgs, row)
+    if not independents:
+        raise bk.BookingError("NO_INDEPENDENT_VERIFIER", "The reporting organization is the only party: no independent verifier", 409)
+    if actor.org_id not in independents:
+        raise bk.BookingError("NOT_INDEPENDENT", "The organization that reported the measurement cannot verify it", 403)
     row.status, row.verifier, row.verified_at = "verified", f"{actor.user_name} ({actor.org_name})", now
     session.flush()
     return row

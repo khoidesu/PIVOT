@@ -12,7 +12,9 @@ from ..access import (
     CAN_CREATE_SHIPMENT, get_visible_shipment, price_visible_ids, visible_shipments_stmt,
     visible_vehicles_stmt,
 )
+from .. import shipment_ops
 from ..assumptions import get_active
+from ..booking.service import BookingError
 from ..auth import Actor, current_actor
 from ..config import settings
 from ..db import get_session
@@ -93,7 +95,14 @@ def create_shipment(body: s.ShipmentCreate, actor: Actor = Depends(current_actor
         if getattr(body, field) not in known:
             raise HTTPException(status_code=422, detail=f"{field} does not exist")
     # mã lô chỉ unique TRONG tenant → không lộ lô của tổ chức khác qua lỗi trùng mã
-    ship = m.Shipment(tenant_id=actor.org_id, status="open", is_simulated=True, **body.model_dump())
+    fields = body.model_dump(exclude={"draft_id"})
+    draft_ev = None
+    if body.draft_id is not None:  # tạo từ bản nháp nhập liệu: bản nháp phải do chính tổ chức này tạo
+        draft_ev = session.execute(select(m.Event).where(
+            m.Event.entity_type == "intake_draft", m.Event.entity_id == body.draft_id, m.Event.tenant_id == actor.org_id)).scalar_one_or_none()
+        if draft_ev is None:
+            raise HTTPException(status_code=422, detail="draft_id does not exist")
+    ship = m.Shipment(tenant_id=actor.org_id, status="open", is_simulated=True, **fields)
     session.add(ship)
     try:
         session.flush()
@@ -102,7 +111,44 @@ def create_shipment(body: s.ShipmentCreate, actor: Actor = Depends(current_actor
         raise HTTPException(status_code=409, detail="Shipment code already exists") from None
     session.add(m.ShipmentParticipant(shipment_id=ship.id, org_id=actor.org_id, role=actor.role,
                                       can_see_price=True))
+    if draft_ev is not None:  # ghi nhận người duyệt + những trường còn cần xem lại của bản nháp
+        now = datetime.now(timezone.utc)
+        session.add(m.Event(tenant_id=actor.org_id, entity_type="shipment", entity_id=ship.id, event_type="SHIPMENT_CREATED_FROM_DRAFT",
+                            occurred_at=now, received_at=now, source_system="pivot.intake", source_event_id=f"created:{ship.id}",
+                            payload={"draft_id": str(body.draft_id), "reviewed_by": str(actor.user_id),
+                                     "draft_needs_review": draft_ev.payload.get("needs_review", [])},
+                            correlation_id=str(actor.user_id)))
     session.commit()
+    return shipment_out_many(session, actor, [ship])[0]
+
+
+def _ops_http(e: BookingError) -> HTTPException:
+    return HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message, "reasons": []})
+
+
+@router.patch("/shipments/{shipment_id}", response_model=s.ShipmentOut)
+def update_shipment(shipment_id: uuid.UUID, body: s.ShipmentUpdate, actor: Actor = Depends(current_actor),
+                    session: Session = Depends(get_session)):
+    """Sửa yêu cầu (chủ lô, khi còn open và chưa có đề xuất giữ/cam kết). Khoá lạc quan bằng `version`."""
+    changes = body.model_dump(exclude={"version"}, exclude_none=True)
+    try:
+        ship = shipment_ops.update(session, actor, shipment_id, changes, body.version, datetime.now(timezone.utc))
+        session.commit()
+    except BookingError as e:
+        session.rollback()
+        raise _ops_http(e) from None
+    return shipment_out_many(session, actor, [ship])[0]
+
+
+@router.delete("/shipments/{shipment_id}", response_model=s.ShipmentOut)
+def cancel_shipment(shipment_id: uuid.UUID, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    """Huỷ yêu cầu (xoá mềm: giữ vết audit). Không huỷ được khi đã có đề xuất đang giữ/đã cam kết."""
+    try:
+        ship = shipment_ops.cancel(session, actor, shipment_id, datetime.now(timezone.utc))
+        session.commit()
+    except BookingError as e:
+        session.rollback()
+        raise _ops_http(e) from None
     return shipment_out_many(session, actor, [ship])[0]
 
 

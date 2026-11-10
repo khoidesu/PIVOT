@@ -17,7 +17,7 @@ def _codes(run):
 
 
 def test_match_ranks_feasible_vehicles_and_explains_rejections(client):
-    run = match(client, "shipper_a", "LOT-A-001")
+    run = match(client, "dispatch", "LOT-A-001")  # điều phối viên thấy đủ biển số + chi tiết
     assert run["status"] == "proposals" and run["eta_method"] == "rule-based"
     assert run["evaluated_vehicles"] == 10
     plates = [p["vehicle"]["plate"] for p in run["proposals"]]
@@ -28,6 +28,39 @@ def test_match_ranks_feasible_vehicles_and_explains_rejections(client):
     assert gates.DATA_STALE in rej["51C-100.08"]               # vị trí quá hạn
     assert gates.PICKUP_WINDOW_MISSED in rej["51C-100.09"]     # trễ giờ lấy hàng
     assert gates.VEHICLE_UNAVAILABLE in rej["51C-100.10"]      # offline
+
+
+def test_other_orgs_fleet_details_are_redacted_for_the_shipper(client):
+    """Governance (DRAFT): chủ hàng không thấy chi tiết đội xe của nhà vận tải khác, chỉ mã lý do + dữ kiện của lô mình."""
+    run = match(client, "shipper_a", "LOT-A-001")
+    assert run["rejections"] and all("•••" in r["plate"] for r in run["rejections"])
+    leaked = {"capacity_kg", "capacity_m3", "vehicle_accepts", "age_minutes", "eta_pickup", "status"}
+    for r in run["rejections"]:
+        for x in r["reasons"]:
+            assert x["detail"].get("redacted") is True and not leaked & set(x["detail"]), x
+    codes = {x["reason_code"] for r in run["rejections"] for x in r["reasons"]}
+    assert {"CAPACITY_EXCEEDED", "CARGO_INCOMPATIBLE", "DATA_STALE"} <= codes          # lý do vẫn đủ để giải thích
+    # nhà vận tải sở hữu xe và điều phối viên thấy đủ
+    own = match(client, "carrier_b", "LOT-B-011")
+    assert any(not r["plate"].count("•") for r in own["rejections"])
+    stored = client.get(f"/v1/proposals/{run['proposals'][0]['id']}", headers=auth("shipper_a")).json()
+    assert all("•••" in r["plate"] for r in stored["rejections"])                       # cũng che khi xem lại đề xuất
+    full = client.get(f"/v1/proposals/{run['proposals'][0]['id']}", headers=auth("dispatch")).json()
+    assert any("capacity_kg" in x["detail"] for r in full["rejections"] for x in r["reasons"])
+
+
+def test_proposal_list_uses_a_constant_number_of_queries(client):
+    for code in ("LOT-A-001", "LOT-A-002", "LOT-A-004", "LOT-A-009"):
+        match(client, "shipper_a", code)
+    counts = []
+    def hook(*a, **k): counts.append(1)
+    sa_event.listen(engine, "before_cursor_execute", hook)
+    try:
+        r = client.get("/v1/proposals", headers=auth("shipper_a"))
+    finally:
+        sa_event.remove(engine, "before_cursor_execute", hook)
+    assert r.status_code == 200 and len(r.json()) >= 8
+    assert len(counts) <= 14, f"{len(counts)} queries for {len(r.json())} proposals"
 
 
 def test_rejected_candidates_are_never_scored(client):

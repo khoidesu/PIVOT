@@ -37,6 +37,7 @@ class ShipmentCreate(BaseModel):
     cutoff_at: AwareDatetime
     price_vnd: int | None = Field(default=None, ge=0)
     customer_name: str | None = None
+    draft_id: uuid.UUID | None = None  # nếu tạo từ bản nháp nhập liệu đã được người dùng duyệt
 
     @model_validator(mode="after")
     def _time_order(self):
@@ -195,6 +196,7 @@ class ActionIn(BaseModel):
 
 
 class EventIn(BaseModel):
+    entity_type: str = Field(default="proposal", pattern="^(proposal|vehicle)$")
     entity_id: uuid.UUID
     event_type: str = Field(min_length=3, max_length=40)
     occurred_at: AwareDatetime
@@ -288,6 +290,7 @@ class BenefitOut(BaseModel):
     verifier: str | None
     verified_at: datetime | None
     can_verify: bool
+    verifier_independent_available: bool = True
     is_simulated: bool
     evidence: list[dict[str, Any]] = []
     evidence_refs: list[dict[str, Any]] = []
@@ -299,3 +302,42 @@ class BenefitOut(BaseModel):
 class BenefitListOut(BaseModel):
     items: list[BenefitOut]
     totals: dict[str, dict[str, int]]
+
+
+class ShipmentUpdate(BaseModel):
+    """Sửa yêu cầu: chỉ các trường gửi lên được đổi; `version` bắt buộc (khoá lạc quan)."""
+    version: int = Field(ge=1)
+    cargo_type: str | None = Field(default=None, min_length=2, max_length=30)
+    weight_kg: float | None = Field(default=None, gt=0)
+    volume_m3: float | None = Field(default=None, gt=0)
+    origin_location_id: uuid.UUID | None = None
+    dest_location_id: uuid.UUID | None = None
+    ready_at: AwareDatetime | None = None
+    pickup_deadline: AwareDatetime | None = None
+    cutoff_at: AwareDatetime | None = None
+    price_vnd: int | None = Field(default=None, ge=0)
+    customer_name: str | None = Field(default=None, max_length=200)
+
+
+class IntakeIn(BaseModel):
+    text: str = Field(min_length=1, max_length=8000)
+
+
+class IntakeFieldOut(BaseModel):
+    value: Any = None
+    display: str | None = None
+    source: dict[str, Any] | None = None
+    status: str  # ok | needs_review
+    notes: list[str] = []
+
+
+class IntakeDraftOut(BaseModel):
+    draft_id: str
+    extractor: dict[str, str]
+    source: dict[str, Any]
+    reference_time: str
+    fields: dict[str, IntakeFieldOut]
+    needs_review: list[str]
+    complete: bool
+    suspicious_instructions: bool
+    is_draft_only: bool

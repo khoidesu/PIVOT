@@ -17,24 +17,46 @@ from .. import models as m
 from ..auth import Actor
 from ..benefits import service as benefits
 from ..booking import service as bk
+from . import payloads
 
-SUPPORTED = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED"}
+SUPPORTED = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED", "VEHICLE_POSITION", "VEHICLE_AVAILABLE"}
+TRIP_EVENTS = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED"}   # chỉ nhà vận tải sở hữu xe được báo
+VEHICLE_EVENTS = {"VEHICLE_POSITION", "VEHICLE_AVAILABLE"}        # chỉ nhà vận tải sở hữu xe được báo
 FINAL_QUALITY = {"applied", "late", "invalid"}
 
 
-def ingest(session: Session, actor: Actor, body: dict, now: datetime) -> tuple[m.Event, bool]:
-    prop = session.get(m.Proposal, body["entity_id"])
+def _authorize(session: Session, actor: Actor, entity_type: str, entity_id, event_type: str):
+    """Trả (entity). Nguồn dữ liệu gốc phải đúng chủ thể: số đo/vị trí/ETA chỉ do nhà vận tải sở hữu xe báo."""
+    if entity_type == "vehicle":
+        veh = session.get(m.Vehicle, entity_id)
+        if veh is None or veh.tenant_id != actor.org_id or actor.role != "carrier":
+            raise bk.BookingError("NOT_FOUND", "Entity not found", 404)
+        if event_type not in VEHICLE_EVENTS:
+            raise bk.BookingError("VALIDATION", f"{event_type} is not a vehicle event", 422)
+        return veh
+    prop = session.get(m.Proposal, entity_id)
     if prop is None:
         raise bk.BookingError("NOT_FOUND", "Entity not found", 404)
-    ship = session.get(m.Shipment, prop.shipment_id)
-    veh = session.get(m.Vehicle, prop.vehicle_id)
+    ship, veh = session.get(m.Shipment, prop.shipment_id), session.get(m.Vehicle, prop.vehicle_id)
     slot = session.get(m.Slot, prop.slot_id) if prop.slot_id else None
-    if actor.org_id not in bk.party_orgs(ship, veh, slot).values():  # chỉ bên liên quan được báo sự kiện
+    if actor.org_id not in bk.party_orgs(ship, veh, slot).values():  # không phải bên liên quan → không biết là có tồn tại
         raise bk.BookingError("NOT_FOUND", "Entity not found", 404)
+    if event_type in VEHICLE_EVENTS:
+        raise bk.BookingError("VALIDATION", f"{event_type} must target a vehicle", 422)
+    if event_type in TRIP_EVENTS and not (actor.role == "carrier" and actor.org_id == veh.tenant_id):
+        raise bk.BookingError("FORBIDDEN", "Only the carrier that owns the vehicle can report trip events", 403)
+    return prop
 
-    ev = m.Event(tenant_id=actor.org_id, entity_type="proposal", entity_id=prop.id, event_type=body["event_type"],
+
+def ingest(session: Session, actor: Actor, body: dict, now: datetime) -> tuple[m.Event, bool]:
+    entity_type = body.get("entity_type", "proposal")
+    _authorize(session, actor, entity_type, body["entity_id"], body["event_type"])
+    payload = payloads.validate(session, body["event_type"], body.get("payload") or {}, body["occurred_at"], now) \
+        if body["event_type"] in SUPPORTED else (body.get("payload") or {})
+
+    ev = m.Event(tenant_id=actor.org_id, entity_type=entity_type, entity_id=body["entity_id"], event_type=body["event_type"],
                  occurred_at=body["occurred_at"], received_at=now, source_system=body["source_system"],
-                 source_event_id=body["source_event_id"], payload=body.get("payload") or {},
+                 source_event_id=body["source_event_id"], payload=payload,
                  correlation_id=body.get("correlation_id"),
                  quality_status="ok" if body["event_type"] in SUPPORTED else "unsupported")
     try:
@@ -53,6 +75,32 @@ def ingest(session: Session, actor: Actor, body: dict, now: datetime) -> tuple[m
     return ev, False
 
 
+def _apply_vehicle_event(session: Session, ev: m.Event) -> str:
+    veh = session.execute(select(m.Vehicle).where(m.Vehicle.id == ev.entity_id).with_for_update()).scalar_one()
+    win = session.execute(select(m.AvailabilityWindow).where(m.AvailabilityWindow.vehicle_id == veh.id)
+                          .order_by(m.AvailabilityWindow.free_from.desc()).with_for_update()).scalars().first()
+    p = ev.payload or {}
+    if ev.event_type == "VEHICLE_POSITION":
+        if veh.position_updated_at is not None and ev.occurred_at <= veh.position_updated_at:
+            return "late"  # tin cũ hơn dữ liệu đang có: không kéo tuổi dữ liệu lùi
+        veh.position_updated_at = min(ev.occurred_at, ev.received_at)
+        if p.get("location_id") and win is not None:
+            win.location_id = uuid.UUID(p["location_id"])
+        return "applied"
+    # VEHICLE_AVAILABLE: bỏ qua nếu đã có tin khả dụng MỚI HƠN đã áp dụng
+    newer = session.execute(select(m.Event.id).where(
+        m.Event.entity_type == "vehicle", m.Event.entity_id == veh.id, m.Event.event_type == "VEHICLE_AVAILABLE",
+        m.Event.quality_status == "applied", m.Event.occurred_at > ev.occurred_at)).first()
+    if newer:
+        return "late"
+    loc, a, b = uuid.UUID(p["location_id"]), datetime.fromisoformat(p["free_from"]), datetime.fromisoformat(p["free_to"])
+    if win is None:
+        session.add(m.AvailabilityWindow(vehicle_id=veh.id, location_id=loc, free_from=a, free_to=b))
+    else:
+        win.location_id, win.free_from, win.free_to = loc, a, b
+    return "applied"
+
+
 def _exception(session: Session, prop: m.Proposal, ev: m.Event, exc_type: str, detail: dict) -> None:
     for e in session.execute(select(m.ExceptionRecord).where(m.ExceptionRecord.proposal_id == prop.id)).scalars():
         if (e.detail or {}).get("event_id") == str(ev.id):
@@ -65,6 +113,10 @@ def apply_event(session: Session, event_id: uuid.UUID, now: datetime) -> str:
     ev = session.get(m.Event, event_id)
     if ev is None or ev.quality_status in FINAL_QUALITY:
         return "skipped"  # đã xử lý rồi → không nhân đôi tác động
+    if ev.entity_type == "vehicle":
+        ev.quality_status = _apply_vehicle_event(session, ev)
+        session.flush()
+        return ev.quality_status
     prop = bk.lock_proposal(session, ev.entity_id)
     ship, veh, slot = bk.lock_resources(session, prop)
     status = prop.status

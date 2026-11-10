@@ -140,14 +140,21 @@ def test_confirmed_outbox_job_is_written_with_the_state_change(client):
         assert s.execute(select(m.OutboxJob.status).where(m.OutboxJob.dedupe_key == f"proposal.confirmed:{pid}")).scalar_one() == "done"
 
 
-def test_event_validation_and_source_event_id_not_leaked_across_tenants(client):
+def test_event_validation_authorization_and_unknown_types(client):
     pid = _confirmed(client)["id"]
     bad = client.post("/v1/events", headers=auth("carrier_b"), json={
         "entity_id": pid, "event_type": "TRIP_STARTED", "occurred_at": "2026-01-01T00:00:00",  # thiếu múi giờ
         "source_system": "x", "source_event_id": "y"})
     assert bad.status_code == 422
+    future = post_event(client, "carrier_b", pid, "TRIP_STARTED")  # hợp lệ
+    assert future.status_code == 202
+    from datetime import timedelta
+    far = client.post("/v1/events", headers=auth("carrier_b"), json={
+        "entity_id": pid, "event_type": "TRIP_STARTED", "occurred_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+        "source_system": "x", "source_event_id": "future-1"})
+    assert far.status_code == 422                                       # sự kiện từ tương lai là dữ liệu lỗi
     assert post_event(client, "carrier_b", str(uuid.uuid4()), "TRIP_STARTED").status_code == 404
-    assert post_event(client, "carrier_b", pid, "TRIP_STARTED", source_event_id="shared", source_system="s").status_code == 202
-    assert post_event(client, "shipper_a", pid, "TRIP_STARTED", source_event_id="shared", source_system="s").status_code == 409
+    for user in ("shipper_a", "node_c", "dispatch"):                    # chỉ nhà vận tải sở hữu xe được báo sự kiện chuyến
+        assert post_event(client, user, pid, "TRIP_STARTED").status_code == 403
     unknown = post_event(client, "carrier_b", pid, "SOMETHING_ELSE")
     assert unknown.status_code == 202 and unknown.json()["quality_status"] == "unsupported"

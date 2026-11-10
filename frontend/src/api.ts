@@ -54,7 +54,13 @@ export interface MatchRun {
 export interface ShipmentCreate {
   code: string; cargo_type: string; weight_kg: number; volume_m3: number; origin_location_id: string
   dest_location_id: string; ready_at: string; pickup_deadline: string; cutoff_at: string
-  price_vnd?: number | null; customer_name?: string | null
+  price_vnd?: number | null; customer_name?: string | null; draft_id?: string | null
+}
+export type ShipmentUpdate = Partial<Omit<ShipmentCreate, 'code' | 'draft_id'>> & { version: number }
+export interface IntakeField { value: unknown; display: string | null; source: { quote: string; start: number; end: number } | null; status: 'ok' | 'needs_review'; notes: string[] }
+export interface IntakeDraft {
+  draft_id: string; extractor: { name: string; kind: string }; source: { length: number; sha256: string }; reference_time: string
+  fields: Record<string, IntakeField>; needs_review: string[]; complete: boolean; suspicious_instructions: boolean; is_draft_only: boolean
 }
 
 export interface TimelineItem {
@@ -76,7 +82,7 @@ export interface Benefit {
   id: string; proposal_id: string | null; shipment_code: string; vehicle_plate: string; cost_category: string
   quantity_before: number; quantity_after: number; unit: string; unit_rate: number; currency: string; net_vnd: number
   status: 'estimated' | 'measured' | 'verified'; baseline_id: string; assumption_version: string
-  beneficiary_org_name: string | null; verifier: string | null; verified_at: string | null; can_verify: boolean; is_simulated: boolean
+  beneficiary_org_name: string | null; verifier: string | null; verified_at: string | null; can_verify: boolean; verifier_independent_available: boolean; is_simulated: boolean
   evidence: { id: string; event_type: string; source_system: string; occurred_at: string; received_at: string; quality_status: string; payload: Record<string, unknown> }[]
   baseline: { id: string; empty_km: number; cost_per_km_vnd: number; fixed_at: string } | null
   assumptions: Record<string, unknown>; formula: { before: number; after: number; rate: number } | null
@@ -140,6 +146,14 @@ export const api = {
   vehicles: () => request<Vehicle[]>('/v1/vehicles'),
   slots: () => request<Slot[]>('/v1/slots'),
   createShipment: (b: ShipmentCreate) => post<Shipment>('/v1/shipments', b),
+  updateShipment: (id: string, b: ShipmentUpdate) => request<Shipment>(`/v1/shipments/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
+  cancelShipment: (id: string) => request<Shipment>(`/v1/shipments/${id}`, { method: 'DELETE' }),
+  intakeDraft: (text: string) => post<IntakeDraft>('/v1/intake/drafts', { text }),
+  sendVehicleEvent: (vehicleId: string, event_type: 'VEHICLE_POSITION', payload: Record<string, unknown> = {}) =>
+    post<{ event_id: string; duplicate: boolean }>('/v1/events', {
+      entity_type: 'vehicle', entity_id: vehicleId, event_type, payload, occurred_at: new Date().toISOString(),
+      source_system: 'ui-carrier', source_event_id: crypto.randomUUID(),
+    }),
   match: (shipment_id: string) => post<MatchRun>('/v1/match-runs', { shipment_id }),
   proposals: () => request<Proposal[]>('/v1/proposals'),
   act: (p: Pick<Proposal, 'id' | 'version'>, action: 'hold' | 'accept' | 'reject') =>

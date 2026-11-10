@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import benefits, core, demo, events, matching
+from .routers import benefits, core, demo, events, intake, matching
 from .worker import process_pending
 
 
@@ -41,6 +41,7 @@ app.include_router(core.router)
 app.include_router(matching.router)
 app.include_router(events.router)
 app.include_router(benefits.router)
+app.include_router(intake.router)
 app.include_router(demo.router)
 
 

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from . import models as m
 from .db import SessionLocal
+from .booking.service import expire_stale
 from .events import service as events
 
 log = logging.getLogger("pivot.worker")
@@ -39,6 +40,9 @@ def process_pending(factory: sessionmaker = SessionLocal, limit: int = 50, now: 
                     fail_hook=None) -> dict:
     """Xử lý tối đa `limit` job đến hạn. fail_hook(job) chỉ dùng để test sự cố worker chết giữa chừng."""
     stats = {"done": 0, "retry": 0, "failed": 0}
+    with factory() as s:  # dọn hold/đề xuất quá hạn (trả slot) — GET không còn ghi DB
+        expire_stale(s, now or datetime.now(timezone.utc))
+        s.commit()
     for _ in range(limit):
         now_ = now or datetime.now(timezone.utc)
         with factory() as s:  # tx1: claim

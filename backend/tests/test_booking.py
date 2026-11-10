@@ -157,6 +157,7 @@ def test_expired_hold_releases_resources_and_blocks_accept(client):
     assert act(client, "node_c", held["id"], "accept").status_code == 409  # PROPOSAL_EXPIRED
     view = get(client, "shipper_a", held["id"])
     assert view["status"] == "expired" and not view["my_actions"]["accept"]
+    run_worker(client)                                                     # worker dọn hold quá hạn (GET không ghi DB)
     assert slot_remaining(prop["slot"]["id"]) == before                    # chỗ slot được trả lại
     other = match(client, "shipper_a", "LOT-A-002")["proposals"][0]        # tài nguyên giữ lại dùng được
     assert act(client, "shipper_a", other, "hold").status_code == 200

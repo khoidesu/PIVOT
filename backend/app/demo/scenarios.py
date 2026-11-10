@@ -118,9 +118,17 @@ def s3_stale(r: Run):
     run = r.match("LOT-A-001")
     stale = all(any(x["reason_code"] == "DATA_STALE" for x in rej["reasons"]) for rej in run["rejections"])
     r.step("Dữ liệu quá hạn → không tự đề xuất (mọi xe DATA_STALE)", run["status"] == "no_feasible_option" and stale, run["status"])
-    r.step("Đưa dữ liệu mô phỏng về trạng thái chuẩn (vị trí xe tươi lại)", r.req("phu", "POST", "/v1/demo/reset").status_code == 200)
+    vehicles = r.req("minh", "GET", "/v1/vehicles").json()
+    codes = []
+    for v in vehicles:  # nhà vận tải gửi sự kiện vị trí mới (nguồn dữ liệu thật của event-driven)
+        codes.append(r.req("minh", "POST", "/v1/events", {
+            "entity_type": "vehicle", "entity_id": v["id"], "event_type": "VEHICLE_POSITION", "payload": {},
+            "occurred_at": datetime.now(timezone.utc).isoformat(), "source_system": "gps-feed",
+            "source_event_id": str(uuid.uuid4())}).status_code)
+    r.step("Nhà vận tải gửi sự kiện VEHICLE_POSITION cho cả đội xe", all(c == 202 for c in codes), f"{len(codes)} sự kiện")
+    r.worker()
     again = r.match("LOT-A-001")
-    r.step("Sau khi dữ liệu tươi lại: ghép được", again["status"] == "proposals", again["status"])
+    r.step("Dữ liệu tươi lại qua sự kiện → ghép được (không cần reset)", again["status"] == "proposals", again["status"])
     return "#/fleet"
 
 
