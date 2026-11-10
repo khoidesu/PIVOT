@@ -13,6 +13,7 @@ from ..access import (
     visible_vehicles_stmt,
 )
 from .. import shipment_ops
+from ..admin import require_admin
 from ..assumptions import get_active
 from ..booking.service import BookingError
 from ..auth import Actor, current_actor
@@ -49,10 +50,11 @@ def meta(actor: Actor = Depends(current_actor), session: Session = Depends(get_s
     params = get_active(session).params
     return s.MetaOut(data_mode=settings.data_mode, is_simulated=True,
                      server_time=datetime.now(timezone.utc),
-                     stale_position_minutes=params["stale_position_minutes"])
+                     stale_position_minutes=params["stale_position_minutes"],
+                     admin_key_required=bool(settings.admin_key))
 
 
-@router.post("/demo/retime")
+@router.post("/demo/retime", dependencies=[Depends(require_admin)])
 def demo_retime(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     """Đưa dữ liệu MÔ PHỎNG về trạng thái tươi trước mỗi kịch bản demo. Chỉ điều phối viên, chỉ khi mock."""
     from ..seed import retime

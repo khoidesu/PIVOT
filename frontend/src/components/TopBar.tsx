@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError, DEMO_USERS, type UserKey } from '../api'
+import { api, ApiError, DEMO_USERS, getAdminKey, type UserKey } from '../api'
 import { useI18n } from '../i18n'
 import { fmtClock, nowMs } from '../fmt'
 import { useApp } from '../store'
@@ -46,7 +46,7 @@ export function TopBar() {
             ))}
           </div>
           {me?.role === 'dispatcher' && (
-            <button className="btn sm" onClick={retime} disabled={busy}>{t('topbar.retime')}</button>
+            <button className="btn sm" onClick={retime} disabled={busy || (!!meta?.admin_key_required && !getAdminKey())} title={meta?.admin_key_required && !getAdminKey() ? t('topbar.retimeNeedKey') : undefined}>{t('topbar.retime')}</button>
           )}
         </div>
         {msg && <div className="topbar-in"><span className="small muted" role="status">{msg}</span></div>}

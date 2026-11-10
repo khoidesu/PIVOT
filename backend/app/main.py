@@ -1,8 +1,11 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import os
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .routers import benefits, core, demo, events, intake, matching
@@ -30,9 +33,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="PIVOT / VSGA", version="0.2.0", lifespan=lifespan,
               description="Prototype điều phối logistics — dữ liệu MÔ PHỎNG (mock).")
 
+_origins = ["http://localhost:5173", "http://127.0.0.1:5173"] + [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -45,6 +49,26 @@ app.include_router(intake.router)
 app.include_router(demo.router)
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    return response
+
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
+
+def mount_static(application: FastAPI, directory: str | None) -> bool:
+    """Phục vụ giao diện đã build ở "/" (một link duy nhất). Gắn SAU các router API nên không bao giờ che /v1, /healthz, /docs."""
+    if directory and os.path.isdir(directory):
+        application.mount("/", StaticFiles(directory=directory, html=True), name="web")
+        return True
+    return False
+
+
+mount_static(app, settings.static_dir)

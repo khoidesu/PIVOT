@@ -1,0 +1,14 @@
+.git
+.claude
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+backend/.venv
+backend/.pytest_cache
+backend/.env*
+frontend/.env*
+pgdata
+docs
+*.md
+!backend/requirements.txt

@@ -1,0 +1,24 @@
+# Render Blueprint: một web service (Docker: API + giao diện) + PostgreSQL.
+# Dùng: Render Dashboard → New → Blueprint → chọn repo khoidesu/PIVOT. Xem docs/DEPLOY.md.
+databases:
+  - name: pivot-db
+    databaseName: pivot
+    user: pivot
+    plan: free            # kiểm tra điều khoản gói miễn phí hiện hành của Render (có thể hết hạn/giới hạn)
+
+services:
+  - type: web
+    name: pivot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free            # gói miễn phí có thể "ngủ" khi ít truy cập → lần mở đầu chậm
+    healthCheckPath: /healthz
+    envVars:
+      - key: PIVOT_DATABASE_URL
+        fromDatabase:
+          name: pivot-db
+          property: connectionString
+      - key: PIVOT_ADMIN_KEY
+        generateValue: true       # Render sinh mã ngẫu nhiên; xem trong Dashboard → Environment
+      - key: PIVOT_DATA_MODE
+        value: mock

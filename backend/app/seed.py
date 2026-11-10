@@ -207,11 +207,22 @@ def retime(session: Session, now: datetime | None = None) -> timedelta:
     return delta
 
 
+def seed_if_empty(session: Session) -> dict | None:
+    """Triển khai lần đầu: seed khi DB trống; các lần khởi động sau KHÔNG đụng vào dữ liệu người dùng đã nhập."""
+    if session.query(m.Organization).count() > 0:
+        return None
+    return seed(session)
+
+
 def main() -> None:
     import sys
 
     with SessionLocal() as session:
-        if "--retime" in sys.argv:
+        if "--if-empty" in sys.argv:
+            info = seed_if_empty(session)
+            session.commit()
+            print("Seed OK (DB trống → đã seed dữ liệu MÔ PHỎNG):" if info else "DB đã có dữ liệu → giữ nguyên.", info or "")
+        elif "--retime" in sys.argv:
             delta = retime(session)
             session.commit()
             print(f"Retime OK: dịch mốc thời gian {delta} (dữ liệu MÔ PHỎNG).")

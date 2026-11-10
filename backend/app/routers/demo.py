@@ -5,12 +5,13 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from .. import models as m
+from ..admin import require_admin
 from ..auth import Actor, current_actor
 from ..config import settings
 from ..db import get_session
 from ..demo.scenarios import SCENARIOS, run_scenario
 
-router = APIRouter(prefix="/v1/demo")
+router = APIRouter(prefix="/v1/demo", dependencies=[Depends(require_admin)])
 
 
 def _guard(actor: Actor) -> None:

@@ -12,7 +12,7 @@ export const DEMO_USERS: { key: UserKey; org: 'A' | 'B' | 'C'; role: 'shipper' |
 ]
 
 export interface Me { user_id: string; user_name: string; org_id: string; org_name: string; org_type: string; role: string }
-export interface Meta { data_mode: 'mock' | 'live'; is_simulated: boolean; server_time: string; stale_position_minutes: number }
+export interface Meta { data_mode: 'mock' | 'live'; is_simulated: boolean; server_time: string; stale_position_minutes: number; admin_key_required: boolean }
 export interface Location { id: string; name: string; kind: string; lat: number; lng: number }
 export interface Shipment {
   id: string; tenant_id: string; code: string; cargo_type: string; weight_kg: number | null; volume_m3: number | null
@@ -106,11 +106,20 @@ export function setUser(u: UserKey) {
   try { localStorage.setItem('pivot.user', u) } catch { /* localStorage có thể bị chặn */ }
 }
 
+// Mã quản trị (chỉ cần khi triển khai công khai): giữ trong sessionStorage — đóng tab là mất, không lưu lâu dài.
+let adminKey = (() => { try { return sessionStorage.getItem('pivot.adminKey') ?? '' } catch { return '' } })()
+export const getAdminKey = () => adminKey
+export function setAdminKey(k: string) {
+  adminKey = k.trim()
+  try { adminKey ? sessionStorage.setItem('pivot.adminKey', adminKey) : sessionStorage.removeItem('pivot.adminKey') } catch { /* bỏ qua */ }
+}
+
 async function request<T>(path: string, init: RequestInit & { idem?: string } = {}): Promise<T> {
   const headers: Record<string, string> = {
     Authorization: `Bearer dev:${currentUser}`,
     ...(init.body ? { 'Content-Type': 'application/json' } : {}),
     ...(init.idem ? { 'Idempotency-Key': init.idem } : {}),
+    ...(adminKey && path.startsWith('/v1/demo/') ? { 'X-Admin-Key': adminKey } : {}),
   }
   let res: Response
   try {

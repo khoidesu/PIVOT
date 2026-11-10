@@ -10,6 +10,8 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
+from ..config import settings
+
 USERS = {"nguyen": "shipper_a", "phuoc": "shipper_a2", "minh": "carrier_b", "khoi": "node_c", "phu": "dispatch"}
 
 
@@ -23,6 +25,8 @@ class Run:
 
     def req(self, who: str, method: str, path: str, body=None, idem: bool = False, client=None):
         h = {"Authorization": f"Bearer dev:{USERS.get(who, who)}"}
+        if settings.admin_key:  # kịch bản gọi các endpoint demo cần mã quản trị
+            h["X-Admin-Key"] = settings.admin_key
         if idem:
             h["Idempotency-Key"] = str(uuid.uuid4())
         c = client or self.c

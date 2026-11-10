@@ -1,16 +1,19 @@
 import { useState } from 'react'
-import { api, ApiError, SCENARIO_IDS, type ScenarioResult } from '../api'
+import { api, ApiError, getAdminKey, SCENARIO_IDS, setAdminKey, type ScenarioResult } from '../api'
 import { Chip, ErrorNote, Note } from '../components/ui'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
 
 export function Demo() {
   const { t } = useI18n()
-  const { me, bump } = useApp()
+  const { me, meta, bump } = useApp()
+  const [keyInput, setKeyInput] = useState('')
+  const [hasKey, setHasKey] = useState(!!getAdminKey())
+  const needKey = !!meta?.admin_key_required
   const [res, setRes] = useState<Record<string, ScenarioResult>>({})
   const [running, setRunning] = useState<string | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
-  const allowed = me?.role === 'dispatcher'
+  const allowed = me?.role === 'dispatcher' && (!needKey || hasKey)
 
   async function run(id: string) {
     setRunning(id); setError(null)
@@ -26,7 +29,19 @@ export function Demo() {
       <section className="card stack">
         <div className="card-h"><h1>{t('demo.title')}</h1><Chip kind="sim">{t('badge.mock')}</Chip></div>
         <span className="muted">{t('demo.intro')}</span>
-        {!allowed && <Note kind="warn">{t('demo.only')}</Note>}
+        {me?.role !== 'dispatcher' && <Note kind="warn">{t('demo.only')}</Note>}
+        {needKey && (
+          <div className="stack">
+            <h3>{t('demo.adminTitle')}</h3>
+            <span className="footnote">{t('demo.adminHint')}</span>
+            <div className="row">
+              <label className="sr" htmlFor="admin-key">{t('demo.adminTitle')}</label>
+              <input id="admin-key" type="password" autoComplete="off" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} style={{ maxWidth: 280 }} />
+              <button className="btn sm" onClick={() => { setAdminKey(keyInput); setHasKey(!!keyInput.trim()); setKeyInput('') }} disabled={!keyInput.trim()}>{t('demo.adminSave')}</button>
+              {hasKey && <button className="btn sm" onClick={() => { setAdminKey(''); setHasKey(false) }}>{t('demo.adminClear')}</button>}
+              {hasKey ? <Chip kind="good">{t('demo.adminSet')}</Chip> : <Chip kind="warn">{t('demo.adminNeed')}</Chip>}
+            </div>
+          </div>)}
         <div className="row">
           <button className="btn primary" disabled={!allowed || !!running} onClick={runAll}>{running ? t('demo.running') : t('demo.runAll')}</button>
           {Object.keys(res).length > 0 && <Chip kind={passed === SCENARIO_IDS.length ? 'good' : 'warn'}>{t('demo.all', { n: passed })}</Chip>}

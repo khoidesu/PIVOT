@@ -6,7 +6,7 @@ xe sắp trống → hàng sẵn sàng → kiểm tra khả thi (hard gate) → 
 > ⚠️ **Mọi dữ liệu trong bản demo là MÔ PHỎNG** (gắn nhãn *MÔ PHỎNG / mock* trên giao diện). Slot ICD là slot giả lập, không phải đặt chỗ thật.
 
 - Nội dung cốt lõi / kế hoạch: [`DRAFT.md`](DRAFT.md) (bất biến) · định hướng kỹ thuật & tiến trình: [`CLAUDE.md`](CLAUDE.md)
-- Báo cáo kiểm thử: [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) · kịch bản video demo: [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+- Triển khai công khai (Render, một link): [`docs/DEPLOY.md`](docs/DEPLOY.md) · Báo cáo kiểm thử: [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md) · kịch bản video demo: [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
 
 ## Công nghệ
 React + TypeScript + Vite · FastAPI + Pydantic · SQLAlchemy + Alembic · PostgreSQL 16 (Docker) · worker đọc outbox trong PostgreSQL.
@@ -43,7 +43,7 @@ Bộ chọn vai trò ở thanh trên: **Nguyên / Phước** (Chủ hàng, tổ 
 
 ## Kiểm thử
 ```bash
-cd backend && .venv/bin/python -m pytest      # 126 test (DB test riêng: pivot_test)
+cd backend && .venv/bin/python -m pytest      # 135 test (DB test riêng: pivot_test)
 cd frontend && npm test && npx tsc --noEmit
 ```
 

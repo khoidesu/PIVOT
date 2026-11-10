@@ -22,6 +22,7 @@ class MetaOut(BaseModel):
     is_simulated: bool
     server_time: datetime
     stale_position_minutes: int
+    admin_key_required: bool = False
 
 
 class ShipmentCreate(BaseModel):

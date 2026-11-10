@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .. import models as m
 from .. import schemas as s
+from ..admin import require_admin
 from ..auth import Actor, current_actor
 from ..booking import audit
 from ..booking import service as bk
@@ -81,7 +82,7 @@ def replay_job(job_id: uuid.UUID, actor: Actor = Depends(current_actor), session
     return job
 
 
-@router.post("/demo/worker/run")
+@router.post("/demo/worker/run", dependencies=[Depends(require_admin)])
 def run_worker_once(simulate_crash: bool = False, advance_seconds: int = 0, actor: Actor = Depends(current_actor)):
     """Chạy worker một lượt ngay (demo/test). Worker nền cũng tự chạy mỗi giây khi bật PIVOT_WORKER_INLINE.
 
