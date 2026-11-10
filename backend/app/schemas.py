@@ -226,3 +226,76 @@ class OutboxOut(ORM):
     attempts: int
     last_error: str | None
     created_at: datetime
+
+
+# ---------------- timeline, replay, lợi ích, demo ----------------
+class TimelineItem(BaseModel):
+    at: datetime
+    kind: str  # match | decision | event | exception | benefit
+    code: str
+    actor: str | None
+    quality: str | None
+    latency_s: int | None
+    detail: dict[str, Any]
+
+
+class TimelineOut(BaseModel):
+    proposal_id: uuid.UUID
+    status: str
+    version: int
+    shipment_code: str
+    items: list[TimelineItem]
+
+
+class ReplayOut(BaseModel):
+    proposal_id: uuid.UUID
+    stored_score: float | None
+    recomputed_score: float
+    reproducible: bool
+    weights_sum: float | None
+    all_gates_pass: bool
+    gate_count: int
+    rejected_candidates: int
+    rule_version: str
+    model_version: str
+    assumption_version: str
+    run_id: str | None
+    baseline: dict[str, Any] | None
+    snapshot_keys: list[str]
+
+
+class ResolveIn(BaseModel):
+    resolution: str = Field(pattern="^(accept_delay|request_replan)$")
+    note: str | None = Field(default=None, max_length=500)
+
+
+class BenefitOut(BaseModel):
+    id: uuid.UUID
+    proposal_id: uuid.UUID | None
+    shipment_code: str
+    vehicle_plate: str
+    cost_category: str
+    quantity_before: float
+    quantity_after: float
+    unit: str
+    unit_rate: float
+    currency: str
+    net_vnd: int
+    status: str  # estimated | measured | verified
+    baseline_id: str
+    assumption_version: str
+    beneficiary_org_name: str | None
+    verifier: str | None
+    verified_at: datetime | None
+    can_verify: bool
+    is_simulated: bool
+    evidence: list[dict[str, Any]] = []
+    evidence_refs: list[dict[str, Any]] = []
+    baseline: dict[str, Any] | None = None
+    assumptions: dict[str, Any] = {}
+    formula: dict[str, Any] | None = None
+
+
+class BenefitListOut(BaseModel):
+    items: list[BenefitOut]
+    totals: dict[str, dict[str, int]]

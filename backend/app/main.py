@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import core, events, matching
+from .routers import benefits, core, demo, events, matching
 from .worker import process_pending
 
 
@@ -40,6 +40,8 @@ app.add_middleware(
 app.include_router(core.router)
 app.include_router(matching.router)
 app.include_router(events.router)
+app.include_router(benefits.router)
+app.include_router(demo.router)
 
 
 @app.get("/healthz")

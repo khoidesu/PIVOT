@@ -10,6 +10,7 @@ from .. import models as m
 from .. import schemas as s
 from ..access import get_visible_shipment
 from ..auth import Actor, current_actor
+from ..booking import audit
 from ..booking import service as bk
 from ..booking.views import proposal_view
 from ..db import get_session
@@ -108,3 +109,19 @@ def accept(proposal_id: uuid.UUID, body: s.ActionIn, response: Response, idempot
 def reject(proposal_id: uuid.UUID, body: s.ActionIn, response: Response, idempotency_key: str | None = Header(default=None),
            actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     return _act(bk.reject, proposal_id, body, idempotency_key, actor, session, response)
+
+
+@router.get("/proposals/{proposal_id}/timeline", response_model=s.TimelineOut)
+def get_timeline(proposal_id: uuid.UUID, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    try:
+        return audit.timeline(session, actor, proposal_id)
+    except bk.BookingError as e:
+        raise _http(e) from None
+
+
+@router.get("/proposals/{proposal_id}/replay", response_model=s.ReplayOut)
+def get_replay(proposal_id: uuid.UUID, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    try:
+        return audit.replay(session, actor, proposal_id)
+    except bk.BookingError as e:
+        raise _http(e) from None

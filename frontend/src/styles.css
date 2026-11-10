@@ -133,3 +133,15 @@ summary { cursor: pointer; font-weight: 600; font-size: 14px; }
 @media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
 .topbar-in { row-gap: 10px; }
 @media (max-width: 520px) { .ctrl select { max-width: 100%; } main { padding-top: 16px; } .card { padding: 14px; } }
+
+/* timeline */
+.tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.tl-item { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 8px 0; position: relative; }
+.tl-item:not(:last-child)::before { content: ''; position: absolute; left: 13px; top: 34px; bottom: -8px; width: 2px; background: var(--line); }
+.tl-dot { width: 28px; height: 28px; border-radius: 99px; display: grid; place-items: center; font-size: 13px; background: #eef2f4; color: #33444c; font-weight: 700; }
+.tl-dot.good { background: var(--pass-bg); color: var(--pass); } .tl-dot.warn { background: var(--unknown-bg); color: var(--unknown); } .tl-dot.teal { background: var(--teal-weak); color: var(--teal-strong); }
+tr[aria-selected='true'] td { font-weight: 600; }
+
+/* không cho phần tử lưới/flex làm tràn ngang (bảng/chuỗi dài tự cuộn trong khung của nó) */
+main > *, .grid2 > *, .grid3 > *, .split > *, .card, .stack > * { min-width: 0; }
+.card-h h1, .card-h h2 { overflow-wrap: anywhere; }

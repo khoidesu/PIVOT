@@ -57,6 +57,34 @@ export interface ShipmentCreate {
   price_vnd?: number | null; customer_name?: string | null
 }
 
+export interface TimelineItem {
+  at: string; kind: 'match' | 'decision' | 'event' | 'exception' | 'benefit'; code: string; actor: string | null
+  quality: string | null; latency_s: number | null; detail: Record<string, unknown>
+}
+export interface Timeline { proposal_id: string; status: string; version: number; shipment_code: string; items: TimelineItem[] }
+export interface Replay {
+  proposal_id: string; stored_score: number | null; recomputed_score: number; reproducible: boolean; weights_sum: number | null
+  all_gates_pass: boolean; gate_count: number; rejected_candidates: number; rule_version: string; model_version: string
+  assumption_version: string; run_id: string | null; baseline: { id: string; empty_km: number; cost_per_km_vnd: number; fixed_at: string } | null
+  snapshot_keys: string[]
+}
+export interface ExceptionItem {
+  id: string; proposal_id: string; exc_type: string; status: 'open' | 'resolved'; created_at: string
+  detail: { action?: string; delay_minutes?: number; resolution?: string; note?: string; resolved_by?: string }
+}
+export interface Benefit {
+  id: string; proposal_id: string | null; shipment_code: string; vehicle_plate: string; cost_category: string
+  quantity_before: number; quantity_after: number; unit: string; unit_rate: number; currency: string; net_vnd: number
+  status: 'estimated' | 'measured' | 'verified'; baseline_id: string; assumption_version: string
+  beneficiary_org_name: string | null; verifier: string | null; verified_at: string | null; can_verify: boolean; is_simulated: boolean
+  evidence: { id: string; event_type: string; source_system: string; occurred_at: string; received_at: string; quality_status: string; payload: Record<string, unknown> }[]
+  baseline: { id: string; empty_km: number; cost_per_km_vnd: number; fixed_at: string } | null
+  assumptions: Record<string, unknown>; formula: { before: number; after: number; rate: number } | null
+}
+export interface BenefitList { items: Benefit[]; totals: Record<'estimated' | 'measured' | 'verified', { count: number; net_vnd: number }> }
+export interface ScenarioResult { id: string; passed: boolean; steps: { label: string; ok: boolean; detail: string }[]; open: string | null }
+export const SCENARIO_IDS = ['success', 'incompatible', 'stale', 'race', 'eta_change', 'duplicate_restart'] as const
+
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public reasons: GateItem[] = []) {
     super(message)
@@ -116,5 +144,18 @@ export const api = {
   proposals: () => request<Proposal[]>('/v1/proposals'),
   act: (p: Pick<Proposal, 'id' | 'version'>, action: 'hold' | 'accept' | 'reject') =>
     post<Proposal>(`/v1/proposals/${p.id}/${action}`, { version: p.version }, crypto.randomUUID()),
+  timeline: (id: string) => request<Timeline>(`/v1/proposals/${id}/timeline`),
+  replay: (id: string) => request<Replay>(`/v1/proposals/${id}/replay`),
+  exceptions: () => request<ExceptionItem[]>('/v1/exceptions'),
+  resolve: (id: string, resolution: 'accept_delay' | 'request_replan', note?: string) =>
+    post<ExceptionItem>(`/v1/exceptions/${id}/resolve`, { resolution, note }),
+  sendEvent: (entity_id: string, event_type: string, payload: Record<string, unknown> = {}) =>
+    post<{ event_id: string; duplicate: boolean }>('/v1/events', {
+      entity_id, event_type, payload, occurred_at: new Date().toISOString(), source_system: 'ui-carrier', source_event_id: crypto.randomUUID(),
+    }),
+  benefits: () => request<BenefitList>('/v1/benefits'),
+  benefit: (id: string) => request<Benefit>(`/v1/benefits/${id}`),
+  verify: (id: string) => post<Benefit>(`/v1/benefits/${id}/verify`, {}),
+  runScenario: (id: string) => post<ScenarioResult>(`/v1/demo/scenarios/${id}/run`, {}),
   retime: () => post<{ retimed_by_seconds: number }>('/v1/demo/retime', {}),
 }

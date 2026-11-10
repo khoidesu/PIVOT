@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import or_, select
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .. import models as m
 from .. import schemas as s
 from ..auth import Actor, current_actor
+from ..booking import audit
 from ..booking import service as bk
 from ..db import SessionLocal, get_session
 from ..events import service as events
@@ -48,6 +49,19 @@ def list_exceptions(actor: Actor = Depends(current_actor), session: Session = De
     return session.execute(stmt.order_by(m.ExceptionRecord.created_at.desc()).limit(200)).scalars().all()
 
 
+@router.post("/exceptions/{exception_id}/resolve", response_model=s.ExceptionOut)
+def resolve_exception(exception_id: uuid.UUID, body: s.ResolveIn, actor: Actor = Depends(current_actor),
+                      session: Session = Depends(get_session)):
+    """Người có quyền quyết định ngoại lệ; hệ thống không tự sửa/chuyển xe của chuyến đã cam kết."""
+    try:
+        ex = audit.resolve_exception(session, actor, exception_id, body.resolution, body.note, datetime.now(timezone.utc))
+        session.commit()
+    except bk.BookingError as e:
+        session.rollback()
+        raise HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message, "reasons": []}) from None
+    return ex
+
+
 @router.get("/outbox", response_model=list[s.OutboxOut])
 def list_outbox(status: str | None = None, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     _dispatcher_only(actor)
@@ -68,7 +82,15 @@ def replay_job(job_id: uuid.UUID, actor: Actor = Depends(current_actor), session
 
 
 @router.post("/demo/worker/run")
-def run_worker_once(actor: Actor = Depends(current_actor)):
-    """Chạy worker một lượt ngay (demo/test). Worker nền cũng tự chạy mỗi giây khi bật PIVOT_WORKER_INLINE."""
+def run_worker_once(simulate_crash: bool = False, advance_seconds: int = 0, actor: Actor = Depends(current_actor)):
+    """Chạy worker một lượt ngay (demo/test). Worker nền cũng tự chạy mỗi giây khi bật PIVOT_WORKER_INLINE.
+
+    simulate_crash: worker "chết" sau khi áp tác động nhưng trước commit (kịch bản worker restart).
+    advance_seconds: coi như thời gian đã trôi để job đang backoff được xử lý lại ngay.
+    """
     _dispatcher_only(actor)
-    return process_pending(SessionLocal)
+    now = datetime.now(timezone.utc) + timedelta(seconds=max(0, min(advance_seconds, 3600)))
+
+    def crash(_job):
+        raise RuntimeError("simulated worker crash before commit")
+    return process_pending(SessionLocal, now=now, fail_hook=crash if simulate_crash else None)

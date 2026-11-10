@@ -8,15 +8,16 @@ Căn cứ đánh giá kỹ thuật: `DRAFT.md` (đánh giá công nghệ + kế 
 
 ## 0. Trạng thái hiện tại
 
-- **Giai đoạn:** **N2 xong** (backend matching/booking/events + frontend màn 1–4) — chờ người dùng review trước N3 (timeline/ngoại lệ, benefit ledger, 6 kịch bản demo, đóng gói).
+- **Giai đoạn:** **N3 xong — toàn bộ phạm vi prototype P0 hoàn tất** (7 màn hình, 6 kịch bản demo). Còn lại: quay video theo `docs/DEMO_SCRIPT.md`, slide (DRAFT mục 12), và P1 nếu còn giờ (AI nhập liệu, ETA benchmark, OR-Tools).
 - **Hiện có (10/11/2026):**
-  - Backend: 20 bảng + 3 migration · seed mô phỏng (5 thành viên: Nguyên, Phước = Chủ hàng A · Minh = Vận tải B · Khôi = ICD Cảng C · Phú = Điều phối viên) + `--retime` · hard gate 8 điều kiện · MatchScore (0–1, trọng số = 1) · `POST /v1/match-runs` · booking `hold/accept/reject` (khoá hàng, hết hạn lười, re-check, xác nhận theo từng bên, `Idempotency-Key`) · `POST /v1/events` idempotent + outbox + worker (lease/retry/replay) · ETA đổi → ngoại lệ · **74 test pass**.
-  - Frontend (`frontend/`, Vite + React + TS): 4 màn hình (nhập yêu cầu · xe & hàng · khuyến nghị + lý do · xác nhận & slot), song ngữ VI/EN, bộ chọn vai trò, nhãn MÔ PHỎNG, polling 2 giây, 5 test i18n.
-- **Chạy local:** `docker compose up -d` → `cd backend && .venv/bin/alembic upgrade head && .venv/bin/python -m app.seed` → `.venv/bin/uvicorn app.main:app --port 8000` (worker nền chạy cùng API) → `cd frontend && npm run dev` → mở http://127.0.0.1:5173. Test: `cd backend && .venv/bin/python -m pytest` · `cd frontend && npm test`. **Trước mỗi buổi demo:** `python -m app.seed --retime` hoặc nút "Làm mới dữ liệu demo" (vai Điều phối viên) — vị trí xe quá 5 phút là bị DATA_STALE.
-- **Còn tồn (ghi nhận từ review N1/N2):** màn timeline/ngoại lệ + bảng lợi ích (N3) · `proposal.confirmed` mới là mock (chưa có API đối tác) · auth là token dev · `reset_open_commitments` chỉ expire đề xuất mở, không đụng chuyến đã xác nhận.
-- **Mục tiêu gần nhất:** dựng prototype chạy được cho sản phẩm dự thi. **Hạn chót còn 3 ngày (tới ~13/11/2026)**, nên 5 ngày của DRAFT được nén lại — xem "Lịch nén 3 ngày" ở mục 4.
+  - Backend: 20 bảng + 4 migration · hard gate 8 điều kiện · MatchScore · booking (hold/accept/reject, xác nhận theo từng bên, re-check, hết hạn lười, `Idempotency-Key`) · events idempotent + outbox + worker · ngoại lệ có xử lý bởi người · timeline + replay · **sổ lợi ích** (baseline chốt lúc ghép; estimated → measured → verified) · công cụ demo (`/v1/demo/{reset,age-positions,scenarios,worker/run}`) · **93 test pass**, match P95 = 30 ms (20 xe × 50 lô).
+  - Frontend: 7 màn hình (nhập yêu cầu · xe & hàng · khuyến nghị · xác nhận & slot · timeline & ngoại lệ · lợi ích · kịch bản demo), VI/EN, 5 thành viên (Nguyên, Phước = Chủ hàng A · Minh = Vận tải B · Khôi = ICD C · Phú = Điều phối viên), polling, nhãn MÔ PHỎNG, 5 test i18n.
+- **Chạy local / reset / kiểm thử:** xem `README.md`. Trước mỗi buổi demo: nút "Làm mới dữ liệu demo" hoặc `python -m app.seed`.
+- **Báo cáo:** `docs/TEST_REPORT.md` (đối chiếu từng điều kiện nghiệm thu, 6 kịch bản, giới hạn đã biết) · `docs/DEMO_SCRIPT.md` (video ≈ 4 phút).
+- **Còn tồn / giới hạn:** `proposal.confirmed` là mock (chưa API ICD thật) · đăng nhập là token dev (chưa OIDC) · ETA rule-based (đường chim bay × 1,3) · lợi ích mô phỏng, chưa chứng minh tiết kiệm thật · P1 chưa làm · chưa staging/CI/backup-restore.
+- **Mục tiêu gần nhất:** hoàn thiện phần trình bày (video, slide) và, nếu còn giờ, P1. **Hạn chót ~13/11/2026.**
 - **Ngày bắt đầu:** 10/11/2026.
-- **Cập nhật gần nhất:** 10/11/2026 — N2 xong: sửa khoảng trống review (gate slot đúng ICD, tuổi dữ liệu lô, cờ assumption active, N+1), MatchScore, booking, events/outbox, frontend 4 màn hình.
+- **Cập nhật gần nhất:** 10/11/2026 — N3 xong: timeline/ngoại lệ, sổ lợi ích, 6 kịch bản demo, tài liệu chạy + báo cáo test + kịch bản video.
 
 > Cập nhật mục này mỗi khi kết thúc một ngày làm việc / một hạng mục P0-P1 trong Backlog (mục 9).
 
@@ -98,10 +99,10 @@ Cập nhật checkbox khi hoàn thành. Mỗi ngày có "điều kiện qua" —
 - [x] **Ngày 3 — Booking:** hold/accept/reject, hết hạn, slot có capacity. *(10/11/2026: state machine đến `completed` qua sự kiện, race test + idempotency + worker restart pass)*
   - Deliverable: 1 luồng xác nhận chạy đến `completed`.
   - Điều kiện qua: 2 request nhận đồng thời → chỉ 1 thành công; gửi lại event không bị nhân đôi tác động.
-- [ ] **Ngày 4 — Timeline & lợi ích:** *(đã xong: ETA đổi → ngoại lệ, replay outbox; còn: màn timeline/ngoại lệ, benefit ledger, bảng lợi ích)*  timeline, ngoại lệ, replay, benefit ledger; AI nháp nếu lõi đã qua.
+- [x] **Ngày 4 — Timeline & lợi ích:** timeline, ngoại lệ, replay, benefit ledger; AI nháp nếu lõi đã qua. *(10/11/2026: màn timeline + ngoại lệ có xử lý, replay tái lập, sổ lợi ích estimated/measured/verified; **AI nháp (P1) chưa làm** — đúng thứ tự DRAFT: chỉ làm khi lõi đã qua)*
   - Deliverable: ETA đổi → tạo ngoại lệ; so sánh baseline–actual; bản nháp AI có dẫn nguồn (nếu làm).
   - Điều kiện qua: không tự sửa chuyến đã cam kết; parsing thiếu trường không tạo lô hiệu lực.
-- [ ] **Ngày 5 — Đóng gói demo:** test lỗi, seed/reset, đóng gói.
+- [x] **Ngày 5 — Đóng gói demo:** test lỗi, seed/reset, đóng gói. *(10/11/2026: 6 kịch bản lặp lại được, reset/retime, README + `docs/TEST_REPORT.md` + `docs/DEMO_SCRIPT.md`; **chưa có** link staging (demo chạy local) và **chưa quay video** — mới có kịch bản)*
   - Deliverable: link staging, hướng dẫn chạy, test report, video demo 3–5 phút.
   - Điều kiện qua: 6 kịch bản demo (mục 6) lặp lại được; mọi số liệu mô phỏng được gắn nhãn rõ.
 
@@ -183,6 +184,7 @@ Thứ tự đầu tư: **dữ liệu & giao dịch đúng → vòng điều ph�
 
 Ghi mỗi quyết định quan trọng ở đây theo thời gian, mới nhất trên đầu. Không xoá lịch sử quyết định cũ — nếu đổi thì thêm dòng mới ghi rõ "thay thế quyết định ngày ...".
 
+- **10/11/2026 (N3)** — Quyết định thiết kế N3: (1) baseline lợi ích chốt trong snapshot lúc ghép, không tính lại sau (DRAFT 11.1); chỉ khoản `measured` mới xác minh được, và chỉ chủ lô/nhà vận tải của chuyến xác minh (điều phối viên, node thì không); (2) ngoại lệ do chủ lô/nhà vận tải quyết định (`accept_delay` | `request_replan`), hệ thống không tự đổi xe; (3) `replay` tính lại điểm từ thành phần + trọng số đã lưu để chứng minh tái lập; (4) 6 kịch bản demo là mã dùng chung cho endpoint, pytest và CLI, chạy qua API thật bằng token của từng thành viên, mỗi kịch bản tự reset; (5) **reset dùng `DELETE` theo thứ tự khoá ngoại thay cho `TRUNCATE`** (TRUNCATE bế tắc với worker/request song song — phát hiện khi chạy tab Demo, có test hồi quy); (6) thêm tab thứ 7 "Kịch bản demo" (ngoài 6 màn hình bắt buộc của DRAFT, chỉ vai Điều phối viên chạy được); (7) hiệu năng ghép đo thật: p95 = 30 ms cho 20 xe × 50 lô.
 - **10/11/2026 (chỉnh UI trước N3)** — Bỏ dải banner "DỮ LIỆU MÔ PHỎNG · MOCK…" trên cùng (vẫn giữ huy hiệu ● MÔ PHỎNG ở thanh đầu và nhãn trên từng lô/slot/đề xuất để không để số liệu giả trông như thật). Bộ chọn vai trò gồm 5 thành viên thật của nhóm: Nguyên (Chủ hàng A), Phước (Chủ hàng A, nhân viên thứ 2 — test chia sẻ trong cùng tổ chức), Minh (Vận tải B), Khôi (ICD Cảng C), Phú (Điều phối viên). Bỏ khối giải thích "Vì sao cần đủ trường?" ở màn nhập yêu cầu.
 - **10/11/2026 (N2)** — Quyết định thiết kế N2: (1) xác nhận theo từng bên (shipper duyệt lô / carrier nhận việc / node duyệt slot), điều phối viên được giữ slot nhưng không xác nhận thay; forwarder sở hữu cả lô và xe thì một lần xác nhận phủ hai bên; (2) khi một đề xuất `confirmed`, các đề xuất mở còn lại của lô bị `cancelled` (một lô – một cam kết); (3) hold hết hạn xử lý lười trong transaction (partial unique index không tham chiếu `now()` được) và `retime` expire đề xuất/hold đang mở; (4) trạng thái thực hiện chỉ đổi bằng sự kiện (`TRIP_STARTED/TRIP_COMPLETED/ETA_UPDATED`) qua outbox worker — tin muộn không kéo lùi trạng thái, ETA đổi chỉ tạo ngoại lệ với chuyến đã cam kết; (5) ETA là rule-based, quãng đường là đường chim bay × 1.3 (xấp xỉ, UI ghi nhãn); (6) giả định đang hiệu lực chọn bằng cờ `is_active`, không suy từ ngày tạo; (7) frontend không dùng router/UI lib: hash routing + CSS thuần, i18n tự viết (mã lý do giữ tiếng Anh).
 - **10/11/2026 (review N1)** — Sau code review backend: (1) DB chỉ bind 127.0.0.1; (2) `ShipmentCreate` bắt buộc múi giờ + `ready_at < pickup_deadline < cutoff_at`, location không tồn tại → 422 (trước đó 500); (3) mã lô unique theo `(tenant_id, code)` thay vì toàn cục để không lộ lô của tenant khác — thay thế thiết kế ban đầu; (4) thêm partial unique index chống đặt trùng xe/lô trên `reservations`, CHECK status cho shipments/proposals/reservations, `decisions.idempotency_key` unique theo tổ chức; (5) seed có chốt chặn `data_mode=mock`, lệnh `--retime` và `POST /v1/demo/retime` để demo không bị DATA_STALE theo thời gian. Còn tồn: gate_slot chưa kiểm slot đúng ICD đích, tuổi dữ liệu của lô, auth nhiều membership, N+1 nhẹ ở danh sách lô.

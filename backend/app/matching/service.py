@@ -96,6 +96,10 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
                 "eta": {"pickup": gates.pickup_eta(e["window"], shipment, now, params).isoformat(),
                         "method": params.get("eta_method", "rule-based"), "confidence": "low (rule-based)"},
                 "estimated_saving_vnd": sc.estimated_saving_vnd, "deadhead_km": sc.deadhead_km,
+                # Baseline chốt tại thời điểm ghép (trước khi biết kết quả) — DRAFT 11.1: không chọn baseline sau khi có kết quả
+                "baseline": {"id": f"base-{run_id[:8]}", "empty_km": params["empty_km_baseline"],
+                             "cost_per_km_vnd": params["cost_per_km_vnd"], "assumption_version": aset.version,
+                             "fixed_at": now.isoformat(), "method": "static corridor baseline (assumption)"},
                 "params_used": {k: params[k] for k in ("stale_position_minutes", "stale_shipment_minutes", "deadhead_minutes",
                                                        "transit_minutes", "handling_minutes", "score_weights")},
             },

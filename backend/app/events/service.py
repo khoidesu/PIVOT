@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from .. import models as m
 from ..auth import Actor
+from ..benefits import service as benefits
 from ..booking import service as bk
 
 SUPPORTED = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED"}
@@ -83,6 +84,7 @@ def apply_event(session: Session, event_id: uuid.UUID, now: datetime) -> str:
             for r in session.execute(select(m.Reservation).where(
                     m.Reservation.proposal_id == prop.id, m.Reservation.status == "committed")).scalars():
                 r.status = "released"  # tài nguyên được trả sau khi hoàn tất
+            benefits.record_completion(session, prop, ev, ship, veh)  # ghi sổ lợi ích cùng transaction
         else:
             ev.quality_status = "late" if status == "completed" else "invalid"
 

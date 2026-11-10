@@ -2,13 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { TopBar } from './components/TopBar'
 import { ErrorNote } from './components/ui'
 import { I18nProvider, useI18n } from './i18n'
+import { Benefits } from './screens/Benefits'
 import { Confirm } from './screens/Confirm'
+import { Demo } from './screens/Demo'
 import { Fleet } from './screens/Fleet'
 import { Recommend } from './screens/Recommend'
 import { Request } from './screens/Request'
+import { Timeline } from './screens/Timeline'
 import { AppProvider, useApp } from './store'
 
-const ROUTES = ['request', 'fleet', 'recommend', 'confirm'] as const
+const ROUTES = ['request', 'fleet', 'recommend', 'confirm', 'timeline', 'benefits', 'demo'] as const
 type Route = (typeof ROUTES)[number]
 
 function useHashRoute(): [Route, URLSearchParams, (to: string) => void] {
@@ -47,6 +50,9 @@ function Shell() {
         {route === 'fleet' && <Fleet go={go} />}
         {route === 'recommend' && <Recommend go={go} query={query} />}
         {route === 'confirm' && <Confirm />}
+        {route === 'timeline' && <Timeline query={query} />}
+        {route === 'benefits' && <Benefits query={query} />}
+        {route === 'demo' && <Demo />}
       </main>
     </>
   )

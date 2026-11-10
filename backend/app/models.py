@@ -275,8 +275,14 @@ class ExceptionRecord(Base):
 
 class BenefitLedger(Base):
     __tablename__ = "benefit_ledger"
+    __table_args__ = (
+        # mỗi chuyến + baseline + hạng mục chỉ ghi một lần (event TRIP_COMPLETED gửi lại không nhân đôi lợi ích)
+        UniqueConstraint("shipment_id", "baseline_id", "cost_category", name="uq_benefit_once"),
+        CheckConstraint("status IN ('estimated','measured','verified')", name="ck_benefit_status"),
+    )
     id: Mapped[uuid.UUID] = pk()
     shipment_id: Mapped[uuid.UUID] = fk("shipments.id")
+    proposal_id: Mapped[uuid.UUID | None] = fk("proposals.id", nullable=True)
     baseline_id: Mapped[str] = mapped_column(String(60))
     cost_category: Mapped[str] = mapped_column(String(40))
     quantity_before: Mapped[float] = mapped_column(Float)

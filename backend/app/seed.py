@@ -49,7 +49,10 @@ TABLES = [
 def reset(session: Session) -> None:
     if settings.data_mode != "mock":  # chốt chặn: không bao giờ TRUNCATE khi không phải môi trường mô phỏng
         raise RuntimeError("Refusing to reset: PIVOT_DATA_MODE is not 'mock'")
-    session.execute(text("TRUNCATE " + ", ".join(TABLES) + " RESTART IDENTITY CASCADE"))
+    # DELETE theo thứ tự khoá ngoại (con trước cha) thay vì TRUNCATE: TRUNCATE cần khoá độc quyền trên mọi bảng nên
+    # bế tắc (deadlock) với worker nền / request đang chạy song song. DELETE chỉ khoá theo dòng, tương thích MVCC.
+    for table in TABLES:
+        session.execute(text(f"DELETE FROM {table}"))
 
 
 def seed(session: Session, now: datetime | None = None) -> dict:
@@ -65,11 +68,11 @@ def seed(session: Session, now: datetime | None = None) -> dict:
     }
     session.add_all(orgs.values())
     users = {
-        "shipper_a": ("A", "shipper", "Nguyên — Chủ hàng A"),
-        "shipper_a2": ("A", "shipper", "Phước — Chủ hàng A (nhân viên 2)"),  # cùng tổ chức A: test chia sẻ trong tổ chức
-        "carrier_b": ("B", "carrier", "Minh — Vận tải B"),
-        "node_c": ("C", "node_operator", "Khôi — ICD Cảng C"),
-        "dispatch": ("C", "dispatcher", "Phú — Điều phối viên"),
+        "shipper_a": ("A", "shipper", "Nguyên"),
+        "shipper_a2": ("A", "shipper", "Phước"),  # cùng tổ chức A: test chia sẻ trong tổ chức
+        "carrier_b": ("B", "carrier", "Minh"),
+        "node_c": ("C", "node_operator", "Khôi"),
+        "dispatch": ("C", "dispatcher", "Phú"),
     }
     for key, (_, _, name) in users.items():
         session.add(m.User(id=uid("user-" + key), email=f"{key}@demo.local", name=name))

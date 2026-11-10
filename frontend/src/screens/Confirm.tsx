@@ -61,7 +61,7 @@ function ProposalRow({ p, onDone }: { p: Proposal; onDone: () => void }) {
         <button className="btn danger" disabled={!a.reject || !!busy} onClick={() => run('reject')}>{t('cf.reject')}</button>
         {none && <span className="footnote">{t('cf.noPerm')}</span>}
       </div>
-      {['confirmed', 'executing'].includes(p.status) && <span className="footnote">{t('cf.execNote')}</span>}
+      {['confirmed', 'executing', 'completed'].includes(p.status) && <div className="row"><a className="btn sm" href={`#/timeline?p=${p.id}`} style={{ textDecoration: 'none' }}>{t('nav.timeline')} →</a><span className="footnote">{t('cf.execNote')}</span></div>}
     </article>
   )
 }
