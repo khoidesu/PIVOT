@@ -1,4 +1,4 @@
-# Kịch bản video demo (≈ 4 phút) — LOGECTION
+# Kịch bản video demo (≈ 4 phút lõi + 1 phút Control Tower) — LOGECTION
 
 Theo DRAFT mục 12: mỗi màn hình trả lời một câu hỏi kinh doanh. Dữ liệu **mô phỏng** — nói rõ điều này ngay đầu video.
 
@@ -15,6 +15,7 @@ Theo DRAFT mục 12: mỗi màn hình trả lời một câu hỏi kinh doanh. D
 | 3:00–3:40 | **Hành trình** (Minh) | Mở chuyến → **Bắt đầu chuyến** → **ETA trễ 30 phút** → đổi vai Nguyên quyết định ngoại lệ | "ETA đổi trên chuyến đã cam kết: hệ thống *không tự đổi xe*, chỉ tạo ngoại lệ để người quyết định. Mỗi dòng có người thực hiện, thời điểm, độ trễ dữ liệu." |
 | 3:40–4:20 | **Lợi ích** (Minh → Nguyên) | Minh **Hoàn tất** chuyến → mở **Lợi ích** → chọn dòng → Nguyên **Xác minh** (nhà vận tải không tự xác minh được) | "Baseline chốt trước khi biết kết quả. Ba mức tách riêng: ước tính, đã đo, đã xác minh — chỉ số đã xác minh mới đáng tin. Từ con số tới bằng chứng và giả định." |
 | 4:20–4:40 | **Tái lập** (Timeline) | Bấm **Tái lập** | "Quyết định tái lập được từ dữ liệu đã lưu, kèm phiên bản quy tắc/giả định." |
-| 4:40–5:00 | **Kịch bản demo** (Phú — menu avatar → Kịch bản demo) | **Chạy cả 6** → 6/6 đạt | "Sáu kịch bản bắt buộc chạy lặp lại được, gồm gửi trùng 10 lần và worker khởi động lại." |
+| 4:40–5:40 | **Control Tower** (Minh → Nguyên → Khôi → Phú) | Minh: **Theo dõi** → *Chạy mô phỏng* (xe chạy trên bản đồ, mốc sáng dần) → chọn *Hỏng xe*; tab Nguyên: chuông có thông báo → **Ngoại lệ** (mức *Nghiêm trọng*, playbook, hạn xử lý) → **Ghép lại**; tab Khôi: **Lịch dock** (bấm khối lịch → check-in / bốc dỡ); Phú: thẻ *Mô hình ETA* (ML vs luật, *Thử với dữ liệu trôi*) | "Giám sát đầu-cuối: tín hiệu đi qua sự kiện idempotent; hệ thống phân mức, đưa playbook và đếm SLA nhưng *không tự đổi chuyến* — chủ hàng bấm Ghép lại. Lịch dock chỉ *đề xuất* khung mới khi ETA đổi. ML ETA chạy trên dữ liệu mô phỏng, chỉ được dùng khi hơn luật ≥ 15% và đủ độ phủ P90, nếu không tự hạ về luật." |
+| 5:40–6:00 | **Kịch bản demo** (Phú — menu avatar → Kịch bản demo) | **Chạy tất cả** → 10/10 đạt | "Mười kịch bản (6 bắt buộc + 4 Control Tower) chạy lặp lại được, gồm gửi trùng 10 lần, worker khởi động lại và đua dock." |
 
 **Lưu ý khi quay:** bấm **Làm mới dữ liệu demo** (vai Phú) ngay trước khi quay vì vị trí xe quá 5 phút bị loại; nếu cần sạch hoàn toàn dùng `python -m app.seed`. Slide thuyết trình (DRAFT mục 12: kiến trúc, AI, matching, governance, kinh tế, roadmap) là phần riêng, không nằm trong repo này.

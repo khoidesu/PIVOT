@@ -2,7 +2,7 @@
 
 Mục tiêu: một **link duy nhất** để mọi người cùng dùng (giao diện + API chung một địa chỉ), dữ liệu **mô phỏng**.
 
-> ✅ Đã kiểm thử trên máy: build image Docker, chạy container với DB trống (migration → seed lần đầu → phục vụ giao diện), mã quản trị, khởi động lại giữ nguyên dữ liệu, 6 kịch bản đạt trong container.
+> ✅ Đã kiểm thử trên máy: build image Docker, chạy container với DB trống (migration → seed lần đầu → phục vụ giao diện), mã quản trị, khởi động lại giữ nguyên dữ liệu, kịch bản đạt trong container (nay là 10; image lớn hơn vì có numpy + scikit-learn, đo thực tế 716 MB — cân nhắc RAM/đĩa của gói miễn phí; đã chạy thử container với DB trống: migration + seed + `/healthz` + ML ETA + 10/10 kịch bản).
 > ⚠️ **Chưa deploy thật lên Render** (cần tài khoản của bạn). File `render.yaml` viết theo tài liệu Render nhưng chưa được Render kiểm tra; nếu lần đầu báo lỗi cấu hình, xem mục "Sự cố thường gặp".
 
 ## Những gì được triển khai
@@ -25,7 +25,7 @@ curl -s $URL/healthz                                        # {"status":"ok"}
 curl -s -H "Authorization: Bearer dev:shipper_a" $URL/v1/meta   # có "admin_key_required": true
 curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "Authorization: Bearer dev:dispatch" $URL/v1/demo/reset   # phải là 403 khi không có mã
 ```
-Rồi mở giao diện, chạy tab Demo với mã quản trị: kỳ vọng **6/6 kịch bản đạt**.
+Rồi mở giao diện, chạy tab Demo với mã quản trị: kỳ vọng **10/10 kịch bản đạt**.
 
 ## Ai làm được gì khi công khai (đọc kỹ)
 | Việc | Ai làm được |

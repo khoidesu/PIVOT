@@ -6,11 +6,11 @@ Dữ liệu: **mô phỏng** (3 tổ chức, 5 thành viên, 10 xe, 20 lô, 20 s
 ## Kết quả tổng
 | Bộ test | Số test | Kết quả |
 |---|---|---|
-| Backend (pytest) | 155 | **155 đạt** |
+| Backend (pytest) | 201 | **201 đạt** |
 | Frontend (vitest) + `tsc` + `vite build` | 15 | **15 đạt**, kiểu và build sạch |
-| Kịch bản demo (CLI trên API thật) | 6 | **6/6 đạt** (0,2–1,2 giây mỗi kịch bản), chạy lặp lại nhiều lần đều đạt |
+| Kịch bản demo (CLI trên API thật) | 10 | **10/10 đạt** (0,1–0,8 giây mỗi kịch bản), chạy lặp lại nhiều lần đều đạt |
 
-Theo file (backend): access 9 · benefits_audit 12 · booking 14 · events 10 · gates 11 · intake 14 · integrity 17 · match 16 · perf 1 · scenarios 8 · shipment_edit 8 · vehicle_events 6.
+Theo file (backend): access 9 · benefits_audit 12 · booking 14 · events 10 · gates 11 · intake 14 · integrity 17 · match 16 · perf 1 · scenarios 12 · shipment_edit 8 · vehicle_events 6 · login 13 · login_scenarios 11 · deploy 9 · **tracking 6 · incidents 12 · docks 10 · eta 10** (mở rộng Control Tower).
 
 ## Đối chiếu điều kiện nghiệm thu (CLAUDE.md mục 8 / DRAFT bảng 3, 5)
 | Nhóm | Mục tiêu | Bằng chứng | Kết quả |
@@ -59,6 +59,16 @@ Từ điển chữ giao diện (tiếng Việt): **2.645 → 1.364 từ (−48%)
 - **Độ chính xác từng trường** trên tập đối chiếu 12 tin mẫu (`tests/fixtures/intake_cases.json`): loại hàng, trọng lượng, điểm lấy, điểm đến, 3 mốc giờ đều **12/12**, tổng **98/98**, không có giá trị sai nào mang trạng thái `ok`. ⚠️ Đây là tập hồi quy **do chính nhóm viết** nên số 100% **không** phải độ chính xác trên tin nhắn thật; cần tập đối chiếu do người dùng nghiệp vụ duyệt, và chưa đo thời gian sửa/tỷ lệ nhập thành công (DRAFT 6.1). Tập mẫu đã giúp phát hiện và sửa 2 lỗi thật của bộ phân tích (bắt nhầm "9h 11/11" thành 09:11; mượn ngày của trường kế tiếp).
 - Chưa hỗ trợ PDF/ảnh/giọng nói, chỉ văn bản dán (đúng phạm vi MVP của DRAFT).
 
+## Mở rộng Control Tower (chi tiết: `docs/CONTROL_TOWER.md`)
+| # | Kịch bản mới | Kết quả | Điểm kiểm chính |
+|---|---|---|---|
+| 7 | Theo dõi chuyến | Đạt | GPS mô phỏng → 3 mốc geofence đúng thứ tự, mỗi mốc **một** lần; không lộ giá/khách hàng |
+| 8 | Hỏng xe → ghép lại | Đạt | critical theo luật `sev-v1`, playbook + SLA, thông báo, chỉ bên có trách nhiệm hoàn tất bước, **ghép lại** trả tài nguyên, xe hỏng không bị đề xuất lại |
+| 9 | Lịch dock | Đạt | tự xếp dock; ETA đổi → chỉ đề xuất, ICD chấp nhận mới áp dụng; hai yêu cầu dời cùng khung → [200, 409] |
+| 10 | Mô hình ETA | Đạt | ML mô phỏng được promote (MAE −64%, độ phủ P90 88%); dữ liệu trôi → tự hạ về luật |
+
+Test đáng chú ý: `test_no_future_leakage…` (trôi chỉ xuất hiện ở đoạn test thì độ phủ phải tụt — nếu test lọt vào huấn luyện/hiệu chỉnh thì không tụt), `test_concurrent_reschedules…`, `test_replan_guards…` (404/403/409 đúng chỗ, `CARGO_ON_BOARD`), `test_replaying_position_events…`. Lỗi tìm được khi viết test: làm tròn khung dock xuống thay vì lên (khung có thể bắt đầu sớm hơn slot vài chục giây) — đã sửa.
+
 ## 6 kịch bản demo bắt buộc
 | # | Kịch bản | Kết quả | Điểm kiểm chính |
 |---|---|---|---|
@@ -85,8 +95,8 @@ Từ điển chữ giao diện (tiếng Việt): **2.645 → 1.364 từ (−48%)
 ## Giới hạn đã biết (không che giấu)
 - Mọi số liệu là **mô phỏng**; "verified" chỉ chứng minh quy trình ghi sổ/xác minh độc lập, **không** chứng minh tiết kiệm thật. Lợi ích mới có một hạng mục (km chạy rỗng × đơn giá phẳng, baseline hằng số 38 km); chưa có chi phí chờ/bốc dỡ/đi vòng, chưa có Bảng A/B/C của DRAFT 11.3.
 - **AI thật chưa được kiểm chứng**: bộ mặc định là luật; bộ LLM chưa chạy với API thật.
-- ETA là rule-based (đường chim bay × 1,3), chưa có khoảng bất định P50/P90; ghép vẫn theo từng lô độc lập (chưa có phân bổ nhiều xe–hàng, OR-Tools là P1).
+- ETA luật có P50/P90 nhưng tham số là mô phỏng; ML chỉ huấn luyện trên lịch sử **do nhóm sinh** (chưa có dữ liệu thật); ghép vẫn theo từng lô độc lập (chưa có phân bổ nhiều xe–hàng, OR-Tools là P1).
 - Sửa yêu cầu chưa xoá được giá/khách hàng đã nhập (để trống = giữ nguyên). Bản nháp nhập liệu dùng lại được cho nhiều lô.
-- `request_replan` của ngoại lệ chỉ ghi nhận quyết định; chưa có luồng huỷ/lập lại chuyến đã cam kết.
+- Ghép lại chỉ với chuyến chưa lấy hàng; đường đi GPS là nội suy mô phỏng; dock/ICD mới có 2 dock cố định 30′; SMS/email chỉ là nhật ký giả lập; chưa làm cold chain, returns, emissions, dashboard KPI tổng (xem `docs/CONTROL_TOWER.md`).
 - `external_id_map`, `logistics_units`, `shipment_legs` mới là khung bảng (chưa có logic ánh xạ ID đối tác, gộp/tách hàng); `ID_UNRESOLVED` chưa được sinh ra; chưa có API sửa sự kiện (`corrects_event_id`).
 - `proposal.confirmed` là xác nhận mock (chưa có API ICD thật); đăng nhập là token dev; chưa RLS, telemetry, backup/restore, staging, CI.
