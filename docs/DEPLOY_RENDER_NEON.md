@@ -1,6 +1,6 @@
 # Triển khai miễn phí: Render (web) + Neon (Postgres) + UptimeRobot (giữ thức)
 
-> Lý do chọn: Hugging Face đã chuyển Docker Space sang gói trả phí (chỉ Static miễn phí) — xem `DEPLOY_HF_NEON.md` (chỉ dùng được nếu bạn có PRO).
+> Lý do chọn: Hugging Face đã chuyển Docker Space sang gói trả phí (chỉ Static miễn phí).
 > Đo thực tế: container dùng **~141 MiB lúc rảnh, ~148 MiB sau khi chạy 10 kịch bản** (giới hạn thử 512 MiB, không OOM) → vừa gói Render free.
 > ⚠️ Chưa chạy thật trên Render. Điều kiện gói free của Render/Neon/UptimeRobot hay đổi — đối chiếu trang chính thức.
 
