@@ -241,3 +241,4 @@ label.inline select { min-width: 220px; width: auto; }
 .g-blk.no_show { background: var(--fail-bg); border-color: var(--fail); color: var(--fail); }
 .g-blk.busy { background: repeating-linear-gradient(45deg, #e4e9eb, #e4e9eb 4px, #f3f6f7 4px, #f3f6f7 8px); border-color: var(--line); cursor: default; }
 .g-blk.sug { outline: 2px dashed var(--unknown); } .g-blk.sel { box-shadow: 0 0 0 2px var(--teal); }
+table.mini { border-collapse: collapse; font-size: 13px; } table.mini th, table.mini td { padding: 3px 12px 3px 0; text-align: left; }

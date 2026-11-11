@@ -1,12 +1,63 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError, type SimMode } from '../api'
+import { api, ApiError, type SimMode, type TripTrack } from '../api'
 import { RouteMap } from '../components/RouteMap'
-import { Chip, ErrorNote, Hint, Loading, Note } from '../components/ui'
+import { Chip, ErrorNote, Hint, Loading, More, Note } from '../components/ui'
+import { fmtTime } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
 const MODES: SimMode[] = ['normal', 'slow', 'breakdown', 'detour']
+
+function EtaBlock({ trip }: { trip: TripTrack }) {
+  const { t } = useI18n()
+  const e = trip.eta
+  if (!e) return null
+  const p50 = e.p50 !== undefined ? e.p50 : e.icd
+  const p90 = e.p90 !== undefined ? e.p90 : e.icd_p90
+  const risk = e.cutoff_risk ?? e.cutoff_risk_p90
+  return (
+    <div className="stack">
+      <div className="row">
+        <b>{t('eta.icd')}</b>
+        {e.stalled ? <Chip kind="bad">{t('eta.stalled')}</Chip> : <span>{fmtTime(p50 ?? null)} <span className="muted">– {fmtTime(p90 ?? null)}</span></span>}
+        {risk && <Chip kind="bad" title={t('eta.riskTip')}>{t('eta.risk')}</Chip>}
+      </div>
+      <div className="row muted small"><Chip>{e.method.startsWith('rule') ? t('eta.rule') : e.method}</Chip>
+        {trip.eta_ml && <Chip kind="teal" title={trip.eta_ml.confidence}>{t('eta.ml', { a: trip.eta_ml.p50_minutes, b: trip.eta_ml.p90_minutes })}</Chip>}
+        {trip.cutoff_at && <span>{t('eta.cutoff', { t: fmtTime(trip.cutoff_at) })}</span>}</div>
+    </div>
+  )
+}
+
+function EtaModelCard() {
+  const { t } = useI18n()
+  const model = useData(() => api.etaModel(), 0)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<ApiError | null>(null)
+  const m = model.data
+  const train = async (drift: number) => { setBusy(true); setErr(null); try { await api.etaTrain(drift); await model.reload(true) } catch (e) { setErr(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) } finally { setBusy(false) } }
+  if (!m) return null
+  const x = m.metrics
+  return (
+    <More label={t('eta.model')}>
+      <div className="stack">
+        <div className="row"><Chip kind={m.status === 'promoted' ? 'good' : 'warn'}>{t(`eta.status.${m.status}`)}</Chip><Chip kind="sim">{t('badge.mock')}</Chip><Hint text={m.note} /></div>
+        {x && (
+          <table className="mini"><thead><tr><th /><th>{t('eta.rule')}</th><th>ML</th></tr></thead><tbody>
+            <tr><td>MAE</td><td>{x.mae_rule}′</td><td>{x.mae_ml}′</td></tr>
+            <tr><td>±15′</td><td>{Math.round(x.within15_rule * 100)}%</td><td>{Math.round(x.within15_ml * 100)}%</td></tr>
+            <tr><td>P90</td><td>{Math.round(x.p90_coverage_rule * 100)}%</td><td>{Math.round(x.p90_coverage_ml * 100)}%</td></tr>
+          </tbody></table>)}
+        {x && <span className="footnote">{t('eta.gate', { n: x.improvement_pct, min: x.min_improvement_pct })}</span>}
+        {err && <ErrorNote error={err} />}
+        {m.reason !== 'ok' && m.status === 'rule_fallback' && <span className="footnote">{t(`eta.reason.${m.reason}`)}</span>}
+        <div className="row"><button className="btn sm" disabled={busy} onClick={() => train(0)}>{t('eta.train')}</button>
+          <button className="btn sm" disabled={busy} onClick={() => train(0.15)}>{t('eta.trainDrift')}</button></div>
+      </div>
+    </More>
+  )
+}
 
 export function Tracking({ query }: { query: URLSearchParams }) {
   const { t } = useI18n()
@@ -54,6 +105,7 @@ export function Tracking({ query }: { query: URLSearchParams }) {
             <div className="row">
               {trip.milestones.map((ms) => <Chip key={ms.code} kind={ms.reached ? 'good' : ''}>{ms.reached ? '✓ ' : ''}{t(`tk.ms.${ms.code}`)}</Chip>)}
             </div>
+            <EtaBlock trip={trip} />
             {canSim && (
               <div className="row">
                 <button className="btn" onClick={() => run(() => api.simStart(trip.proposal_id))}>{t('tk.sim')}</button><Hint text={t('tk.simHint')} />
@@ -64,6 +116,7 @@ export function Tracking({ query }: { query: URLSearchParams }) {
             {error && <Note kind="err">{error.message}</Note>}
           </div>
         </div>)}
+      {me?.role === 'dispatcher' && <div className="card"><EtaModelCard /></div>}
     </section>
   )
 }

@@ -33,7 +33,7 @@ export interface Proposal {
   score: number | null
   score_components: { fit: number; time_margin: number; empty_km_saved: number; weights: Record<string, number>; missing: string[] }
   estimated_saving_vnd: number | null; deadhead_km: number | null
-  eta: { pickup: string; method: string; confidence: string } | null
+  eta: { pickup: string; pickup_p90?: string; icd?: string; icd_p90?: string; method: string; confidence: string; cutoff_risk_p90?: boolean } | null
   gates: GateItem[]; rejections: Rejection[]
   rule_version: string; model_version: string; assumption_version: string
   expires_at: string | null; hold_seconds_left: number | null
@@ -93,11 +93,21 @@ export interface Benefit {
 export interface BenefitList { items: Benefit[]; totals: Record<'estimated' | 'measured' | 'verified', { count: number; net_vnd: number }> }
 export interface ScenarioResult { id: string; passed: boolean; steps: { label: string; ok: boolean; detail: string }[]; open: string | null }
 export type SimMode = 'normal' | 'slow' | 'breakdown' | 'detour'
+export interface LiveEta {
+  method: string; confidence: string; p50?: string | null; p90?: string | null; icd?: string; icd_p90?: string
+  stalled?: boolean; cutoff_risk?: boolean; cutoff_risk_p90?: boolean; remaining_km?: number; speed_kmh?: number
+}
+export interface EtaModel {
+  label: string; trained: boolean; status: 'promoted' | 'rule_fallback' | 'untrained'; reason: string; note: string
+  metrics: { n_train: number; n_test: number; mae_rule: number; mae_ml: number; improvement_pct: number; within15_rule: number; within15_ml: number
+    p90_coverage_rule: number; p90_coverage_ml: number; min_improvement_pct: number; coverage_target: number[]; drift: number } | null
+}
 export interface TripTrack {
   proposal_id: string; status: string; shipment_code: string; plate: string; is_simulated: boolean
   position: { lat: number; lng: number; speed_kmh: number | null; age_seconds: number | null } | null
   progress_pct: number; remaining_km: number; total_km: number
   milestones: { code: string; reached: boolean }[]
+  eta: LiveEta | null; eta_ml: { p50_minutes: number; p90_minutes: number; label: string; confidence: string } | null; cutoff_at: string | null
   route: { lat: number; lng: number }[]; pickup_index: number
   geofences: { code: string; lat: number; lng: number; radius_m: number }[]
   track?: { at: string; lat: number; lng: number; speed_kmh: number | null }[]
@@ -221,6 +231,8 @@ export const api = {
   dockBoard: () => request<DockBoard>('/v1/docks/board'),
   dockReschedule: (id: string, version: number, window_start: string, dock_id: string) => post<unknown>(`/v1/dock-appointments/${id}/reschedule`, { version, window_start, dock_id }),
   dockAccept: (id: string, version: number) => post<unknown>(`/v1/dock-appointments/${id}/accept-suggestion`, { version }),
+  etaModel: () => request<EtaModel>('/v1/eta/model'),
+  etaTrain: (drift: number) => post<EtaModel>('/v1/eta/train', { drift }),
   benefits: () => request<BenefitList>('/v1/benefits'),
   benefit: (id: string) => request<Benefit>(`/v1/benefits/${id}`),
   verify: (id: string) => post<Benefit>(`/v1/benefits/${id}/verify`, {}),

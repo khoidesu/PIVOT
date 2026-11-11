@@ -57,7 +57,7 @@ function ProposalCard({ p, rank, onHold, busy }: { p: Proposal; rank: number; on
       </div>
       <ul className="why">{mainReasons(p, t).map((r, i) => <li key={i}>{r}</li>)}</ul>
       <div className="small muted">
-        {p.eta && <>{t('rec.eta')} <b>{fmtTime(p.eta.pickup)}</b></>}
+        {p.eta && <>{t('rec.eta')} <b>{fmtTime(p.eta.pickup)}</b>{p.eta.pickup_p90 && <span className="muted"> – {fmtTime(p.eta.pickup_p90)}</span>}{p.eta.cutoff_risk_p90 && <> <Chip kind="warn" title={t('eta.riskTip')}>{t('eta.risk')}</Chip></>}</>}
         {p.slot && <> · {t('rec.slot')} <b>{fmtTime(p.slot.start_at)}–{fmtTime(p.slot.end_at).slice(-5)}</b></>}
         {p.estimated_saving_vnd != null && <> · ≈ <b>{fmtVnd(p.estimated_saving_vnd)}</b></>}
       </div>
