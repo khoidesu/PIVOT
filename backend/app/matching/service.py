@@ -13,6 +13,7 @@ from .. import models as m
 from ..assumptions import get_active
 from ..auth import Actor
 from ..booking import service as bk
+from ..eta import baseline as eta_mod
 from . import gates, score
 
 RUN_ROLES = {"shipper", "carrier", "dispatcher"}
@@ -93,8 +94,7 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
                             "position_updated_at": e["vehicle"].position_updated_at.isoformat()
                             if e["vehicle"].position_updated_at else None},
                 "gates": [bk.gate_to_dict(r) for r in e["verdict"].results],
-                "eta": {"pickup": gates.pickup_eta(e["window"], shipment, now, params).isoformat(),
-                        "method": params.get("eta_method", "rule-based"), "confidence": "low (rule-based)"},
+                "eta": eta_mod.build(gates.pickup_eta(e["window"], shipment, now, params), now, params, shipment.cutoff_at),
                 "estimated_saving_vnd": sc.estimated_saving_vnd, "deadhead_km": sc.deadhead_km,
                 # Baseline chốt tại thời điểm ghép (trước khi biết kết quả) — DRAFT 11.1: không chọn baseline sau khi có kết quả
                 "baseline": {"id": f"base-{run_id[:8]}", "empty_km": params["empty_km_baseline"],

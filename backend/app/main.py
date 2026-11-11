@@ -8,9 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .routers import auth, benefits, core, demo, docks, events, incidents, intake, matching, tracking
+from .routers import auth, benefits, core, demo, docks, eta, events, incidents, intake, matching, tracking
 from .worker import process_pending
 
+
+
+def _warm_eta() -> None:
+    from .eta import ml
+    ml.ensure_trained()
 
 
 def sim_tick_once() -> None:
@@ -32,6 +37,7 @@ async def lifespan(app: FastAPI):
     if settings.allow_dev_tokens and settings.data_mode != "mock":
         raise RuntimeError("Refusing to start: dev tokens enabled while PIVOT_DATA_MODE != 'mock'")
     task = None
+    asyncio.get_event_loop().run_in_executor(None, _warm_eta)  # huấn luyện ETA mô phỏng nền (không chặn khởi động)
     if settings.worker_inline:  # worker nền đọc outbox mỗi giây (chạy cùng tiến trình cho demo local)
         async def loop():
             while True:
@@ -64,6 +70,7 @@ app.include_router(intake.router)
 app.include_router(tracking.router)
 app.include_router(incidents.router)
 app.include_router(docks.router)
+app.include_router(eta.router)
 app.include_router(demo.router)
 
 

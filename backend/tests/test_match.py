@@ -80,7 +80,7 @@ def test_score_is_normalised_ranked_and_versioned(client):
         assert all(0.0 <= c[k] <= 1.0 for k in ("fit", "time_margin", "empty_km_saved"))
         assert abs(sum(c["weights"].values()) - 1.0) < 1e-9
         assert 0.0 <= p["score"] <= 1.0
-        assert p["rule_version"] == "rules-v1" and p["assumption_version"] == "assume-v1"
+        assert p["rule_version"] == "rules-v1" and p["assumption_version"] == "assume-v2"
         assert p["model_version"] == "rule-based" and p["eta"]["method"] == "rule-based"
         assert p["estimated_saving_vnd"] is not None  # tiền tách khỏi điểm
         assert "price_vnd" not in p["shipment"] and "customer_name" not in p["shipment"]

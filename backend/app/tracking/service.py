@@ -88,6 +88,8 @@ def _visible_proposals(session: Session, actor, only_active: bool):
 
 
 def trip_view(session: Session, prop: m.Proposal, ship: m.Shipment, veh: m.Vehicle, now: datetime) -> dict:
+    from ..assumptions import get_active
+    from ..eta import live as eta_live, ml
     pts, pickup_idx, cum = route_for(session, prop)
     total = cum[-1]
     reached = reached_milestones(session, prop.id)
@@ -103,6 +105,9 @@ def trip_view(session: Session, prop: m.Proposal, ship: m.Shipment, veh: m.Vehic
         "progress_pct": round(100 * along / total) if total else 0, "remaining_km": round(max(total - along, 0), 1),
         "total_km": round(total, 1), "milestones": [{"code": c, "reached": c in reached} for c in MILESTONE_LABELS],
         "is_simulated": True,
+        "eta": eta_live.live(session, prop, ship, veh, now, get_active(session).params) or ((prop.input_snapshot or {}).get("eta")),
+        "cutoff_at": ship.cutoff_at,
+        "eta_ml": ml.predict(now) if prop.status in ("confirmed", "executing") else None,  # chỉ khi mô hình được promote (dữ liệu mô phỏng)
         "route": [{"lat": a, "lng": b} for a, b in pts], "pickup_index": pickup_idx,
         "geofences": [{"code": "AT_PICKUP", "lat": pts[pickup_idx][0], "lng": pts[pickup_idx][1], "radius_m": int(R_PICKUP_KM * 1000)},
                       {"code": "AT_ICD_GATE", "lat": pts[-1][0], "lng": pts[-1][1], "radius_m": int(R_GATE_KM * 1000)}],

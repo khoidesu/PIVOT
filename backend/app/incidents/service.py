@@ -113,7 +113,26 @@ def sweep(session: Session, now: datetime, stale_minutes: int = 15) -> dict:
             age = int((now - veh.position_updated_at).total_seconds() // 60)
             if raise_exception(session, prop, "DATA_STALE", {"age_minutes": age}, now, source="sweep", dedupe_key=f"stale:{prop.id}"):
                 stale += 1
-    return {"escalated": escalated, "stale": stale}
+    risk = _delay_risk(session, now)
+    return {"escalated": escalated, "stale": stale, "risk": risk}
+
+
+def _delay_risk(session: Session, now: datetime) -> int:
+    """DELAY_RISK: dự báo SẼ lỡ cut-off (P90 vượt) trước khi thực sự trễ — luôn mức critical theo luật. Idempotent (1 lần/chuyến)."""
+    from ..assumptions import get_active
+    from ..eta import live as eta_live
+    params = get_active(session).params
+    n = 0
+    for prop, ship, veh in session.execute(select(m.Proposal, m.Shipment, m.Vehicle).join(m.Shipment, m.Shipment.id == m.Proposal.shipment_id)
+                                           .join(m.Vehicle, m.Vehicle.id == m.Proposal.vehicle_id)
+                                           .where(m.Proposal.status.in_(("confirmed", "executing")))).all():
+        live = eta_live.live(session, prop, ship, veh, now, params)
+        planned = (prop.input_snapshot or {}).get("eta") or {}
+        risky = live["cutoff_risk"] if live else bool(planned.get("cutoff_risk_p90"))
+        if risky and raise_exception(session, prop, "DELAY_RISK", {"delay_minutes": 0, "cutoff_risk": True, "basis": "live_p90" if live else "plan_p90"},
+                                     now, source="sweep", dedupe_key=f"risk:{prop.id}"):
+            n += 1
+    return n
 
 
 # ---------------------------------------------------------------- ghép lại (đóng ngõ cụt "request_replan")

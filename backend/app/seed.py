@@ -33,6 +33,11 @@ ASSUMPTIONS_V1 = {
     "transit_minutes": 90,  # điểm lấy → ICD (bảng tuyến–khung giờ, rule-based)
     "handling_minutes": 20,
     "eta_method": "rule-based",
+    # ETA luật (assume-v2): P50 = bảng tuyến (deadhead + transit); khung giờ chỉ nới độ bất định P90. Tham số MÔ PHỎNG.
+    "eta": {"model_version": "eta-rule-v1", "p90_buffer_minutes": 10, "peak_am_hours": [7, 8], "peak_pm_hours": [16, 17, 18],
+            "night_hours": [22, 23, 0, 1, 2, 3, 4, 5], "tz_offset_hours": 7,
+            "spread": {"normal": 0.15, "peak_am": 0.35, "peak_pm": 0.45, "night": 0.10},
+            "live_speed_kmh_fallback": 35.0, "live_p90_speed_factor": 0.75},
     "score_weights": {"fit": 0.4, "time_margin": 0.3, "empty_km_saved": 0.3},  # tổng = 1
     "cost_per_km_vnd": 14000,
     "empty_km_baseline": 38,
@@ -107,7 +112,7 @@ def seed(session: Session, now: datetime | None = None) -> dict:
         "depot": m.Location(id=uid("loc-depot"), name="Depot Thủ Đức (mô phỏng)", kind="depot", lat=10.87, lng=106.77),
     }
     session.add_all(locs.values())
-    session.add(m.AssumptionSet(id=uid("assume-v1"), version="assume-v1",
+    session.add(m.AssumptionSet(id=uid("assume-v2"), version="assume-v2",
                                 params=ASSUMPTIONS_V1 | {"anchor_at": now.isoformat()}))
     session.flush()
 

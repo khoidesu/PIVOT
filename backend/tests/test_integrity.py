@@ -66,7 +66,7 @@ def proposal_ids(seeded):
         ids = []
         for _ in range(2):
             p = m.Proposal(shipment_id=ship.id, vehicle_id=veh.id, rule_version="rules-v1",
-                           assumption_version="assume-v1")
+                           assumption_version="assume-v2")
             s.add(p)
             s.flush()
             ids.append(p.id)

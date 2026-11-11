@@ -24,9 +24,11 @@ SUGGEST_HORIZON = timedelta(hours=6)
 
 
 def _ceil5(dt: datetime) -> datetime:
-    dt = dt.replace(second=0, microsecond=0)
-    extra = (5 - dt.minute % 5) % 5
-    return dt + timedelta(minutes=extra) if extra else dt
+    """Làm tròn LÊN bội số 5 phút (không bao giờ sớm hơn dt)."""
+    floored = dt.replace(second=0, microsecond=0)
+    if floored == dt and dt.minute % 5 == 0:
+        return dt
+    return floored + timedelta(minutes=5 - dt.minute % 5)
 
 
 def lock_docks(session: Session, node_org_id: uuid.UUID, location_id: uuid.UUID | None = None) -> list[m.Dock]:
@@ -66,7 +68,7 @@ def find_window(session: Session, docks: list[m.Dock], earliest: datetime, lates
 
 
 def arrival_at_icd(session: Session, prop: m.Proposal) -> datetime | None:
-    """ETA tới ICD (luật) = ETA lấy hàng của chuyến + thời gian trung chuyển (assume-v1)."""
+    """ETA tới ICD (luật) = ETA lấy hàng của chuyến + thời gian trung chuyển (assume-v2)."""
     pickup = ((prop.input_snapshot or {}).get("eta") or {}).get("pickup")
     return datetime.fromisoformat(pickup) + timedelta(minutes=get_active(session).params["transit_minutes"]) if pickup else None
 
