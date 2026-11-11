@@ -69,10 +69,18 @@ export interface Replay {
   assumption_version: string; run_id: string | null; baseline: { id: string; empty_km: number; cost_per_km_vnd: number; fixed_at: string } | null
   snapshot_keys: string[]
 }
+export type Severity = 'low' | 'medium' | 'high' | 'critical'
+export interface ExceptionTask { id: string; step_key: string; kind: 'auto' | 'human'; owner: string; status: 'pending' | 'done'; completed_by: string | null; can_complete: boolean }
 export interface ExceptionItem {
   id: string; proposal_id: string; exc_type: string; status: 'open' | 'resolved'; created_at: string
   detail: { action?: string; delay_minutes?: number; resolution?: string; note?: string; resolved_by?: string }
+  severity: Severity; sla_due_at: string | null; escalated_at: string | null; overdue: boolean; source: string
+  shipment_code: string; plate: string; proposal_status: string; proposal_version: number
+  tasks: ExceptionTask[]; can_replan: boolean; rule_version: string | null
 }
+export interface NotificationItem { id: string; exception_id: string | null; channel: 'in_app' | 'sms_sim' | 'email_sim'; created_at: string; read: boolean
+  payload: { category: string; severity: Severity; shipment_code: string; plate: string; escalated?: boolean } }
+export interface NotificationList { unread: number; items: NotificationItem[] }
 export interface Benefit {
   id: string; proposal_id: string | null; shipment_code: string; vehicle_plate: string; cost_category: string
   quantity_before: number; quantity_after: number; unit: string; unit_rate: number; currency: string; net_vnd: number
@@ -193,6 +201,11 @@ export const api = {
   trip: (id: string) => request<TripTrack>(`/v1/tracking/${id}`),
   simStart: (id: string) => post<{ running: boolean; mode: SimMode }>(`/v1/sim/${id}/start`, {}),
   simMode: (id: string, mode: SimMode) => post<{ running: boolean; mode: SimMode }>(`/v1/sim/${id}/mode`, { mode }),
+  completeTask: (exId: string, taskId: string) => post<ExceptionItem>(`/v1/exceptions/${exId}/tasks/${taskId}/complete`, {}),
+  replan: (p: { id: string; version: number }) =>
+    post<{ cancelled_proposal_id: string; shipment_id: string; new_proposals: number }>(`/v1/proposals/${p.id}/replan`, { version: p.version }),
+  notifications: () => request<NotificationList>('/v1/notifications'),
+  readNotifications: () => post<{ ok: boolean }>('/v1/notifications/read', {}),
   benefits: () => request<BenefitList>('/v1/benefits'),
   benefit: (id: string) => request<Benefit>(`/v1/benefits/${id}`),
   verify: (id: string) => post<Benefit>(`/v1/benefits/${id}/verify`, {}),

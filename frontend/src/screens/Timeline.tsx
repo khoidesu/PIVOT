@@ -122,7 +122,7 @@ export function Timeline({ query }: { query: URLSearchParams }) {
                       {e.status === 'open' && (canDecide ? (
                         <div className="row">
                           <button className="btn sm primary" disabled={!!busy} onClick={() => resolve(e, 'accept_delay')}>{t('tl.resolve.accept_delay')}</button>
-                          <button className="btn sm" disabled={!!busy} onClick={() => resolve(e, 'request_replan')}>{t('tl.resolve.request_replan')}</button>
+                          <a className="btn sm" href="#/exceptions">{t('nav.exceptions')}</a>
                         </div>) : <span className="footnote">{t('tl.noPermResolve')}</span>)}
                     </div>))}
                 </section>)}

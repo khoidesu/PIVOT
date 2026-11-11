@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useData } from '../useData'
 import { api, ApiError, getAdminKey } from '../api'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
@@ -6,6 +7,36 @@ import { Chip, Hint } from './ui'
 
 export function Brand() {
   return <div className="brand"><div className="logo" aria-hidden>L</div><b>LOGECTION</b></div>
+}
+
+function Bell() {
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  const wrap = useRef<HTMLDivElement>(null)
+  const list = useData(() => api.notifications(), 4000)
+  useEffect(() => {
+    if (!open) return
+    const out = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', out)
+    return () => document.removeEventListener('mousedown', out)
+  }, [open])
+  const items = (list.data?.items ?? []).filter((n) => n.channel === 'in_app').slice(0, 15)
+  const unread = list.data?.unread ?? 0
+  return (
+    <div className="menu-wrap" ref={wrap}>
+      <button className="bell" aria-label={t('bell.title')} aria-expanded={open} onClick={() => setOpen((v) => !v)}>🔔{unread > 0 && <span className="dot">{unread > 9 ? '9+' : unread}</span>}</button>
+      {open && (
+        <div className="menu bell-list" role="menu">
+          {!items.length && <div className="muted small" style={{ padding: 10 }}>{t('bell.empty')}</div>}
+          {items.map((n) => (
+            <button key={n.id} role="menuitem" className={`it${n.read ? '' : ' unread'}`} onClick={() => { setOpen(false); window.location.hash = '#/exceptions' }}>
+              <b>{t(`ex.cat.${n.payload.category}`)} · {t(`ex.sev.${n.payload.severity}`)}</b>
+              <span className="muted small">{n.payload.shipment_code} · {n.payload.plate}{n.payload.escalated ? ` · ${t('ex.escalated')}` : ''}</span>
+            </button>))}
+          {unread > 0 && <button role="menuitem" onClick={() => { void api.readNotifications().then(() => list.reload(true)) }}>{t('bell.read')}</button>}
+        </div>)}
+    </div>
+  )
 }
 
 export function TopBar() {
@@ -42,6 +73,7 @@ export function TopBar() {
           <Chip kind={sim ? 'sim' : 'good'}>● {sim ? t('badge.mock') : t('badge.live')}</Chip>
           {sim && <Hint text={t('badge.mockTip')} />}
         </div>
+        {me && <Bell />}
         {me && (
           <div className="menu-wrap" ref={wrap}>
             <button className="who" aria-haspopup="menu" aria-expanded={open} aria-label={t('menu.open')} onClick={() => setOpen((v) => !v)}>
