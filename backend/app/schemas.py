@@ -84,6 +84,7 @@ class VehicleOut(ORM):
 class SlotOut(ORM):
     id: uuid.UUID
     node_org_id: uuid.UUID
+    node_org_name: str | None = None
     location_id: uuid.UUID
     start_at: datetime
     end_at: datetime
@@ -177,6 +178,7 @@ class ProposalOut(BaseModel):
 
 class MatchRunIn(BaseModel):
     shipment_id: uuid.UUID
+    node_org_id: uuid.UUID | None = None  # chủ hàng chọn ICD; bỏ trống → luân phiên giữa các ICD có slot đạt
 
 
 class MatchRunOut(BaseModel):

@@ -31,7 +31,7 @@ def _http(e: bk.BookingError) -> HTTPException:
 def create_match_run(body: s.MatchRunIn, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     shipment = get_visible_shipment(session, actor, body.shipment_id)
     now = _now()
-    run = run_match(session, actor, shipment, now)
+    run = run_match(session, actor, shipment, now, body.node_org_id)
     session.commit()
     from ..matching.redact import redact_rejections
     vids = {r["vehicle_id"] for r in run["rejections"] + run["needs_data"]}

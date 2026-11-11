@@ -23,7 +23,30 @@ def _loc(locs: dict, location_id):
     return locs[location_id]
 
 
-def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetime) -> dict:
+def _spread_icds(top: list, slots: list, shipment: m.Shipment, now: datetime, params: dict, reserved_vehicles: set) -> None:
+    """Nhiều ICD cùng có slot đạt tại điểm đến → các đề xuất luân phiên giữa các ICD (theo thứ tự giờ slot sớm nhất của mỗi ICD),
+    để mọi ICD đều nhận được yêu cầu xác nhận. Trước đây luôn lấy slot sớm nhất nên ICD có nhiều slot sớm hơn "nuốt" hết đề xuất.
+    Slot mới vẫn phải qua hard gate (đánh giá lại); không đạt thì giữ slot cũ. Chỉ một ICD → không đổi gì."""
+    nodes: list = []
+    for sl in slots:
+        if sl.node_org_id not in nodes:
+            nodes.append(sl.node_org_id)
+    if len(nodes) < 2:
+        return
+    for i, e in enumerate(top):
+        want = nodes[i % len(nodes)]
+        if e["slot"] is not None and e["slot"].node_org_id == want:
+            continue
+        for sl in slots:
+            if sl.node_org_id != want:
+                continue
+            verdict = gates.evaluate(shipment, e["vehicle"], e["window"], sl, now, params, vehicle_reserved=e["vehicle"].id in reserved_vehicles)
+            if verdict.status == "PASS":
+                e["slot"], e["verdict"] = sl, verdict
+                break
+
+
+def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetime, node_org_id: uuid.UUID | None = None) -> dict:
     if actor.role not in RUN_ROLES:
         raise HTTPException(status_code=403, detail="Role cannot run matching")
     if shipment.status != "open":
@@ -42,6 +65,10 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
     # lọc gần phù hợp: chỉ slot tại điểm đến của lô (slot sai điểm vẫn bị gate loại nếu lọt vào)
     slots = list(session.execute(select(m.Slot).where(m.Slot.location_id == shipment.dest_location_id)
                                  .order_by(m.Slot.start_at)).scalars())
+    if node_org_id is not None:  # chủ hàng chỉ định ICD: chỉ xét slot của ICD đó (không có → báo rõ, không âm thầm đổi sang ICD khác)
+        slots = [sl for sl in slots if sl.node_org_id == node_org_id]
+        if not slots:
+            raise HTTPException(status_code=422, detail={"code": "NODE_HAS_NO_SLOTS", "message": "The chosen ICD has no slots at this destination"})
     reserved_vehicles = set(session.execute(select(m.Reservation.resource_id).where(
         m.Reservation.resource_type == "vehicle", m.Reservation.status.in_(("held", "committed")))).scalars())
 
@@ -76,6 +103,8 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
         scored.append({**e, "scored": sc})
     scored.sort(key=score.rank_key)
     top = scored[: params.get("max_proposals", 3)]
+    if node_org_id is None:
+        _spread_icds(top, slots, shipment, now, params, reserved_vehicles)
 
     proposals = []
     ttl = timedelta(minutes=params.get("proposal_ttl_minutes", 15))
