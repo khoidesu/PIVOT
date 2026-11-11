@@ -11,9 +11,10 @@ import { Fleet } from './screens/Fleet'
 import { Recommend } from './screens/Recommend'
 import { Request } from './screens/Request'
 import { Timeline } from './screens/Timeline'
+import { Tracking } from './screens/Tracking'
 import { AppProvider, useApp } from './store'
 
-const ROUTES: Route[] = ['request', 'fleet', 'recommend', 'confirm', 'timeline', 'benefits', 'demo']
+const ROUTES: Route[] = ['request', 'fleet', 'recommend', 'confirm', 'timeline', 'benefits', 'demo', 'tracking']
 
 function useHashRoute(): [Route, URLSearchParams, (to: string) => void] {
   const read = () => {
@@ -54,6 +55,7 @@ function Shell() {
         {route === 'fleet' && <Fleet go={go} />}
         {route === 'recommend' && <Recommend go={go} query={query} />}
         {route === 'confirm' && <Confirm />}
+        {route === 'tracking' && <Tracking query={query} />}
         {route === 'timeline' && <Timeline query={query} />}
         {route === 'benefits' && <Benefits query={query} />}
         {route === 'demo' && <Demo />}

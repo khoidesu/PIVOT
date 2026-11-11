@@ -84,6 +84,16 @@ export interface Benefit {
 }
 export interface BenefitList { items: Benefit[]; totals: Record<'estimated' | 'measured' | 'verified', { count: number; net_vnd: number }> }
 export interface ScenarioResult { id: string; passed: boolean; steps: { label: string; ok: boolean; detail: string }[]; open: string | null }
+export type SimMode = 'normal' | 'slow' | 'breakdown' | 'detour'
+export interface TripTrack {
+  proposal_id: string; status: string; shipment_code: string; plate: string; is_simulated: boolean
+  position: { lat: number; lng: number; speed_kmh: number | null; age_seconds: number | null } | null
+  progress_pct: number; remaining_km: number; total_km: number
+  milestones: { code: string; reached: boolean }[]
+  route: { lat: number; lng: number }[]; pickup_index: number
+  geofences: { code: string; lat: number; lng: number; radius_m: number }[]
+  track?: { at: string; lat: number; lng: number; speed_kmh: number | null }[]
+}
 export const SCENARIO_IDS = ['success', 'incompatible', 'stale', 'race', 'eta_change', 'duplicate_restart'] as const
 
 export class ApiError extends Error {
@@ -179,6 +189,10 @@ export const api = {
     post<{ event_id: string; duplicate: boolean }>('/v1/events', {
       entity_id, event_type, payload, occurred_at: new Date().toISOString(), source_system: 'ui-carrier', source_event_id: crypto.randomUUID(),
     }),
+  tracking: () => request<TripTrack[]>('/v1/tracking'),
+  trip: (id: string) => request<TripTrack>(`/v1/tracking/${id}`),
+  simStart: (id: string) => post<{ running: boolean; mode: SimMode }>(`/v1/sim/${id}/start`, {}),
+  simMode: (id: string, mode: SimMode) => post<{ running: boolean; mode: SimMode }>(`/v1/sim/${id}/mode`, { mode }),
   benefits: () => request<BenefitList>('/v1/benefits'),
   benefit: (id: string) => request<Benefit>(`/v1/benefits/${id}`),
   verify: (id: string) => post<Benefit>(`/v1/benefits/${id}/verify`, {}),
