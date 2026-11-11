@@ -368,6 +368,19 @@ class TripTrack(Base):
     source: Mapped[str] = mapped_column(String(20), default="gps")  # gps | sim-gps
 
 
+class TripRoute(Base):
+    """Tuyến đường bộ thật (OSRM) của một chuyến, lưu MỘT LẦN khi chuyến chưa chạy để hình học bất biến suốt chuyến
+    (tránh tiến độ/mốc 'nhảy' nếu tuyến đổi giữa chừng). Không có dòng này → dùng tuyến nội suy mô phỏng."""
+    __tablename__ = "trip_routes"
+    proposal_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("proposals.id"), primary_key=True)
+    points: Mapped[list] = mapped_column(JSON)  # [[lat, lng], ...]
+    pickup_index: Mapped[int] = mapped_column(Integer)
+    distance_km: Mapped[float] = mapped_column(Float)
+    duration_min: Mapped[float] = mapped_column(Float)  # thời gian lái thông thoáng theo OSRM (chưa nhân hệ số)
+    source: Mapped[str] = mapped_column(String(20), default="osrm")
+    fetched_at: Mapped[datetime] = ts(default_now=True)
+
+
 class SimTrip(Base):
     """Trạng thái bộ giả lập GPS của một chuyến (chỉ dùng cho demo/mô phỏng)."""
     __tablename__ = "sim_trips"
