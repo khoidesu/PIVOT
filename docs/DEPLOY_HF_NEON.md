@@ -2,7 +2,7 @@
 
 Kết quả: **một link công khai chạy 24/7**, dữ liệu **được giữ** sau mỗi lần khởi động lại (nằm ở Neon). Dữ liệu vẫn là **mô phỏng**.
 
-> ✅ Đã kiểm thử trên máy: dựng đúng gói sẽ đẩy lên Space (`deploy/hf/push_space.sh` ở chế độ DRY_RUN), build image, chạy ở cổng 7860 với DB trống → `/healthz` OK, không có `X-Frame-Options`, 10/10 kịch bản đạt.
+> ✅ Đã kiểm thử trên máy: build image từ mã hiện tại, chạy với DB trống (migration → seed → `/healthz`), 10/10 kịch bản đạt; cờ `PIVOT_ALLOW_EMBED` có test.
 > ⚠️ **Chưa chạy thật trên Hugging Face/Neon** (cần tài khoản của bạn). Điều kiện gói free của hai dịch vụ hay đổi — đối chiếu trang chính thức.
 
 ## Phần 1 — Neon (database)
@@ -21,13 +21,14 @@ Ghi chú: ứng dụng tự đổi `postgresql://` sang driver đúng, tự ch�
 3. Vào Space → **Settings → Variables and secrets** → thêm 2 **Secrets**:
    - `PIVOT_DATABASE_URL` = chuỗi Neon ở Phần 1.
    - `PIVOT_ADMIN_KEY` = một chuỗi ngẫu nhiên dài (tạo bằng `openssl rand -hex 16`); chỉ người phụ trách demo biết.
+   - Thêm 1 **Variable** `PIVOT_ALLOW_EMBED` = `true` (để chạy được trong khung nhúng của huggingface.co).
 4. Tạo **Access token**: <https://huggingface.co/settings/tokens> → New token → loại *Write* → copy (chỉ hiện một lần).
 5. Trên máy, ở thư mục gốc repo, chạy (thay bằng tài khoản và tên Space của bạn):
    ```bash
-   deploy/hf/push_space.sh TAI-KHOAN/logection
+   deploy/hf/push.sh TAI-KHOAN/logection
    ```
    Khi git hỏi *Username*: tên tài khoản HF; *Password*: **dán access token** (tự gõ ở terminal).
-   Script lấy mã ở commit `HEAD`, thêm README cấu hình Space, cố định cổng 7860 và bật `PIVOT_ALLOW_FRAMING` rồi đẩy lên Space. **Hãy commit mọi thay đổi trước khi chạy.**
+   Script lấy mã ở commit `HEAD`, thêm README cấu hình Space (cổng 8000 khai báo bằng `app_port`) rồi đẩy lên Space. **Hãy commit mọi thay đổi trước khi chạy.**
 6. Mở Space → tab **Logs** xem build (5–10 phút, lâu hơn do scikit-learn). Khi thấy `Uvicorn running` là xong.
 7. Link công khai dạng `https://TAI-KHOAN-logection.hf.space`.
 
@@ -42,7 +43,7 @@ Mở link → đăng nhập **Phú — Điều phối viên** → menu avatar �
 Kiểm tra giữ dữ liệu: tạo một lô → ở Space chọn **Settings → Factory reboot** (hoặc *Restart*) → lô vẫn còn.
 
 ## Cập nhật sau này
-Sửa mã → `git commit` → chạy lại `deploy/hf/push_space.sh TAI-KHOAN/logection`. Migration mới tự chạy khi khởi động; dữ liệu cũ giữ nguyên.
+Sửa mã → `git commit` → chạy lại `deploy/hf/push.sh TAI-KHOAN/logection`. Migration mới tự chạy khi khởi động; dữ liệu cũ giữ nguyên.
 
 ## Sự cố thường gặp
 | Triệu chứng | Cách xử lý |

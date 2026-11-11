@@ -106,9 +106,3 @@ def test_embed_flag_only_removes_frame_protection(client, monkeypatch):
     h = client.get("/healthz").headers
     assert "X-Frame-Options" not in h and h["X-Content-Type-Options"] == "nosniff"
 
-
-def test_framing_header_is_on_by_default_and_can_be_disabled_for_hf_spaces(client, monkeypatch):
-    from app.config import settings
-    assert client.get("/healthz").headers.get("x-frame-options") == "SAMEORIGIN"
-    monkeypatch.setattr(settings, "allow_framing", True)
-    assert "x-frame-options" not in client.get("/healthz").headers

@@ -79,7 +79,7 @@ async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
-    if not settings.allow_framing:
+    if not settings.allow_embed:
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     return response
 
