@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     intake_extractor: str = "rule"  # rule | llm  (llm chỉ dùng được khi có PIVOT_ANTHROPIC_API_KEY)
     anthropic_api_key: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường
     anthropic_model: str = "claude-haiku-5-5"
+    allow_embed: bool = False  # true → bỏ X-Frame-Options (cần khi chạy trong khung nhúng của Hugging Face Spaces)
     allow_dev_tokens: bool = True  # chỉ cho prototype local; tắt khi có OIDC thật
 
 

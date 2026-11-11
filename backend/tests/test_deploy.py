@@ -97,3 +97,11 @@ def test_seed_if_empty_seeds_once_and_never_touches_user_data(seeded):
         info = seed_if_empty(s)
         s.commit()
         assert info and info["shipments"] == 20
+
+
+def test_embed_flag_only_removes_frame_protection(client, monkeypatch):
+    from app.config import settings
+    assert client.get("/healthz").headers["X-Frame-Options"] == "SAMEORIGIN"
+    monkeypatch.setattr(settings, "allow_embed", True)
+    h = client.get("/healthz").headers
+    assert "X-Frame-Options" not in h and h["X-Content-Type-Options"] == "nosniff"

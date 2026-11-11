@@ -18,7 +18,7 @@ COPY backend/ ./
 COPY --from=web /web/dist /app/static
 COPY deploy/entrypoint.sh /app/entrypoint.sh
 ENV PIVOT_STATIC_DIR=/app/static PIVOT_DATA_MODE=mock
-RUN useradd --create-home app && chmod +x /app/entrypoint.sh && chown -R app /app
+RUN useradd --create-home --uid 1000 app && chmod +x /app/entrypoint.sh && chown -R app /app
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('PORT','8000'))"

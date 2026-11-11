@@ -70,3 +70,22 @@ docker run --rm -p 127.0.0.1:18000:8000 --network <tên-mạng-compose> \
 
 ## Đăng nhập đơn giản (tên + vai trò)
 Bản demo công khai dùng đăng nhập **không mật khẩu**: ai cũng nhập được tên + vai trò, kể cả *Điều phối viên*. Đã giảm rủi ro bằng: trần số người đăng ký (`MAX_REGISTERED_USERS = 500` trong `backend/app/accounts.py`, vượt thì 429); tên chỉ cho 2–40 ký tự an toàn; chỉ chạy khi `PIVOT_DATA_MODE=mock`; reset/kịch bản/làm tuổi dữ liệu vẫn cần **mã quản trị** (`PIVOT_ADMIN_KEY`). **Không dùng cho dữ liệu thật.** Mỗi người mới tạo một tổ chức + dữ liệu mẫu nhỏ nên cơ sở dữ liệu sẽ lớn dần theo số người đăng nhập; reset toàn bộ giữ danh tính, muốn xoá hẳn thì dọn bảng `users/organizations` có `is_registered = true`.
+
+## Phương án miễn phí 24/7: Hugging Face Space (Docker) + Neon
+Phù hợp khi cần đủ RAM (Space free ≈ 16 GB) và không bị ngủ sau 15 phút như Render free. *Điều kiện của dịch vụ có thể thay đổi — kiểm tra lại trước khi dùng.*
+
+1. **Neon** (neon.tech, free): tạo project Postgres, copy connection string **không qua pooler** (`postgresql://…?sslmode=require`; tên host không có `-pooler`). Đĩa của Space là tạm thời nên DB phải ở ngoài.
+2. **Hugging Face**: tạo Space → SDK **Docker** → (public để team vào không cần tài khoản).
+3. Trong Space → **Settings → Variables and secrets**:
+   - Secret `PIVOT_DATABASE_URL` = connection string của Neon
+   - Secret `PIVOT_ADMIN_KEY` = mã tự đặt (chỉ Điều phối viên có mã mới reset/chạy kịch bản)
+   - Variable `PIVOT_DATA_MODE` = `mock`
+   - Variable `PIVOT_ALLOW_EMBED` = `true` (để chạy được trong khung nhúng của huggingface.co; mở thẳng `*.hf.space` thì không cần)
+4. Từ máy bạn, ở thư mục gốc repo (git sẽ hỏi username + **token ghi** của Hugging Face — tự nhập, đừng chia sẻ):
+   ```bash
+   deploy/hf/push.sh <hf-username>/<space-name>
+   ```
+   Space tự build Docker (vài phút). Cổng 8000 đã khai báo trong `deploy/hf/README.md` (`app_port`).
+5. Mở `https://<hf-username>-<space-name>.hf.space`, vào tab Demo với mã quản trị → kỳ vọng **10/10 đạt**.
+
+Lưu ý: cập nhật = chạy lại `push.sh` (không tự theo GitHub). Space không có truy cập trong thời gian dài (khoảng 48 giờ) có thể bị tạm dừng — mở lại là chạy tiếp, dữ liệu vẫn ở Neon. Space public nên `/docs` và đăng nhập tên+vai trò mở cho mọi người: chỉ dùng dữ liệu mô phỏng.
