@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .config import settings
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+engine = create_engine(settings.database_url, pool_pre_ping=True, pool_recycle=300)  # DB trên mạng (Neon) có thể ngắt kết nối nhàn rỗi
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
