@@ -1,23 +1,17 @@
-# Render Blueprint: một web service (Docker: API + giao diện) + PostgreSQL.
-# Dùng: Render Dashboard → New → Blueprint → chọn repo khoidesu/PIVOT. Xem docs/DEPLOY.md.
-databases:
-  - name: pivot-db
-    databaseName: pivot
-    user: pivot
-    plan: free            # kiểm tra điều khoản gói miễn phí hiện hành của Render (có thể hết hạn/giới hạn)
-
+# Render Blueprint: một web service Docker (API + giao diện). Database ở Neon (Postgres ngoài, free) — KHÔNG tạo DB của Render.
+# Dùng: Render Dashboard → New → Blueprint → chọn repo khoidesu/PIVOT. Xem docs/DEPLOY.md và docs/DEPLOY_RENDER_NEON.md.
 services:
   - type: web
-    name: pivot
+    name: logection
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: free            # gói miễn phí có thể "ngủ" khi ít truy cập → lần mở đầu chậm
+    plan: free            # 512 MB là đủ (đo thực tế ~150 MB); gói free "ngủ" sau 15 phút không truy cập → dùng UptimeRobot ping
+    region: singapore     # cùng vùng với Neon (AWS Singapore) để giảm độ trễ
     healthCheckPath: /healthz
+    autoDeploy: true      # mỗi lần push lên nhánh main sẽ tự build lại
     envVars:
       - key: PIVOT_DATABASE_URL
-        fromDatabase:
-          name: pivot-db
-          property: connectionString
+        sync: false       # dán chuỗi Neon trong Dashboard (không ghi vào repo)
       - key: PIVOT_ADMIN_KEY
         generateValue: true       # Render sinh mã ngẫu nhiên; xem trong Dashboard → Environment
       - key: PIVOT_DATA_MODE
