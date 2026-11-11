@@ -34,7 +34,7 @@ export function RouteMap({ trip, late }: { trip: TripTrack; late?: boolean }) {
     if (!m || !g) return
     g.clearLayers()
     const route = trip.route.map((p) => [p.lat, p.lng] as [number, number])
-    L.polyline(route, { color: '#8aa0a8', weight: 4, dashArray: '6 8' }).addTo(g)
+    L.polyline(route, trip.route_source === 'osrm' ? { color: '#5b7c99', weight: 5, opacity: 0.75 } : { color: '#8aa0a8', weight: 4, dashArray: '6 8' }).addTo(g)  // đường bộ thật: nét liền; mô phỏng: nét đứt
     if (trip.track?.length) L.polyline(trip.track.map((p) => [p.lat, p.lng] as [number, number]), { color: TEAL, weight: 5 }).addTo(g)
     for (const f of trip.geofences) {
       L.circle([f.lat, f.lng], { radius: f.radius_m, color: TEAL, weight: 1, fillOpacity: 0.12 }).addTo(g)
@@ -44,9 +44,10 @@ export function RouteMap({ trip, late }: { trip: TripTrack; late?: boolean }) {
       const cls = late ? 'mk-veh late' : 'mk-veh'
       L.marker([trip.position.lat, trip.position.lng], { icon: L.divIcon({ className: 'mk', html: `<span class="${cls}">🚚</span>`, iconSize: [30, 30] }), zIndexOffset: 1000 }).bindTooltip(trip.plate).addTo(g)
     }
-    if (fitted.current !== trip.proposal_id) { // chỉ co giãn khung nhìn khi đổi chuyến (không giật khi polling)
+    const key = `${trip.proposal_id}:${trip.route_source}`
+    if (fitted.current !== key) { // chỉ co giãn khung nhìn khi đổi chuyến (không giật khi polling)
       m.fitBounds(L.latLngBounds(route), { padding: [30, 30] })
-      fitted.current = trip.proposal_id
+      fitted.current = key
     }
   }, [trip, late])
 

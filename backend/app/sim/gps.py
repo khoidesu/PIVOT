@@ -26,6 +26,7 @@ def start(session: Session, proposal_id: uuid.UUID, now: datetime, time_scale: f
     if prop is None or prop.status not in ("confirmed", "executing"):
         raise ValueError("Only a confirmed/executing trip can be simulated")
     veh = session.get(m.Vehicle, prop.vehicle_id)
+    tracking.ensure_road_route(session, prop)  # đường bộ thật nếu có mạng (chỉ khi chưa chạy); lỗi → giữ tuyến nội suy
     sim = session.get(m.SimTrip, proposal_id)
     if sim is None:
         sim = m.SimTrip(proposal_id=proposal_id, running=True, mode="normal", along_km=0.0, time_scale=time_scale, updated_at=now)

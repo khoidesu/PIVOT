@@ -27,6 +27,19 @@ def tracking_detail(proposal_id: uuid.UUID, actor: Actor = Depends(current_actor
     return out
 
 
+@router.post("/tracking/{proposal_id}/road-route")
+def fetch_road_route(proposal_id: uuid.UUID, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    """Lấy & lưu tuyến đường bộ thật (OSRM) cho chuyến đã cam kết nhưng chưa chạy. Idempotent; chuyến đang chạy giữ nguyên hình học.
+    Ai thấy được chuyến thì gọi được (chỉ lưu dữ liệu bản đồ công khai, không tiết lộ gì thêm)."""
+    for prop, _sh, _v, _sl in tracking._visible_proposals(session, actor, only_active=False):
+        if prop.id == proposal_id:
+            tr = tracking.ensure_road_route(session, prop)
+            session.commit()
+            return {"route_source": "osrm" if tr else "simulated",
+                    "distance_km": tr.distance_km if tr else None, "duration_min": tr.duration_min if tr else None}
+    raise HTTPException(status_code=404, detail="Trip not found")
+
+
 class SimIn(BaseModel):
     mode: str = "normal"
 

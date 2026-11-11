@@ -63,6 +63,7 @@ cd frontend && npm test && npx tsc --noEmit
 - **Booking**: hold có hạn, xác nhận theo từng bên, re-check, chống đặt trùng, `Idempotency-Key`.
 - **Sự kiện**: đầu vào xe (`VEHICLE_POSITION`, `VEHICLE_AVAILABLE`) và chuyến (`TRIP_*`, `ETA_UPDATED`) idempotent qua outbox; chỉ nhà vận tải sở hữu xe được báo.
 - **Theo dõi & ETA**: GPS **mô phỏng** qua đường sự kiện thật, mốc geofence một lần, ETA luật P50/P90 + ETA trực tiếp; ML trên lịch sử mô phỏng chỉ được dùng khi qua cổng promote, tự hạ về luật.
+- **ETA có tín hiệu thật**: tuyến đường bộ thật (OSRM) trên bản đồ + hệ số thời tiết (Open-Meteo) cộng vào ETA luật; không có mạng thì tự hạ về luật. Biến môi trường: `PIVOT_SIGNALS_ENABLED` (mặc định `true`), `PIVOT_OSRM_URL`, `PIVOT_WEATHER_URL`, `PIVOT_SIGNALS_TIMEOUT_S`. Giao thông chỉ là hệ số luật theo khung giờ (không phải kẹt xe trực tiếp). Cần chạy `alembic upgrade head` (bảng `trip_routes`).
 - **Lịch dock**: tự xếp dock khi chuyến xác nhận, chống trùng lịch, dwell time, NO_SHOW; ETA đổi chỉ *đề xuất* khung mới, ICD chấp nhận mới áp dụng.
 - **Ngoại lệ**: 8 loại, mức độ theo luật có version, playbook + SLA + leo thang, thông báo mô phỏng, **ghép lại** chuyến chưa lấy hàng (hệ thống không tự đổi chuyến).
 - **Lợi ích**: baseline chốt trước, estimated → measured → verified, xác minh phải do bên độc lập.

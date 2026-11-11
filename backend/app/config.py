@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường
     anthropic_model: str = "claude-haiku-5-5"
     allow_embed: bool = False  # true → bỏ X-Frame-Options (cần khi chạy trong khung nhúng của Hugging Face Spaces)
+    signals_enabled: bool = True  # ETA tầng 2: gọi OSRM (đường bộ thật) + Open-Meteo (thời tiết); tắt → chỉ dùng ETA luật + tuyến nội suy
+    osrm_url: str = "https://router.project-osrm.org"  # máy chủ demo công khai (fair use); tự dựng OSRM riêng cho production
+    weather_url: str = "https://api.open-meteo.com/v1/forecast"
+    signals_timeout_s: float = 2.5
     allow_dev_tokens: bool = True  # chỉ cho prototype local; tắt khi có OIDC thật
 
 

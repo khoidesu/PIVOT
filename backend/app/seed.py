@@ -44,7 +44,7 @@ ASSUMPTIONS_V1 = {
 }
 
 TABLES = [
-    "notifications", "dock_appointments", "exception_tasks", "outbox_jobs", "trip_tracks", "sim_trips", "benefit_ledger", "exceptions", "decisions", "reservations", "proposals",
+    "notifications", "dock_appointments", "exception_tasks", "outbox_jobs", "trip_tracks", "trip_routes", "sim_trips", "benefit_ledger", "exceptions", "decisions", "reservations", "proposals",
     "assumption_sets", "external_id_map", "events", "docks", "slots", "availability_windows", "vehicles",
     "shipment_participants", "logistics_units", "shipment_legs", "shipments", "locations",
     "memberships", "users", "organizations",

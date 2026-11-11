@@ -102,13 +102,20 @@ export interface EtaModel {
   metrics: { n_train: number; n_test: number; mae_rule: number; mae_ml: number; improvement_pct: number; within15_rule: number; within15_ml: number
     p90_coverage_rule: number; p90_coverage_ml: number; min_improvement_pct: number; coverage_target: number[]; drift: number } | null
 }
+export interface EtaSignals {
+  status: 'ok' | 'partial' | 'fallback' | 'disabled'; method: string; version: string; confidence?: string; reason?: string
+  p50?: string | null; p90?: string | null; minutes_p50?: number; minutes_p90?: number; band?: string
+  sources?: { route: string | null; weather: string | null }
+  components?: { road_km: number; free_flow_min: number; remaining_fraction: number; truck_factor: number; traffic_factor: number; weather_factor: number }
+  weather?: { precip_mm_h: number; weather_code: number; wind_kmh: number; observed_at?: string | null; source: string } | null
+}
 export interface TripTrack {
   proposal_id: string; status: string; shipment_code: string; plate: string; is_simulated: boolean
   position: { lat: number; lng: number; speed_kmh: number | null; age_seconds: number | null } | null
   progress_pct: number; remaining_km: number; total_km: number
   milestones: { code: string; reached: boolean }[]
   eta: LiveEta | null; eta_ml: { p50_minutes: number; p90_minutes: number; label: string; confidence: string } | null; cutoff_at: string | null
-  route: { lat: number; lng: number }[]; pickup_index: number
+  route: { lat: number; lng: number }[]; pickup_index: number; route_source: 'osrm' | 'simulated'; eta_signals?: EtaSignals | null
   geofences: { code: string; lat: number; lng: number; radius_m: number }[]
   track?: { at: string; lat: number; lng: number; speed_kmh: number | null }[]
 }
@@ -222,6 +229,7 @@ export const api = {
     }),
   tracking: () => request<TripTrack[]>('/v1/tracking'),
   trip: (id: string) => request<TripTrack>(`/v1/tracking/${id}`),
+  roadRoute: (id: string) => post<{ route_source: 'osrm' | 'simulated'; distance_km: number | null; duration_min: number | null }>(`/v1/tracking/${id}/road-route`, {}),
   simStart: (id: string) => post<{ running: boolean; mode: SimMode }>(`/v1/sim/${id}/start`, {}),
   simMode: (id: string, mode: SimMode) => post<{ running: boolean; mode: SimMode }>(`/v1/sim/${id}/mode`, { mode }),
   completeTask: (exId: string, taskId: string) => post<ExceptionItem>(`/v1/exceptions/${exId}/tasks/${taskId}/complete`, {}),
