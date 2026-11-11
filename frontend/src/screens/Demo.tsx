@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { api, ApiError, getAdminKey, SCENARIO_IDS, setAdminKey, type ScenarioResult } from '../api'
-import { Chip, ErrorNote, Note } from '../components/ui'
+import { Chip, ErrorNote, Hint, More, Note } from '../components/ui'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
 
@@ -27,25 +27,22 @@ export function Demo() {
   return (
     <>
       <section className="card stack">
-        <div className="card-h"><h1>{t('demo.title')}</h1><Chip kind="sim">{t('badge.mock')}</Chip></div>
-        <span className="muted">{t('demo.intro')}</span>
+        <div className="card-h"><h1>{t('demo.title')}</h1></div>
         {me?.role !== 'dispatcher' && <Note kind="warn">{t('demo.only')}</Note>}
-        {needKey && (
-          <div className="stack">
-            <h3>{t('demo.adminTitle')}</h3>
-            <span className="footnote">{t('demo.adminHint')}</span>
-            <div className="row">
-              <label className="sr" htmlFor="admin-key">{t('demo.adminTitle')}</label>
-              <input id="admin-key" type="password" autoComplete="off" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} style={{ maxWidth: 280 }} />
-              <button className="btn sm" onClick={() => { setAdminKey(keyInput); setHasKey(!!keyInput.trim()); setKeyInput('') }} disabled={!keyInput.trim()}>{t('demo.adminSave')}</button>
-              {hasKey && <button className="btn sm" onClick={() => { setAdminKey(''); setHasKey(false) }}>{t('demo.adminClear')}</button>}
-              {hasKey ? <Chip kind="good">{t('demo.adminSet')}</Chip> : <Chip kind="warn">{t('demo.adminNeed')}</Chip>}
-            </div>
-          </div>)}
         <div className="row">
           <button className="btn primary" disabled={!allowed || !!running} onClick={runAll}>{running ? t('demo.running') : t('demo.runAll')}</button>
           {Object.keys(res).length > 0 && <Chip kind={passed === SCENARIO_IDS.length ? 'good' : 'warn'}>{t('demo.all', { n: passed })}</Chip>}
         </div>
+        {needKey && (
+          <More label={`${t('demo.adminTitle')} ${hasKey ? '✓' : '⚠'}`} open={!hasKey}>
+            <div className="row">
+              <label className="sr" htmlFor="admin-key">{t('demo.adminTitle')}</label>
+              <input id="admin-key" type="password" autoComplete="off" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} style={{ maxWidth: 260 }} />
+              <button className="btn sm" onClick={() => { setAdminKey(keyInput); setHasKey(!!keyInput.trim()); setKeyInput('') }} disabled={!keyInput.trim()}>{t('demo.adminSave')}</button>
+              {hasKey && <button className="btn sm" onClick={() => { setAdminKey(''); setHasKey(false) }}>{t('demo.adminClear')}</button>}
+              <Chip kind={hasKey ? 'good' : 'warn'}>{hasKey ? t('demo.adminSet') : t('demo.adminNeed')}</Chip> <Hint text={t('demo.adminTip')} />
+            </div>
+          </More>)}
       </section>
       {error && <ErrorNote error={error} />}
       <div className="grid2">
@@ -58,15 +55,17 @@ export function Demo() {
                 {r && <Chip kind={r.passed ? 'PASS' : 'FAIL'}>{r.passed ? t('demo.pass') : t('demo.fail')}</Chip>}
               </div>
               <span className="muted small">{t(`demo.s.${id}.desc`)}</span>
-              <div><button className="btn sm" disabled={!allowed || !!running} onClick={() => run(id)}>{running === id ? t('demo.running') : t('demo.run')}</button></div>
+              <div className="row">
+                <button className="btn sm" disabled={!allowed || !!running} onClick={() => run(id)}>{running === id ? t('demo.running') : t('demo.run')}</button>
+                {r?.open && <a href={r.open} className="small">{t('demo.open')}</a>}
+              </div>
               {r && (
-                <>
+                <More label={t('demo.steps')} open={!r.passed}>
                   <ul className="why" style={{ listStyle: 'none', paddingLeft: 0 }}>
                     {r.steps.map((s, i) => (
                       <li key={i}><Chip kind={s.ok ? 'PASS' : 'FAIL'}>{s.ok ? '✓' : '✗'}</Chip> {s.label}{s.detail && <span className="muted small"> — {s.detail}</span>}</li>))}
                   </ul>
-                  {r.open && <a href={r.open} className="small">{t('demo.open')}</a>}
-                </>)}
+                </More>)}
             </article>)
         })}
       </div>

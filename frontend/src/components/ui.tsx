@@ -35,19 +35,25 @@ export const Loading = () => { const { t } = useI18n(); return <div className="e
 
 const FLOW = ['proposed', 'pending_acceptance', 'confirmed', 'executing', 'completed']
 
+/** Tiến trình gọn: chấm tròn + nhãn của bước hiện tại. */
 export function Stepper({ status }: { status: string }) {
   const { t } = useI18n()
   const idx = FLOW.indexOf(status)
   if (idx < 0) return <Chip kind="bad">{t(`ps.${status}`)}</Chip>
   return (
-    <div className="stepper" aria-label={t('cf.step')}>
-      {FLOW.map((s, i) => (
-        <span key={s} className={`step ${i < idx ? 'done' : i === idx ? 'cur' : ''}`} aria-current={i === idx ? 'step' : undefined}>
-          <i />{t(`ps.${s}`)}
-        </span>
-      ))}
-    </div>
+    <span className="dots" role="img" aria-label={`${t(`ps.${status}`)} (${idx + 1}/${FLOW.length})`}>
+      <span aria-hidden>{FLOW.map((s, i) => <i key={s} className={i < idx ? 'done' : i === idx ? 'cur' : ''} />)}</span>
+      <b>{t(`ps.${status}`)}</b>
+    </span>
   )
 }
 
-export const loadPct = (kg: number | null, cap: number) => (kg == null ? null : Math.round((kg / cap) * 100))
+/** Giải thích ngắn khi rê chuột / focus bàn phím (không chiếm chỗ trên màn hình). */
+export const Hint = ({ text }: { text: string }) => <span className="hint" tabIndex={0} data-tip={text} aria-label={text}>?</span>
+
+/** Thông tin kỹ thuật/chi tiết: thu gọn mặc định (vẫn truy cập được, bàn phím mở bằng Enter/Space). */
+export function More({ label, open, children }: { label?: string; open?: boolean; children: ReactNode }) {
+  const { t } = useI18n()
+  return <details className="more" open={open}><summary>{label ?? t('more')}</summary><div className="more-body">{children}</div></details>
+}
+

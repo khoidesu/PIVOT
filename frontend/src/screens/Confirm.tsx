@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, type Proposal } from '../api'
-import { Chip, ErrorNote, Loading, Note, Stepper } from '../components/ui'
-import { fmtClock, fmtTime, nowMs } from '../fmt'
+import { Chip, ErrorNote, Loading, More, Note, Stepper } from '../components/ui'
+import { fmtTime, nowMs } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
@@ -32,27 +32,17 @@ function ProposalRow({ p, onDone }: { p: Proposal; onDone: () => void }) {
   return (
     <article className="card stack" aria-label={`${p.shipment.code} ${p.vehicle.plate}`}>
       <div className="spread">
-        <div><b>{p.shipment.code}</b> <span className="muted">→</span> <b className="mono">{p.vehicle.plate}</b>
-          <span className="muted small"> · {p.vehicle.carrier_org_name}</span></div>
-        <div className="row">
-          <Chip kind={p.status === 'confirmed' || p.status === 'completed' ? 'good' : ['rejected', 'expired', 'cancelled'].includes(p.status) ? 'bad' : 'teal'}>{t(`ps.${p.status}`)}</Chip>
-          <Chip kind="sim">{t('badge.mock')}</Chip><span className="code muted">v{p.version}</span>
-        </div>
-      </div>
-      <Stepper status={p.status} />
-      <div className="facts">
-        <div className="fact"><small>{t('rec.slot')}</small>
-          {p.slot ? <><b>{fmtTime(p.slot.start_at)}–{fmtTime(p.slot.end_at).slice(-5)}</b><small>{p.slot.node_org_name} · {t('rec.slotSeats', { n: p.slot.remaining, cap: p.slot.capacity })}</small></> : '—'}</div>
-        <div className="fact"><small>{t('cf.source', { src: '' }).replace(/:\s*$/, '')}</small>
-          <b>{p.confirmation_source ?? '—'}</b><small>{t(`cf.src.${p.confirmation_source ?? 'mock'}`)}</small></div>
+        <div><b>{p.shipment.code}</b> <span className="muted">→</span> <b className="mono">{p.vehicle.plate}</b></div>
+        <Stepper status={p.status} />
       </div>
       <div className="row">
         {Object.entries(p.parties).map(([k, v]) => (
-          <Chip key={k} kind={v.accepted ? 'good' : p.status === 'pending_acceptance' ? 'warn' : undefined}>
-            {v.accepted ? '✓' : '○'} {t(`party.${k}`)} · {v.org_name} — {v.accepted ? t('cf.accepted') : t('cf.waiting')}
+          <Chip key={k} kind={v.accepted ? 'good' : p.status === 'pending_acceptance' ? 'warn' : undefined} title={v.org_name ?? undefined}>
+            {v.accepted ? '✓' : '○'} {t(`party.${k}`)}
           </Chip>))}
+        {p.slot && <Chip title={t('cf.srcTip', { src: p.slot.source })}>{t('rec.slot')} {fmtTime(p.slot.start_at)}–{fmtTime(p.slot.end_at).slice(-5)}</Chip>}
+        {left != null && (left > 0 ? <span className="countdown">{t('cf.countdown', { s: left })}</span> : <Chip kind="FAIL">{t('cf.holdExpired')}</Chip>)}
       </div>
-      {left != null && <div>{left > 0 ? <span className="countdown">{t('cf.countdown', { s: left })}</span> : <Chip kind="FAIL">{t('cf.holdExpired')}</Chip>}</div>}
       {error && <ErrorNote error={error} />}
       {ok && <Note kind="ok">{ok}</Note>}
       <div className="row">
@@ -60,8 +50,8 @@ function ProposalRow({ p, onDone }: { p: Proposal; onDone: () => void }) {
         <button className="btn primary" disabled={!a.accept || !!busy} onClick={() => run('accept')}>{t('cf.accept')}</button>
         <button className="btn danger" disabled={!a.reject || !!busy} onClick={() => run('reject')}>{t('cf.reject')}</button>
         {none && <span className="footnote">{t('cf.noPerm')}</span>}
+        {['confirmed', 'executing', 'completed'].includes(p.status) && <a className="btn sm" href={`#/timeline?p=${p.id}`}>{t('nav.timeline')} →</a>}
       </div>
-      {['confirmed', 'executing', 'completed'].includes(p.status) && <div className="row"><a className="btn sm" href={`#/timeline?p=${p.id}`} style={{ textDecoration: 'none' }}>{t('nav.timeline')} →</a><span className="footnote">{t('cf.execNote')}</span></div>}
     </article>
   )
 }
@@ -78,31 +68,24 @@ export function Confirm() {
 
   return (
     <>
-      <section className="card">
-        <div className="card-h"><h1>{t('cf.title')}</h1><span className="muted">{t('cf.intro')}</span></div>
-        <span className="footnote">{t('cf.refresh')} {me && <>· {t(`role.${me.role}`)}</>}</span>
-      </section>
+      <div className="card-h"><h1>{t('cf.title')}</h1><span className="live" role="status"><i aria-hidden />{t('cf.live')}</span></div>
       {props.error && <ErrorNote error={props.error} />}
       {props.loading && !props.data ? <Loading /> : list.length === 0 ? <div className="card empty">{t('cf.empty')}</div> : (
         <>
           <div className="grid2">{live.map((p) => <ProposalRow key={p.id} p={p} onDone={refresh} />)}</div>
-          {past.length > 0 && (
-            <details><summary>{t('ps.completed')} / {t('ps.expired')} / {t('ps.rejected')} ({past.length})</summary>
-              <div className="grid2" style={{ marginTop: 12 }}>{past.map((p) => <ProposalRow key={p.id} p={p} onDone={refresh} />)}</div>
-            </details>)}
+          {past.length > 0 && <More label={t('cf.past', { n: past.length })}><div className="grid2">{past.map((p) => <ProposalRow key={p.id} p={p} onDone={refresh} />)}</div></More>}
         </>
       )}
-      <section className="card">
-        <div className="card-h"><h2>{t('cf.slotsTitle')}</h2><Chip kind="sim">{t('badge.mock')}</Chip></div>
-        <div className="table-wrap"><table>
-          <thead><tr><th>{t('fleet.slotCol.time')}</th><th>{t('fleet.slotCol.left')}</th><th>{t('fleet.slotCol.source')}</th></tr></thead>
-          <tbody>{(slots.data ?? []).map((s) => (
-            <tr key={s.id}><td className="nw">{fmtTime(s.start_at)}–{fmtTime(s.end_at).slice(-5)}</td>
-              <td><Chip kind={s.remaining === 0 ? 'FAIL' : 'PASS'}>{s.remaining}/{s.capacity}</Chip></td>
-              <td><Chip kind="sim">{s.source}</Chip></td></tr>))}</tbody>
-        </table></div>
-        <span className="footnote">{slots.data ? fmtClock(new Date(nowMs()).toISOString()) : ''}</span>
-      </section>
+      {me?.role === 'node_operator' && (
+        <section className="card">
+          <div className="card-h"><h2>{t('cf.slotsTitle')}</h2></div>
+          <div className="table-wrap"><table>
+            <thead><tr><th>{t('col.time')}</th><th>{t('col.left')}</th></tr></thead>
+            <tbody>{(slots.data ?? []).filter((s) => s.node_org_id === me.org_id).map((s) => (
+              <tr key={s.id}><td className="nw">{fmtTime(s.start_at)}–{fmtTime(s.end_at).slice(-5)}</td>
+                <td><Chip kind={s.remaining === 0 ? 'FAIL' : 'PASS'}>{s.remaining}/{s.capacity}</Chip></td></tr>))}</tbody>
+          </table></div>
+        </section>)}
     </>
   )
 }

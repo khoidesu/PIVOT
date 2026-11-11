@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
         task.cancel()
 
 
-app = FastAPI(title="PIVOT / VSGA", version="0.2.0", lifespan=lifespan,
+app = FastAPI(title="LOGECTION", version="0.2.0", lifespan=lifespan,
               description="Prototype điều phối logistics — dữ liệu MÔ PHỎNG (mock).")
 
 _origins = ["http://localhost:5173", "http://127.0.0.1:5173"] + [o.strip() for o in settings.cors_origins.split(",") if o.strip()]

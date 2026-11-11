@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { api, ApiError, type IntakeDraft, type Shipment } from '../api'
-import { Chip, ErrorNote, Note } from '../components/ui'
+import { Chip, ErrorNote, Hint, Note } from '../components/ui'
 import { isoToLocalInput, localInputDefault, localInputToIso } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
@@ -29,7 +29,8 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
   const [error, setError] = useState<ApiError | null>(null)
   const [localErr, setLocalErr] = useState<string | null>(null)
   const [done, setDone] = useState<{ shipment: Shipment; edited: boolean } | null>(null)
-  // nhập liệu từ văn bản
+  // nhập liệu từ văn bản (thu gọn mặc định)
+  const [showImport, setShowImport] = useState(false)
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<IntakeDraft | null>(null)
   const [drafting, setDrafting] = useState(false)
@@ -77,7 +78,7 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
       cutoff: v('cutoff_at') ? isoToLocalInput(v('cutoff_at') as string) : x.cutoff,
       price: v('price_vnd') != null ? String(v('price_vnd')) : '', customer: (v('customer_name') as string) ?? '',
     }))
-    setDraftUsed(true); setReviewed(false); setDone(null)
+    setDraftUsed(true); setReviewed(false); setDone(null); setShowImport(false)
   }
 
   async function submit(e: FormEvent) {
@@ -112,45 +113,49 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
 
   return (
     <div style={{ maxWidth: 900 }} className="stack">
-      {!editing && allowed && (
-        <section className="card stack">
-          <div className="card-h"><h2>{t('in.title')}</h2><span className="muted">{t('in.hint')}</span></div>
-          <label className="sr" htmlFor="intake-text">{t('in.title')}</label>
-          <textarea id="intake-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('in.placeholder')} maxLength={8000} rows={4} />
-          <div className="row">
-            <button type="button" className="btn" onClick={extract} disabled={drafting || !text.trim()}>{drafting ? t('in.running') : t('in.run')}</button>
-            {(draft || text) && <button type="button" className="btn sm" onClick={() => { setText(''); setDraft(null); setDraftUsed(false) }}>{t('in.clear')}</button>}
-          </div>
-          {draft && (
-            <div className="stack">
-              <Note kind={draft.extractor.kind === 'llm' ? 'info' : 'warn'}>
-                {draft.extractor.kind === 'llm' ? t('in.byLlm', { name: draft.extractor.name }) : t('in.byRule')} <b>{t('in.draftOnly')}</b>
-              </Note>
-              {draft.suspicious_instructions && <Note kind="err">{t('in.suspicious')}</Note>}
-              <div className="table-wrap"><table>
-                <thead><tr><th>{t('in.col.field')}</th><th>{t('in.col.value')}</th><th>{t('in.col.source')}</th><th>{t('in.col.status')}</th></tr></thead>
-                <tbody>{DRAFT_ORDER.map((k) => {
-                  const x = draft.fields[k]
-                  if (!x || (x.value == null && (k === 'price_vnd' || k === 'customer_name'))) return null  // trường tuỳ chọn không có thì không cần hiển thị
-                  return (
-                    <tr key={k}>
-                      <td><b>{t(`in.f.${k}`)}</b></td>
-                      <td>{x.value == null ? <span className="muted">—</span> : x.display}</td>
-                      <td>{x.source ? <q className="small">{x.source.quote}</q> : <span className="muted small">{t('in.missing')}</span>}</td>
-                      <td><Chip kind={x.status === 'ok' ? 'PASS' : 'UNKNOWN'}>{x.status === 'ok' ? t('in.ok') : t('in.review')}</Chip>
-                        {x.notes.filter((n) => !n.startsWith('candidates')).map((n) => <div key={n} className="footnote">{t(`in.note.${n}`) === `in.note.${n}` ? n : t(`in.note.${n}`)}</div>)}</td>
-                    </tr>)
-                })}</tbody>
-              </table></div>
-              <div><button type="button" className="btn primary" onClick={useDraft}>{t('in.use')}</button></div>
-            </div>)}
-        </section>)}
-
       <section className="card">
-        <div className="card-h"><h1>{editing ? t('req.editTitle', { code: editing.code }) : t('req.title')}</h1><span className="muted">{editing ? t('req.editHint') : t('req.intro')}</span></div>
-        {me && !allowed && <Note kind="warn">{t('req.cannot', { role: t(`role.${me.role}`) })}</Note>}
+        <div className="card-h">
+          <h1>{editing ? t('req.edit', { code: editing.code }) : t('req.new')}</h1>
+          {!editing && allowed && <button type="button" className="btn sm" onClick={() => setShowImport((v) => !v)} aria-expanded={showImport}>{t('req.paste')}</button>}
+        </div>
+        {me && !allowed && <Note kind="warn">{t('req.cannot')}</Note>}
         {notFound && <Note kind="err">{t('req.notFound')}</Note>}
-        <form className="form" onSubmit={submit} aria-label={t('req.title')}>
+
+        {showImport && !editing && allowed && (
+          <div className="stack import">
+            <label className="sr" htmlFor="intake-text">{t('req.paste')}</label>
+            <textarea id="intake-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('in.placeholder')} maxLength={8000} rows={3} />
+            <div className="row">
+              <button type="button" className="btn sm" onClick={extract} disabled={drafting || !text.trim()}>{drafting ? t('in.running') : t('in.run')}</button>
+              {(draft || text) && <button type="button" className="btn sm" onClick={() => { setText(''); setDraft(null); setDraftUsed(false) }}>{t('in.clear')}</button>}
+            </div>
+            {draft && (
+              <div className="stack">
+                <div className="row"><Chip kind={draft.extractor.kind === 'llm' ? 'teal' : 'warn'}>{t('in.draft', { by: draft.extractor.kind === 'llm' ? t('in.byLlm', { name: draft.extractor.name }) : t('in.byRule') })}</Chip></div>
+                {draft.suspicious_instructions && <Note kind="err">{t('in.suspicious')}</Note>}
+                <div className="table-wrap"><table>
+                  <thead><tr><th>{t('in.col.field')}</th><th>{t('in.col.value')}</th><th>{t('in.col.source')}</th><th /></tr></thead>
+                  <tbody>{DRAFT_ORDER.map((k) => {
+                    const x = draft.fields[k]
+                    if (!x || (x.value == null && (k === 'price_vnd' || k === 'customer_name'))) return null // trường tuỳ chọn không có thì không hiện
+                    const warn = x.status !== 'ok'
+                    return (
+                      <tr key={k}>
+                        <td><b>{t(`in.f.${k}`)}</b></td>
+                        <td>{x.value == null ? <span className="muted">—</span> : x.display}</td>
+                        <td>{x.source ? <q className="small">{x.source.quote}</q> : <span className="muted small">{t('in.missing')}</span>}</td>
+                        <td>{warn
+                          ? <Chip kind="UNKNOWN" title={x.notes.filter((n) => !n.startsWith('candidates')).map((n) => (t(`in.note.${n}`) === `in.note.${n}` ? n : t(`in.note.${n}`))).join(' ')}>⚠</Chip>
+                          : <Chip kind="PASS">✓</Chip>}
+                          {warn && x.notes.filter((n) => !n.startsWith('candidates')).map((n) => <div key={n} className="footnote">{t(`in.note.${n}`) === `in.note.${n}` ? n : t(`in.note.${n}`)}</div>)}</td>
+                      </tr>)
+                  })}</tbody>
+                </table></div>
+                <div><button type="button" className="btn primary sm" onClick={useDraft}>{t('in.use')}</button></div>
+              </div>)}
+          </div>)}
+
+        <form className="form" onSubmit={submit} aria-label={t('req.new')}>
           <label>{t('req.code')}<input value={f.code} onChange={set('code')} disabled={!allowed || !!editing} required maxLength={40} title={editing ? t('req.codeLocked') : undefined} /></label>
           <label className={cls('cargo_type')}>{t('req.cargo')}
             <select value={f.cargo_type} onChange={set('cargo_type')} disabled={!allowed}>
@@ -168,22 +173,21 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
           <label className={cls('ready')}>{t('req.ready')}<input type="datetime-local" value={f.ready} onChange={set('ready')} disabled={!allowed} required /></label>
           <label className={cls('deadline')}>{t('req.deadline')}<input type="datetime-local" value={f.deadline} onChange={set('deadline')} disabled={!allowed} required /></label>
           <label className={cls('cutoff')}>{t('req.cutoff')}<input type="datetime-local" value={f.cutoff} onChange={set('cutoff')} disabled={!allowed} required /></label>
-          <label>{t('req.price')}<input type="number" min="0" inputMode="numeric" value={f.price} onChange={set('price')} disabled={!allowed} /></label>
+          <label>{t('req.price')} <Hint text={t('req.privacyTip')} /><input type="number" min="0" inputMode="numeric" value={f.price} onChange={set('price')} disabled={!allowed} /></label>
           <label className="full">{t('req.customer')}<input value={f.customer} onChange={set('customer')} disabled={!allowed} maxLength={200} /></label>
           <div className="full stack">
-            <span className="footnote">{t('req.tz')} {t('req.sensitive')}{editing ? ` ${t('req.clearNote')}` : ''}</span>
             {draftUsed && draft && draft.needs_review.length > 0 && (
               <label className="check"><input type="checkbox" checked={reviewed} onChange={(e) => setReviewed(e.target.checked)} />{t('in.confirm')}</label>)}
             {localErr && <Note kind="err">{localErr}</Note>}
             {error && <ErrorNote error={error} />}
             {done && (
               <Note kind="ok">
-                <div className="spread"><span>{done.edited ? t('req.updated', { code: done.shipment.code, v: done.shipment.version }) : t('req.created', { code: done.shipment.code })}</span>
-                  <button type="button" className="btn primary sm" onClick={() => go(`/recommend?lot=${done.shipment.id}`)}>{t('req.findMatch')}</button></div>
+                <div className="spread"><span>{done.edited ? t('req.updated', { code: done.shipment.code }) : t('req.created', { code: done.shipment.code })}</span>
+                  <button type="button" className="btn primary sm" onClick={() => go(`/recommend?lot=${done.shipment.id}`)}>{t('req.match')}</button></div>
               </Note>)}
             <div className="row">
               <button className="btn primary" type="submit" disabled={!allowed || busy || notFound}>{busy ? t('req.submitting') : editing ? t('req.update') : t('req.submit')}</button>
-              {editing && <button type="button" className="btn" onClick={() => go('/fleet')}>{t('req.cancelEdit')}</button>}
+              {editing && <button type="button" className="btn" onClick={() => go('/fleet')}>{t('req.back')}</button>}
             </div>
           </div>
         </form>

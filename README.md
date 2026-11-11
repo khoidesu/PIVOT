@@ -1,4 +1,6 @@
-# PIVOT / VSGA — prototype điều phối logistics
+# LOGECTION — prototype điều phối logistics
+
+> **Tên dự án: LOGECTION** (trước đây PIVOT / VSGA). Chỉ phần nhìn thấy được đổi tên; biến môi trường `PIVOT_*`, tên cơ sở dữ liệu, dịch vụ Docker/Render và repo `khoidesu/PIVOT` giữ nguyên để không làm hỏng triển khai. `DRAFT.md` (bất biến) vẫn gọi là PIVOT / VSGA.
 
 Dự án dự thi **AI FOR BUSINESS INNOVATION**. Prototype chạy được cho một luồng quyết định:
 xe sắp trống → hàng sẵn sàng → kiểm tra khả thi (hard gate) → giữ slot → xác nhận → theo dõi → ghi nhận lợi ích.
@@ -43,7 +45,7 @@ cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 |---|---|
 | Làm mới mốc thời gian (vị trí xe quá 5 phút là bị loại) | nút **Làm mới dữ liệu demo** (vai Phú) hoặc `python -m app.seed --retime` |
 | Reset toàn bộ (xoá đề xuất, sự kiện, sổ lợi ích) | `python -m app.seed` hoặc `POST /v1/demo/reset` (vai Phú) |
-| Chạy 6 kịch bản demo | tab **7 · Kịch bản demo** (vai Phú) hoặc `python -m app.demo.run_scenarios` |
+| Chạy 6 kịch bản demo | menu avatar → **Kịch bản demo** (vai Điều phối viên) hoặc `python -m app.demo.run_scenarios` |
 
 ## Kiểm thử
 ```bash
@@ -51,8 +53,8 @@ cd backend && .venv/bin/python -m pytest      # 155 test (DB test riêng: pivot_
 cd frontend && npm test && npx tsc --noEmit
 ```
 
-## 7 màn hình
-1. Nhập yêu cầu (gõ tay hoặc dán tin nhắn → bản nháp có dẫn nguồn; **sửa/huỷ** ở màn 2) · 2. Xe & hàng · 3. Khuyến nghị + lý do · 4. Xác nhận & slot · 5. Timeline & ngoại lệ · 6. Lợi ích · 7. Kịch bản demo
+## Màn hình (menu hiện theo vai trò)
+**Yêu cầu** (gõ tay hoặc nút *Dán tin nhắn* → bản nháp có dẫn nguồn) · **Lô / Xe / Slot** (sửa, huỷ lô) · **Ghép** (khuyến nghị + lý do; chi tiết kỹ thuật ở mục *Chi tiết*) · **Xác nhận** · **Hành trình** (timeline, ngoại lệ, tái lập) · **Lợi ích**. Chủ hàng thấy cả 6; nhà vận tải không có *Yêu cầu* ở menu (vẫn vào được bằng nút *+ Yêu cầu*); ICD chỉ thấy *Slot · Xác nhận · Hành trình*; điều phối viên thấy phần còn lại và mở *Kịch bản demo* từ menu avatar.
 
 ## Tính năng chính
 - **Yêu cầu**: tạo, **sửa** (khoá lạc quan, bị khoá khi đã giữ/cam kết) và **huỷ** (xoá mềm, giữ audit); nhập từ văn bản dán → bản nháp có trích đoạn nguồn, người dùng duyệt rồi mới tạo.

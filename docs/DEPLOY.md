@@ -1,4 +1,4 @@
-# Triển khai công khai (Render) — PIVOT / VSGA
+# Triển khai công khai (Render) — LOGECTION
 
 Mục tiêu: một **link duy nhất** để mọi người cùng dùng (giao diện + API chung một địa chỉ), dữ liệu **mô phỏng**.
 
@@ -16,7 +16,7 @@ Mục tiêu: một **link duy nhất** để mọi người cùng dùng (giao di
 3. Cho Render quyền đọc repo `khoidesu/PIVOT` → chọn repo → Render đọc `render.yaml` → **Apply**.
 4. Chờ build 5–10 phút. Xong có địa chỉ dạng `https://pivot-xxxx.onrender.com`.
 5. Lấy mã quản trị: service **pivot → Environment → `PIVOT_ADMIN_KEY`** (bấm hiện giá trị). **Chỉ giữ cho bạn** hoặc người phụ trách demo.
-6. Mở địa chỉ → chọn thành viên ở thanh trên. Muốn Reset/Chạy kịch bản: chọn **Phú — Điều phối viên** → tab **7 · Kịch bản demo** → nhập mã quản trị.
+6. Mở địa chỉ → đăng nhập bằng tên + vai trò. Muốn Reset/Chạy kịch bản: chọn **Phú — Điều phối viên** → tab **7 · Kịch bản demo** → nhập mã quản trị.
 
 ### Kiểm tra sau khi deploy
 ```bash

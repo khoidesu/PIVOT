@@ -1,4 +1,4 @@
-# Báo cáo kiểm thử — PIVOT / VSGA prototype
+# Báo cáo kiểm thử — LOGECTION prototype
 
 Ngày chạy: 10/11/2026 · Máy: macOS (Darwin 25.6), Python 3.13.7, PostgreSQL 16 (Docker, local), Node 24.
 Dữ liệu: **mô phỏng** (3 tổ chức, 5 thành viên, 10 xe, 20 lô, 20 slot). Các ngưỡng là cấu hình pilot, không phải SLA.
@@ -7,7 +7,7 @@ Dữ liệu: **mô phỏng** (3 tổ chức, 5 thành viên, 10 xe, 20 lô, 20 s
 | Bộ test | Số test | Kết quả |
 |---|---|---|
 | Backend (pytest) | 155 | **155 đạt** |
-| Frontend (vitest) + `tsc` + `vite build` | 8 | **8 đạt**, kiểu và build sạch |
+| Frontend (vitest) + `tsc` + `vite build` | 15 | **15 đạt**, kiểu và build sạch |
 | Kịch bản demo (CLI trên API thật) | 6 | **6/6 đạt** (0,2–1,2 giây mỗi kịch bản), chạy lặp lại nhiều lần đều đạt |
 
 Theo file (backend): access 9 · benefits_audit 12 · booking 14 · events 10 · gates 11 · intake 14 · integrity 17 · match 16 · perf 1 · scenarios 8 · shipment_edit 8 · vehicle_events 6.
@@ -28,6 +28,23 @@ Theo file (backend): access 9 · benefits_audit 12 · booking 14 · events 10 ·
 | **Sửa/huỷ yêu cầu** | Không sửa lặng lẽ chuyến đã cam kết | sửa có khoá lạc quan; làm mới `data_updated_at`; vô hiệu đề xuất cũ; bị chặn khi đã giữ/cam kết (`SHIPMENT_LOCKED`); huỷ là xoá mềm giữ audit; vết audit chỉ ghi tên trường, không ghi giá/khách hàng | Đạt |
 | **Nhập liệu có dẫn nguồn** | Chỉ bản nháp; trường thiếu → needs_review; văn bản là dữ liệu không tin cậy | xem mục "Nhập liệu" bên dưới | Đạt (với giới hạn nêu rõ) |
 | Hiệu năng | Match P95 < 2 s cho 20 xe × 50 lô | `test_perf`: **p50 = 50 ms, p95 = 93 ms, max = 241 ms** (50 lượt qua HTTP + DB local; số đo thay đổi theo tải máy, lần chạy trước 30 ms). Danh sách đề xuất: 15 đề xuất → **8 truy vấn** (trước 79) | Đạt |
+
+## Gọn giao diện (đổi tên LOGECTION)
+Đo bằng trình duyệt thật, cùng dữ liệu, cùng cách đo (số từ hiển thị trong `#root`, chờ nội dung ổn định); bản cũ dựng từ `HEAD` ở cổng riêng.
+
+| Màn hình (vai trò) | Trước | Sau | Giảm |
+|---|---|---|---|
+| Đăng nhập | 141 | 44 | −69% |
+| Thanh đầu + menu | 69 | 21 | −70% |
+| Yêu cầu (Chủ hàng) | 210 | 81 | −61% |
+| Lô / Xe / Slot (Chủ hàng · Nhà vận tải · ICD · Điều phối) | 483 · 654 · 276 · 935 | 203 · 146 · 106 · 368 | −58% · −78% · −62% · −61% |
+| Ghép, sau khi chạy (Chủ hàng · Điều phối) | 707 · 803 | 214 · 312 | −70% · −61% |
+| Xác nhận (Chủ hàng · Nhà vận tải · ICD · Điều phối) | 827 · 817 · 813 · 1398 | 230 · 249 · 418 · 469 | −72% · −70% · −49% · −66% |
+| Hành trình (Chủ hàng · Điều phối) | 202 · 242 | 106 · 176 | −48% · −27% |
+| Lợi ích | 283 | 100 | −65% |
+| Kịch bản demo (Điều phối) | 287 | 98 | −66% |
+
+Từ điển chữ giao diện (tiếng Việt): **2.645 → 1.364 từ (−48%)**, có test giữ ngân sách ≤ 1.400 từ và test phát hiện khoá i18n không còn dùng. Menu theo vai trò có test (ICD không vào được Ghép/Lợi ích; Demo chỉ ở menu avatar của Điều phối viên). Chi tiết kỹ thuật (điểm thành phần, điều kiện, phiên bản, tái lập) chỉ thu gọn vào mục *Chi tiết*, không xoá. Số từ giữ lại một phần là dữ liệu thật (biển số, giờ, tên lô) nên không giảm hơn nữa.
 
 ## Đăng nhập đơn giản, mỗi tab một người
 - `test_login` (13 test): tên/vai trò sai → 422; người mới có tổ chức riêng + dữ liệu mẫu đúng vai trò; đăng nhập lại = cùng tài khoản (không nhân đôi dữ liệu); **hai chủ hàng tên khác nhau không đọc/sửa/huỷ được lô của nhau (404)**; luồng ghép–giữ–xác nhận **giữa ba tổ chức mới** (chủ hàng → nhà vận tải → ICD) ra `confirmed`, người ngoài không thấy đề xuất; biển số xe của các nhà vận tải không trùng; **reset giữ danh tính** và cấp lại dữ liệu mẫu; retime không dịch dữ liệu của người đăng ký; đăng nhập bị chặn ngoài chế độ mô phỏng; trần số người đăng ký; 6 lần đăng nhập đồng thời cùng tên mới → đúng một tài khoản.

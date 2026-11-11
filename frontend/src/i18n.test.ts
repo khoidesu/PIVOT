@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { dictionaries, reasonText, translate } from './i18n'
+import { allowedRoute, defaultRoute, navFor } from './nav'
 
 const REASON_CODES = ['CAPACITY_EXCEEDED', 'CARGO_INCOMPATIBLE', 'DATA_STALE', 'PICKUP_WINDOW_MISSED', 'CUTOFF_RISK',
   'VEHICLE_UNAVAILABLE', 'SLOT_FULL', 'SLOT_WINDOW_MISSED', 'SLOT_LOCATION_MISMATCH', 'MISSING_FIELD', 'SHIPMENT_NOT_OPEN', 'ID_UNRESOLVED']
@@ -52,5 +55,51 @@ describe('i18n', () => {
   it('mã lỗi không biết vẫn hiển thị được (không vỡ UI)', () => {
     const t = (k: string, p?: Record<string, string | number>) => translate('vi', k, p)
     expect(reasonText({ gate: 'x', status: 'FAIL', reason_code: 'NEW_CODE', detail: {} }, t, (s) => s)).toContain('x')
+  })
+})
+
+const SRC = join(__dirname)
+const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]))
+const wordsOf = (lang: 'vi' | 'en') => Object.values(dictionaries[lang]).reduce((n, v) => n + v.split(/\s+/).filter(Boolean).length, 0)
+
+describe('giao diện gọn chữ', () => {
+  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ)', () => {
+    expect(wordsOf('vi')).toBeLessThanOrEqual(1400)
+  })
+  it('mọi khoá i18n đều được mã nguồn dùng (không để chuỗi chết)', () => {
+    const code = walk(SRC).filter((f) => /\.(tsx?)$/.test(f) && !/i18n(\.test)?\.ts$/.test(f)).map((f) => readFileSync(f, 'utf8')).join('\n')
+    const dynamic = ['status.', 'ps.', 'cargo.', 'role.', 'rd.', 'party.', 'gate.', 'reason.', 'tl.code.', 'tl.q.', 'tl.resolve.', 'tl.exc.', 'in.note.', 'in.f.', 'err.',
+      'demo.s.', 'rec.comp.', 'rec.s.', 'bf.status.', 'bf.sub.', 'nav.', 'fleet.tab.', 'cf.ok.']
+    const dead = Object.keys(dictionaries.vi).filter((k) => !dynamic.some((p) => k.startsWith(p)) && !code.includes(`'${k}'`) && !code.includes(`\`${k}\``))
+    expect(dead).toEqual([])
+  })
+  it('thanh đầu có tên LOGECTION', () => {
+    expect(readFileSync(join(SRC, 'components', 'TopBar.tsx'), 'utf8')).toContain('LOGECTION')
+    expect(readFileSync(join(SRC, '..', 'index.html'), 'utf8')).toContain('<title>LOGECTION</title>')
+  })
+})
+
+describe('menu theo vai trò', () => {
+  it('mỗi vai trò chỉ thấy mục liên quan', () => {
+    expect(navFor('shipper')).toEqual(['request', 'fleet', 'recommend', 'confirm', 'timeline', 'benefits'])
+    expect(navFor('carrier')).toEqual(['fleet', 'recommend', 'confirm', 'timeline', 'benefits'])
+    expect(navFor('node_operator')).toEqual(['fleet', 'confirm', 'timeline'])
+    expect(navFor('dispatcher')).toEqual(['fleet', 'recommend', 'confirm', 'timeline', 'benefits'])
+    expect(navFor(undefined)).toEqual([])
+  })
+  it('ICD không vào được Ghép/Lợi ích; Demo chỉ dành cho điều phối viên và không nằm ở menu chính', () => {
+    expect(allowedRoute('node_operator', 'recommend')).toBe(false)
+    expect(allowedRoute('node_operator', 'benefits')).toBe(false)
+    for (const r of ['shipper', 'carrier', 'node_operator']) expect(allowedRoute(r, 'demo')).toBe(false)
+    expect(allowedRoute('dispatcher', 'demo')).toBe(true)
+    expect(navFor('dispatcher')).not.toContain('demo')
+  })
+  it('nhà vận tải vào được "Yêu cầu" (forwarder) dù không ở menu; điều phối viên không tạo được yêu cầu', () => {
+    expect(allowedRoute('carrier', 'request')).toBe(true)
+    expect(allowedRoute('dispatcher', 'request')).toBe(false)
+  })
+  it('mục mặc định theo vai trò', () => {
+    expect(defaultRoute('shipper')).toBe('request')
+    for (const r of ['carrier', 'node_operator', 'dispatcher']) expect(defaultRoute(r)).toBe('fleet')
   })
 })

@@ -164,4 +164,41 @@ fieldset.roles legend { font-size: 13px; font-weight: 600; color: #26363e; margi
 .role-card input { flex: 0 0 18px; width: 18px; min-height: 18px; margin-top: 3px; }
 .role-card small { display: block; color: var(--muted); font-size: 13px; font-weight: 400; }
 .role-card.on { border-color: var(--teal); background: var(--teal-weak); }
-.who { display: flex; flex-direction: column; line-height: 1.25; }
+
+/* ---- gọn chữ: tooltip, chi tiết thu gọn, tiến trình dạng chấm, menu avatar ---- */
+.hint { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 99px; background: #e6edf0; color: var(--muted); font-size: 11px; font-weight: 700; cursor: help; position: relative; vertical-align: middle; }
+.hint:hover::after, .hint:focus::after { content: attr(data-tip); position: absolute; z-index: 30; left: 50%; top: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 240px; background: #12262c; color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; line-height: 1.4; text-align: left; box-shadow: var(--shadow); }
+details.more { border: 0; background: transparent; padding: 0; }
+details.more > summary { font-size: 13px; color: var(--teal-strong); font-weight: 600; list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: '▸'; font-size: 11px; transition: transform .12s; }
+details.more[open] > summary::before { transform: rotate(90deg); }
+.more-body { margin-top: 10px; padding: 12px; background: #f6f9fa; border: 1px solid var(--line); border-radius: 10px; }
+.dots { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.dots > span { display: inline-flex; gap: 4px; }
+.dots i { width: 9px; height: 9px; border-radius: 99px; background: #d3dce0; display: inline-block; }
+.dots i.done { background: #22a35a; } .dots i.cur { background: var(--teal); box-shadow: 0 0 0 3px var(--teal-weak); }
+.live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.live i { width: 8px; height: 8px; border-radius: 99px; background: #22a35a; animation: pulse 2s infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.menu-wrap { position: relative; }
+button.who { display: flex; flex-direction: row; align-items: center; font: inherit; gap: 8px; background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 4px; cursor: pointer; text-align: left; }
+button.who:hover { border-color: var(--teal); }
+button.who b { display: block; font-size: 13px; line-height: 1.2; } button.who small { display: block; font-size: 11px; color: var(--muted); }
+.avatar { width: 28px; height: 28px; border-radius: 99px; background: var(--teal); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 220px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; display: grid; gap: 2px; }
+.menu > button { text-align: left; border: 0; background: transparent; padding: 9px 10px; border-radius: 8px; cursor: pointer; min-height: 38px; }
+.menu > button:hover:not(:disabled) { background: var(--teal-weak); } .menu > button:disabled { opacity: .45; cursor: not-allowed; }
+.menu-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; }
+.btn.icon { padding: 4px 9px; min-height: 32px; font-size: 14px; }
+.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+a.btn { color: inherit; }
+label.inline { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+label.inline select { min-width: 220px; width: auto; }
+.import { padding: 12px; border: 1px dashed var(--line); border-radius: 12px; margin-bottom: 14px; }
+.score { text-align: right; display: grid; } .score-big { font-size: 26px; }
+.rank { align-items: flex-start; } .plate { font-size: 17px; }
+.why { font-size: 14px; }
+.topbar-in { gap: 10px 16px; }
+.brand b { font-size: 17px; letter-spacing: 0.06em; }
+@media (max-width: 520px) { button.who span:last-child small { display: none; } label.inline select { min-width: 0; width: 100%; } }
