@@ -43,6 +43,8 @@ def process_pending(factory: sessionmaker = SessionLocal, limit: int = 50, now: 
     with factory() as s:  # dọn hold/đề xuất quá hạn (trả slot) — GET không còn ghi DB
         expire_stale(s, now or datetime.now(timezone.utc))
         from .incidents.service import sweep
+        from .docks.service import sweep as dock_sweep
+        dock_sweep(s, now or datetime.now(timezone.utc))  # NO_SHOW + hàng đợi dock
         sweep(s, now or datetime.now(timezone.utc))  # leo thang quá SLA + phát hiện dữ liệu vị trí quá cũ
         s.commit()
     for _ in range(limit):

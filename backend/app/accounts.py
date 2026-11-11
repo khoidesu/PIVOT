@@ -93,6 +93,9 @@ def provision_org(session: Session, org: m.Organization, role: str, now: datetim
             session.add(m.Slot(node_org_id=org.id, location_id=L["icd"].id, start_at=start, end_at=start + timedelta(minutes=30),
                                capacity=3, remaining=3, source="mock"))
             made["slots"] += 1
+    if role == "node_operator" and not session.execute(select(m.Dock.id).where(m.Dock.node_org_id == org.id)).first():
+        for code in ("D1", "D2"):
+            session.add(m.Dock(node_org_id=org.id, location_id=L["icd"].id, code=code, handling_minutes=30))
     session.flush()
     return made
 

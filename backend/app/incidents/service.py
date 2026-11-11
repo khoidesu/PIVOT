@@ -145,6 +145,8 @@ def replan(session: Session, actor: Actor, proposal_id: uuid.UUID, version: int,
     sim = session.get(m.SimTrip, prop.id)
     if sim:
         sim.running = False
+    from ..docks.service import cancel_for
+    cancel_for(session, prop.id)
     for ex in session.execute(select(m.ExceptionRecord).where(m.ExceptionRecord.proposal_id == prop.id, m.ExceptionRecord.status == "open")).scalars():
         ex.status, ex.resolved_at = "resolved", now
         ex.detail = {**(ex.detail or {}), "resolution": "replanned", "resolved_by": actor.user_name, "resolved_org": actor.org_name,

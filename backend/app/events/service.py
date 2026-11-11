@@ -20,8 +20,9 @@ from ..booking import service as bk
 from . import payloads
 
 SUPPORTED = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED", "VEHICLE_POSITION", "VEHICLE_AVAILABLE",
-             "INCIDENT_REPORTED", "CARGO_DAMAGE_REPORTED"}
-TRIP_EVENTS = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED", "INCIDENT_REPORTED"}   # chỉ nhà vận tải sở hữu xe được báo
+             "INCIDENT_REPORTED", "CARGO_DAMAGE_REPORTED", "GATE_CHECK_IN", "UNLOAD_STARTED", "UNLOAD_COMPLETED"}
+TRIP_EVENTS = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED", "INCIDENT_REPORTED", "GATE_CHECK_IN"}
+NODE_EVENTS = {"UNLOAD_STARTED", "UNLOAD_COMPLETED"}  # chỉ ICD (node) của slot được báo   # chỉ nhà vận tải sở hữu xe được báo
 VEHICLE_EVENTS = {"VEHICLE_POSITION", "VEHICLE_AVAILABLE"}        # chỉ nhà vận tải sở hữu xe được báo
 SYSTEM_EVENTS = {"MILESTONE_REACHED"}                      # chỉ hệ thống sinh ra, không nhận từ ngoài
 FINAL_QUALITY = {"applied", "late", "invalid"}
@@ -47,6 +48,8 @@ def _authorize(session: Session, actor: Actor, entity_type: str, entity_id, even
         raise bk.BookingError("VALIDATION", f"{event_type} must target a vehicle", 422)
     if event_type in TRIP_EVENTS and not (actor.role == "carrier" and actor.org_id == veh.tenant_id):
         raise bk.BookingError("FORBIDDEN", "Only the carrier that owns the vehicle can report trip events", 403)
+    if event_type in NODE_EVENTS and not (actor.role == "node_operator" and slot is not None and slot.node_org_id == actor.org_id):
+        raise bk.BookingError("FORBIDDEN", "Only the terminal operator of the slot can report unloading events", 403)
     return prop
 
 
@@ -157,9 +160,15 @@ def apply_event(session: Session, event_id: uuid.UUID, now: datetime) -> str:
             ev.quality_status = "applied"
         elif status in ("confirmed", "executing"):
             _exception(session, prop, ev, "ETA_CHANGED", {"delay_minutes": delay, "action": "needs_decision"})
+            from ..docks import service as docks
+            docks.on_eta_delay(session, prop, delay)  # đề xuất khung dock mới (ICD chấp nhận mới áp dụng)
             ev.quality_status = "applied"  # chỉ tạo ngoại lệ; KHÔNG sửa chuyến đã cam kết
         else:
             ev.quality_status = "late" if status == "completed" else "invalid"
+
+    elif ev.event_type in ("GATE_CHECK_IN", "UNLOAD_STARTED", "UNLOAD_COMPLETED"):
+        from ..docks import service as docks
+        ev.quality_status = docks.apply_dock_event(session, prop, ev) if status in ("confirmed", "executing", "completed") else "invalid"
 
     elif ev.event_type in ("INCIDENT_REPORTED", "CARGO_DAMAGE_REPORTED"):
         p = ev.payload or {}

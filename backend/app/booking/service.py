@@ -273,6 +273,8 @@ def accept(session: Session, actor: Actor, proposal_id: uuid.UUID, version: int,
             sib.version += 1
         prop.status = "confirmed"
         prop.version += 1
+        from ..docks.service import assign
+        assign(session, prop, ship, veh, slot, now)  # xếp dock trong CÙNG transaction (khoá dock chống trùng lịch)
         session.add(m.OutboxJob(topic="proposal.confirmed", payload={"proposal_id": str(prop.id)},
                                 dedupe_key=f"proposal.confirmed:{prop.id}"))
     session.flush()

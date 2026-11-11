@@ -39,8 +39,8 @@ ASSUMPTIONS_V1 = {
 }
 
 TABLES = [
-    "notifications", "exception_tasks", "outbox_jobs", "trip_tracks", "sim_trips", "benefit_ledger", "exceptions", "decisions", "reservations", "proposals",
-    "assumption_sets", "external_id_map", "events", "slots", "availability_windows", "vehicles",
+    "notifications", "dock_appointments", "exception_tasks", "outbox_jobs", "trip_tracks", "sim_trips", "benefit_ledger", "exceptions", "decisions", "reservations", "proposals",
+    "assumption_sets", "external_id_map", "events", "docks", "slots", "availability_windows", "vehicles",
     "shipment_participants", "logistics_units", "shipment_legs", "shipments", "locations",
     "memberships", "users", "organizations",
 ]
@@ -136,6 +136,8 @@ def seed(session: Session, now: datetime | None = None) -> dict:
         session.add(m.AvailabilityWindow(id=uid(f"win-{i}"), vehicle_id=uid(f"veh-{i}"),
                                          location_id=locs[loc].id, free_from=H(free_h), free_to=H(free_h + 9)))
 
+    for code in ("D1", "D2"):  # dock của ICD (mô phỏng): lịch hẹn xe đặt theo dock
+        session.add(m.Dock(id=uid(f"dock-{code}"), node_org_id=orgs["C"].id, location_id=locs["icd"].id, code=code, handling_minutes=30))
     # --- 20 slot ICD (node C) — slot mô phỏng, nguồn xác nhận = mock ---
     for i in range(1, 21):
         start = H(2 + (i - 1) * 0.5)
@@ -230,6 +232,13 @@ def retime(session: Session, now: datetime | None = None) -> timedelta:
                 value = getattr(row, col)
                 if value is not None:
                     setattr(row, col, value + delta)
+    for appt, dock in session.query(m.DockAppointment, m.Dock).join(m.Dock, m.Dock.id == m.DockAppointment.dock_id).all():
+        if dock.node_org_id in skip:
+            continue
+        for col in ("window_start", "window_end", "base_eta_at", "eta_at", "suggested_start", "suggested_end"):
+            value = getattr(appt, col)
+            if value is not None:
+                setattr(appt, col, value + delta)
     aset.params = {**aset.params, "anchor_at": now.isoformat()}  # gán lại để SQLAlchemy nhận ra JSON đổi
     return delta
 

@@ -378,3 +378,42 @@ class SimTrip(Base):
     time_scale: Mapped[float] = mapped_column(Float, default=20.0)  # tăng tốc thời gian mô phỏng để demo ngắn
     seq: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = ts(default_now=True)
+
+
+class Dock(Base):
+    """Cửa/bãi bốc dỡ của một ICD (mô phỏng). Lịch hẹn xe đặt theo dock."""
+    __tablename__ = "docks"
+    __table_args__ = (UniqueConstraint("node_org_id", "code", name="uq_dock_org_code"),)
+    id: Mapped[uuid.UUID] = pk()
+    node_org_id: Mapped[uuid.UUID] = fk("organizations.id")
+    location_id: Mapped[uuid.UUID] = fk("locations.id")
+    code: Mapped[str] = mapped_column(String(10))
+    status: Mapped[str] = mapped_column(String(10), default="active")  # active | closed
+    handling_minutes: Mapped[int] = mapped_column(Integer, default=30)
+
+
+class DockAppointment(Base):
+    """Lịch hẹn xe tại dock (Truck Appointment). Chống trùng lịch bằng khoá dòng dock + kiểm tra chồng lấn trong transaction."""
+    __tablename__ = "dock_appointments"
+    __table_args__ = (UniqueConstraint("proposal_id", name="uq_dock_appt_proposal"),
+                      CheckConstraint("window_end > window_start", name="ck_dock_appt_window"),
+                      CheckConstraint("status IN ('scheduled','checked_in','unloading','completed','no_show','cancelled')", name="ck_dock_appt_status"))
+    id: Mapped[uuid.UUID] = pk()
+    dock_id: Mapped[uuid.UUID] = fk("docks.id")
+    proposal_id: Mapped[uuid.UUID] = fk("proposals.id")
+    vehicle_id: Mapped[uuid.UUID] = fk("vehicles.id")
+    window_start: Mapped[datetime] = ts()
+    window_end: Mapped[datetime] = ts()
+    status: Mapped[str] = mapped_column(String(12), default="scheduled")
+    base_eta_at: Mapped[datetime | None] = ts(nullable=True)  # ETA đến ICD lúc đặt lịch
+    eta_at: Mapped[datetime | None] = ts(nullable=True)  # ETA hiện tại (đổi theo ETA_UPDATED)
+    checked_in_at: Mapped[datetime | None] = ts(nullable=True)
+    unloading_started_at: Mapped[datetime | None] = ts(nullable=True)
+    completed_at: Mapped[datetime | None] = ts(nullable=True)
+    dwell_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)  # từ check-in đến bốc dỡ xong
+    suggested_dock_id: Mapped[uuid.UUID | None] = fk("docks.id", nullable=True)
+    suggested_start: Mapped[datetime | None] = ts(nullable=True)
+    suggested_end: Mapped[datetime | None] = ts(nullable=True)
+    suggestion_reason: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = ts(default_now=True)
