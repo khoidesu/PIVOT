@@ -9,6 +9,7 @@ from ..booking.service import BookingError
 
 MAX_EMPTY_KM = 500.0          # số đo km chạy rỗng hợp lệ: 0..500
 MAX_DELAY_MIN = 24 * 60
+BBOX = (10.4, 11.3, 106.3, 107.2)  # hành lang mô phỏng (lat_min, lat_max, lng_min, lng_max)
 MAX_FUTURE_SKEW = timedelta(minutes=5)  # sự kiện "từ tương lai" quá 5 phút là dữ liệu lỗi
 
 
@@ -57,6 +58,13 @@ def validate(session: Session, event_type: str, payload: dict, occurred_at: date
             if session.get(m.Location, lid) is None:
                 _bad("payload.location_id does not exist")
             p["location_id"] = str(lid)
+        if event_type == "VEHICLE_POSITION" and ("lat" in p or "lng" in p):
+            if "lat" not in p or "lng" not in p:
+                _bad("payload.lat and payload.lng must be sent together")
+            p["lat"] = _num(p["lat"], "lat", BBOX[0], BBOX[1])
+            p["lng"] = _num(p["lng"], "lng", BBOX[2], BBOX[3])
+            if "speed_kmh" in p:
+                p["speed_kmh"] = _num(p["speed_kmh"], "speed_kmh", 0, 150)
         if event_type == "VEHICLE_AVAILABLE":
             a, b = _aware(p.get("free_from"), "free_from"), _aware(p.get("free_to"), "free_to")
             if not a < b:

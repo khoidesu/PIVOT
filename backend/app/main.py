@@ -8,9 +8,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .routers import auth, benefits, core, demo, events, intake, matching
+from .routers import auth, benefits, core, demo, events, intake, matching, tracking
 from .worker import process_pending
 
+
+
+def sim_tick_once() -> None:
+    """Đẩy bộ giả lập GPS một bước (chỉ có tác dụng khi có chuyến đã bật mô phỏng)."""
+    from datetime import datetime, timezone
+    from .db import SessionLocal
+    from .sim import gps
+    try:
+        with SessionLocal() as s:
+            if gps.tick(s, datetime.now(timezone.utc)):
+                s.commit()
+    except Exception:  # noqa: BLE001 — mô phỏng không được làm sập vòng worker
+        pass
 
 
 @asynccontextmanager
@@ -23,6 +36,7 @@ async def lifespan(app: FastAPI):
         async def loop():
             while True:
                 await asyncio.to_thread(process_pending)
+                await asyncio.to_thread(sim_tick_once)
                 await asyncio.sleep(1)
         task = asyncio.create_task(loop())
     yield
@@ -47,6 +61,7 @@ app.include_router(matching.router)
 app.include_router(events.router)
 app.include_router(benefits.router)
 app.include_router(intake.router)
+app.include_router(tracking.router)
 app.include_router(demo.router)
 
 

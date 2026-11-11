@@ -137,6 +137,9 @@ class Vehicle(Base):
     capacity_m3: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(20), default="available")  # available|committed|offline
     position_updated_at: Mapped[datetime | None] = ts(nullable=True)
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)  # vị trí GPS mới nhất (mô phỏng)
+    lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    speed_kmh: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_simulated: Mapped[bool] = mapped_column(Boolean, default=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
 
@@ -311,3 +314,29 @@ class OutboxJob(Base):
     dedupe_key: Mapped[str | None] = mapped_column(String(120), nullable=True, unique=True)
     last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = ts(default_now=True)
+
+
+class TripTrack(Base):
+    """Vệt di chuyển của một chuyến (breadcrumb). Giới hạn số điểm/chuyến ở tracking.service."""
+    __tablename__ = "trip_tracks"
+    __table_args__ = (Index("ix_trip_tracks_proposal_at", "proposal_id", "at"),)
+    id: Mapped[uuid.UUID] = pk()
+    proposal_id: Mapped[uuid.UUID] = fk("proposals.id")
+    vehicle_id: Mapped[uuid.UUID] = fk("vehicles.id")
+    at: Mapped[datetime] = ts()
+    lat: Mapped[float] = mapped_column(Float)
+    lng: Mapped[float] = mapped_column(Float)
+    speed_kmh: Mapped[float | None] = mapped_column(Float, nullable=True)
+    source: Mapped[str] = mapped_column(String(20), default="gps")  # gps | sim-gps
+
+
+class SimTrip(Base):
+    """Trạng thái bộ giả lập GPS của một chuyến (chỉ dùng cho demo/mô phỏng)."""
+    __tablename__ = "sim_trips"
+    proposal_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("proposals.id"), primary_key=True)
+    running: Mapped[bool] = mapped_column(Boolean, default=True)
+    mode: Mapped[str] = mapped_column(String(12), default="normal")  # normal | slow | breakdown | detour
+    along_km: Mapped[float] = mapped_column(Float, default=0.0)
+    time_scale: Mapped[float] = mapped_column(Float, default=20.0)  # tăng tốc thời gian mô phỏng để demo ngắn
+    seq: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = ts(default_now=True)
