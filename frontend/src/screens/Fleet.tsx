@@ -35,6 +35,11 @@ export function Fleet({ go }: { go: (to: string) => void }) {
     for (const v of mine) await api.sendVehicleEvent(v.id, 'VEHICLE_POSITION')
     setMsg(t('fleet.updateAllDone', { n: mine.length })); setTimeout(() => { void vehicles.reload(true) }, 1600)
   })
+  const myOpen = (lots.data ?? []).filter((s) => s.status === 'open' && !!me && s.tenant_id === me.org_id)
+  const refreshAll = () => guard(async () => {
+    for (const s of myOpen) await api.refreshShipment(s.id)
+    setMsg(t('fleet.refreshDone', { n: myOpen.length })); await lots.reload(true)
+  })
   const ownerOf = (s: Shipment) => canEdit && s.tenant_id === me?.org_id
   const visibleLots = (lots.data ?? []).filter((s) => showCancelled || s.status !== 'cancelled')
   const cur = tab === 'lots' ? lots : tab === 'vehicles' ? vehicles : slots
@@ -49,6 +54,7 @@ export function Fleet({ go }: { go: (to: string) => void }) {
               <button key={x} role="tab" aria-selected={tab === x} aria-pressed={tab === x} onClick={() => setTab(x)}>{t(`fleet.tab.${x}`)}</button>))}
           </div>
           {canEdit && <button className="btn sm primary" onClick={() => go('/request')}>{t('fleet.add')}</button>}
+          {tab === 'lots' && me?.role === 'shipper' && myOpen.length > 0 && <button className="btn sm" title={t('fleet.refreshAllTip')} onClick={refreshAll}>{t('fleet.refreshAll')}</button>}
           {tab === 'vehicles' && me?.role === 'carrier' && mine.length > 0 && <button className="btn sm" onClick={sendAll}>{t('fleet.updateAll')}</button>}
         </div>
       </div>

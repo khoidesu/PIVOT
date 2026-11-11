@@ -95,6 +95,20 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
   useEffect(() => { setRun(null); setError(null) }, [lotId, me?.role])
   useEffect(() => { if (!lotId && open.length) setLotId(open[0].id) }, [open.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const vehicles = useData(() => api.vehicles())
+  const isStale = (gate: string) => !!run?.rejections.some((r) => r.reasons.some((g) => g.gate === gate && g.reason_code === 'DATA_STALE'))
+  const staleLot = run?.status === 'no_feasible_option' && isStale('shipment_fresh')
+  const staleVeh = run?.status === 'no_feasible_option' && isStale('data_fresh')
+  async function refreshThenRun(kind: 'lot' | 'veh') {
+    setBusy(true); setError(null)
+    try {
+      if (kind === 'lot') await api.refreshShipment(lotId)
+      else { for (const v of (vehicles.data ?? []).filter((x) => x.tenant_id === me?.org_id)) await api.sendVehicleEvent(v.id, 'VEHICLE_POSITION'); await new Promise((r) => setTimeout(r, 1600)) }
+      setRun(await api.match(lotId)); void lots.reload(true)
+    } catch (e) { setError(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) }
+    finally { setBusy(false) }
+  }
+
   const allowed = me ? CAN_MATCH.has(me.role) : false
   async function doRun() {
     setBusy(true); setError(null)
@@ -133,6 +147,14 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
           <Note kind={run.status === 'proposals' ? 'ok' : run.status === 'needs_data' ? 'warn' : 'err'}>
             {t(`rec.s.${run.status}`, { n: run.proposals.length, v: run.evaluated_vehicles })}
           </Note>
+          {(staleLot || staleVeh) && (
+            <Note kind="warn">
+              <div className="stack">
+                {staleLot && <div>{t('rec.stale.lot')} {me?.role === 'shipper' ? <button className="btn sm" disabled={busy} onClick={() => refreshThenRun('lot')}>{t('rec.stale.refreshLot')}</button> : t('rec.stale.askShipper')}</div>}
+                {staleVeh && <div>{t('rec.stale.veh')} {me?.role === 'carrier' ? <button className="btn sm" disabled={busy} onClick={() => refreshThenRun('veh')}>{t('rec.stale.refreshVeh')}</button> : t('rec.stale.askCarrier')}</div>}
+                {me?.role === 'dispatcher' && <div className="small">{t('rec.stale.reset')}</div>}
+              </div>
+            </Note>)}
           {run.proposals.length > 0 && (
             <div className="grid3">{run.proposals.map((p, i) => <ProposalCard key={p.id} p={p} rank={i + 1} onHold={hold} busy={holding === p.id} />)}</div>
           )}

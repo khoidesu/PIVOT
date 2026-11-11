@@ -142,6 +142,18 @@ def update_shipment(shipment_id: uuid.UUID, body: s.ShipmentUpdate, actor: Actor
     return shipment_out_many(session, actor, [ship])[0]
 
 
+@router.post("/shipments/{shipment_id}/refresh", response_model=s.ShipmentOut)
+def refresh_shipment(shipment_id: uuid.UUID, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    """Chủ lô xác nhận dữ liệu lô còn đúng → làm mới tuổi dữ liệu (không đổi nội dung)."""
+    try:
+        ship = shipment_ops.refresh(session, actor, shipment_id, datetime.now(timezone.utc))
+        session.commit()
+    except BookingError as e:
+        session.rollback()
+        raise _ops_http(e) from None
+    return shipment_out_many(session, actor, [ship])[0]
+
+
 @router.delete("/shipments/{shipment_id}", response_model=s.ShipmentOut)
 def cancel_shipment(shipment_id: uuid.UUID, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     """Huỷ yêu cầu (xoá mềm: giữ vết audit). Không huỷ được khi đã có đề xuất đang giữ/đã cam kết."""

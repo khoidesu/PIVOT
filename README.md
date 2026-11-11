@@ -50,7 +50,7 @@ cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 
 ## Kiểm thử
 ```bash
-cd backend && .venv/bin/python -m pytest      # 201 test (DB test riêng: pivot_test)
+cd backend && .venv/bin/python -m pytest      # 204 test (DB test riêng: pivot_test)
 cd frontend && npm test && npx tsc --noEmit
 ```
 

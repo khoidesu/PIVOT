@@ -78,7 +78,8 @@ small { color: #5b6b73; }
 <h3>0.3 “Làm mới dữ liệu” — làm trước mỗi buổi test và khi cần</h3>
 <p>Dữ liệu mẫu được tạo với mốc thời gian tương đối: vị trí xe chỉ “tươi” trong <b>5 phút</b>; slot, hạn lấy hàng cũng trôi theo giờ. Nếu để lâu, mọi xe sẽ bị loại vì <code>DATA_STALE</code> hoặc lô hết hạn lấy hàng. Vì vậy:</p>
 <ul><li>Tab 4 (Phú): avatar → <span class="btn">Làm mới dữ liệu</span> → thấy thông báo <b>“Đã làm mới dữ liệu.”</b>. Việc này <b>dịch lại các mốc thời gian</b> nhưng <b>giữ nguyên các đề xuất/chuyến đang có</b>.</li>
-<li>Sau khi làm mới, bạn có <b>khoảng 2–4 phút</b> trước khi xe mẫu lại “cũ” quá 5 phút. Khi chạy các bài Ghép → Xác nhận, hãy làm liền tay; nếu thấy mọi xe bị loại <code>DATA_STALE</code>, bấm “Làm mới dữ liệu” lần nữa (hoặc xem TC-08).</li>
+<li>Sau khi làm mới, bạn có <b>khoảng 2–4 phút</b> trước khi xe mẫu lại “cũ” quá 5 phút. Khi chạy các bài Ghép → Xác nhận, hãy làm liền tay; nếu thấy mọi xe bị loại <code>DATA_STALE</code>, bấm “Làm mới dữ liệu” lần nữa (cần mã quản trị) <b>hoặc tự làm mới không cần mã</b>: ngay trên màn Ghép sẽ hiện khung vàng với nút “Làm mới lô &amp; chạy lại” (Nguyên) / “Cập nhật vị trí xe &amp; chạy lại” (Minh) — xem TC-08.</li>
+<li><b>Có hai loại dữ liệu cũ, phải làm mới cả hai:</b> <b>vị trí xe</b> (quá 5 phút) và <b>dữ liệu lô</b> (quá 60 phút). Chỉ làm mới xe thì vẫn không ghép được nếu lô đã cũ. Ngoài ra <b>hạn lấy hàng/giờ sẵn sàng</b> của lô mẫu trôi theo thời gian: sau vài giờ mốc đó đã qua, lúc này chỉ “Làm mới dữ liệu” (reset, cần mã quản trị) mới khôi phục hoàn toàn.</li>
 <li><b>Muốn xoá sạch mọi chuyến/đề xuất để làm lại từ đầu:</b> Phú → “Kịch bản demo” → <span class="btn">Chạy tất cả</span> (mỗi kịch bản tự reset; kịch bản cuối cùng để lại dữ liệu mẫu sạch). <b>Lưu ý:</b> việc này xoá dữ liệu của <b>tất cả</b> mọi người đang test.</li></ul>
 
 <h3>0.4 Dữ liệu mẫu bạn sẽ dùng</h3>
@@ -205,10 +206,10 @@ small { color: #5b6b73; }
 <li>Nguyên: <span class="tab">Ghép</span> → LOT-A-001 → <span class="btn">Chạy ghép</span>.</li>
 <li>Minh: <span class="tab">Xe &amp; lô</span> → tab con <b>“Xe”</b>: nhìn cột <b>“Vị trí”</b> và chip <b>“Quá hạn”</b>.</li>
 <li>Minh: bấm <span class="btn">Cập nhật vị trí</span> → thông báo <b>“Đã gửi 10 sự kiện vị trí.”</b>; chờ ~2 giây.</li>
-<li>Nguyên: <span class="btn">Chạy ghép</span> lại.</li>
+<li>Nguyên: <span class="btn">Chạy ghép</span> lại. Nếu lô vẫn bị loại <code>DATA_STALE</code> (lô cũ quá 60 phút) → khung vàng hiện nút <span class="btn">Làm mới lô &amp; chạy lại</span> (hoặc <span class="tab">Xe &amp; lô</span> → tab “Lô” → <span class="btn">Làm mới lô</span>). Bấm nút đó.</li>
 </ol>
-<div class="ok"><b>Mong đợi:</b> bước 2: <b>không có phương án</b>, mọi xe <code>DATA_STALE</code> (có thể thêm lý do khác). Bước 3: các xe hiện “xx phút trước” kèm chip đỏ <b>Quá hạn</b>. Bước 5: có phương án trở lại (xe .08 vốn “cũ” nay cũng được cập nhật).</div>
-<div class="see"><b>Phân tích:</b> “tuổi dữ liệu” có thật: vị trí xe đến qua <b>sự kiện</b> (VEHICLE_POSITION) từ nhà vận tải; gửi lại thì hệ thống ghép lại được mà không cần reset.</div>
+<div class="ok"><b>Mong đợi:</b> bước 2: <b>không có phương án</b>, mọi xe <code>DATA_STALE</code> (có thể thêm lý do khác) và hiện <b>khung vàng</b> giải thích “Dữ liệu lô đã cũ / Vị trí xe đã cũ” kèm nút làm mới đúng vai (Nguyên: làm mới lô; Minh: cập nhật vị trí; Phú: chỉ có hướng dẫn). Bước 3: các xe hiện “xx phút trước” kèm chip đỏ <b>Quá hạn</b>. Bước 5: có phương án trở lại sau khi làm mới <b>cả xe lẫn lô</b> (xe .08 vốn “cũ” nay cũng được cập nhật).</div>
+<div class="see"><b>Phân tích:</b> “tuổi dữ liệu” có thật và có <b>hai ngưỡng</b>: vị trí xe 5 phút (đến qua <b>sự kiện</b> VEHICLE_POSITION từ nhà vận tải) và dữ liệu lô 60 phút (chủ lô <b>xác nhận dữ liệu còn đúng</b> bằng nút làm mới; việc này được ghi audit <code>SHIPMENT_REFRESHED</code>, không đổi nội dung lô). Làm mới đủ cả hai thì ghép lại được mà không cần reset.</div>
 <p><span class="box"></span>Đạt &nbsp; <span class="box"></span>Không đạt</p></div>
 
 <h2 class="pb">Phần C — Giữ slot và xác nhận ba bên</h2>
@@ -417,7 +418,8 @@ small { color: #5b6b73; }
 <table>
 <tr><th>Hiện tượng</th><th>Nguyên nhân thường gặp</th><th>Cách xử lý</th></tr>
 <tr><td>Mở web rất chậm / báo không kết nối</td><td>Máy chủ miễn phí vừa “thức dậy”</td><td>Chờ 30–60 giây rồi tải lại</td></tr>
-<tr><td>“Chạy ghép” báo không có phương án / mọi xe <code>DATA_STALE</code></td><td>Dữ liệu mẫu quá 5 phút kể từ lần làm mới</td><td>Phú: “Làm mới dữ liệu”, hoặc Minh: “Cập nhật vị trí”</td></tr>
+<tr><td>“Chạy ghép” báo không có phương án / mọi xe <code>DATA_STALE</code></td><td>Vị trí xe quá 5 phút <b>và/hoặc</b> dữ liệu lô quá 60 phút kể từ lần làm mới</td><td>Bấm nút trong <b>khung vàng</b> ở màn Ghép (Nguyên: “Làm mới lô &amp; chạy lại”; Minh: “Cập nhật vị trí xe &amp; chạy lại”) — cần làm <b>cả hai</b>. Hoặc Phú: “Làm mới dữ liệu” (cần mã quản trị)</td></tr>
+<tr><td>Làm mới xe và lô rồi mà vẫn không có phương án (nhất là sau vài giờ)</td><td>Giờ sẵn sàng / hạn lấy hàng của lô mẫu, hoặc khung rảnh của xe, đã trôi qua</td><td>Chỉ reset mới khôi phục: Phú “Làm mới dữ liệu” (cần mã quản trị do người phụ trách cấp)</td></tr>
 <tr><td>Lô đã bị người khác ghép / không thấy lô mong đợi</td><td>Nhiều người cùng test trên dữ liệu dùng chung</td><td>Chọn lô khác, hoặc Phú chạy “Chạy tất cả” để reset (xoá dữ liệu của mọi người)</td></tr>
 <tr><td>“Đề xuất đã hết hạn.”</td><td>Quá 120 giây từ lúc “Giữ slot”</td><td>Chạy ghép và giữ lại; xác nhận nhanh hơn</td></tr>
 <tr><td>Bị đưa về màn Đăng nhập</td><td>Phiên hết hạn do dữ liệu vừa reset</td><td>Đăng nhập lại (tên + vai trò)</td></tr>

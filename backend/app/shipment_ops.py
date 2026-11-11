@@ -6,7 +6,8 @@
 - Sửa dùng khoá lạc quan `version`. Sửa xong: version+1, data_updated_at=now (dữ liệu "tươi" lại), các đề xuất `proposed`
   của lô bị `cancelled` vì đầu vào đã đổi (phải ghép lại).
 - "Xoá" = HUỶ (status `cancelled`): sự kiện/đề xuất/sổ lợi ích tham chiếu lô nên không xoá cứng, để giữ vết audit (DRAFT mục 10).
-- Mọi thay đổi ghi sự kiện SHIPMENT_UPDATED / SHIPMENT_CANCELLED (chỉ tên trường, không ghi giá/khách hàng).
+- `refresh`: chủ lô xác nhận dữ liệu còn đúng (làm mới tuổi dữ liệu, không đổi nội dung).
+- Mọi thay đổi ghi sự kiện SHIPMENT_UPDATED / SHIPMENT_CANCELLED / SHIPMENT_REFRESHED (chỉ tên trường, không ghi giá/khách hàng).
 """
 import uuid
 from datetime import datetime
@@ -83,6 +84,20 @@ def update(session: Session, actor: Actor, shipment_id: uuid.UUID, changes: dict
     _audit(session, actor, ship, "SHIPMENT_UPDATED",
            {"fields": sorted(changed), "sensitive_fields_changed": sorted(SENSITIVE & set(changed)),
             "version": ship.version, "proposals_invalidated": cancelled}, now)
+    session.flush()
+    return ship
+
+
+def refresh(session: Session, actor: Actor, shipment_id: uuid.UUID, now: datetime) -> m.Shipment:
+    """Chủ lô xác nhận dữ liệu lô VẪN ĐÚNG → làm mới `data_updated_at` (để qua cổng shipment_fresh).
+
+    Không đổi nội dung, không tăng version, không vô hiệu đề xuất (không có đầu vào nào đổi). Có ghi audit
+    SHIPMENT_REFRESHED để thấy ai xác nhận lúc nào; vẫn bị khoá khi lô đã giữ/cam kết.
+    """
+    ship, props = _lock(session, actor, shipment_id)
+    _ensure_unlocked(ship, props, now)
+    ship.data_updated_at = now
+    _audit(session, actor, ship, "SHIPMENT_REFRESHED", {"version": ship.version}, now)
     session.flush()
     return ship
 

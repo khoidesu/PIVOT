@@ -126,3 +126,36 @@ def test_concurrent_edit_and_hold_never_corrupt_state(client):
         assert 500 not in codes.values() and 503 not in codes.values(), out
         assert (codes["edit"], codes["hold"]) in {(200, 409), (409, 200)}, out
         client.post("/v1/demo/reset", headers=auth("dispatch"))
+
+
+def _age_lot(lot, hours=3):
+    with SessionLocal() as s:
+        s.execute(update(m.Shipment).where(m.Shipment.id == uuid.UUID(lot["id"])).values(data_updated_at=datetime.now(timezone.utc) - timedelta(hours=hours)))
+        s.commit()
+
+
+def test_owner_can_refresh_a_stale_lot_without_changing_it(client):
+    """Tester không có mã quản trị: chủ lô xác nhận 'dữ liệu còn đúng' để qua cổng shipment_fresh."""
+    lot = _lot(client)
+    _age_lot(lot)
+    assert match(client, "shipper_a", "LOT-A-001")["status"] == "no_feasible_option"
+    r = client.post(f"/v1/shipments/{lot['id']}/refresh", headers=auth("shipper_a"))
+    assert r.status_code == 200
+    after = r.json()
+    assert (after["version"], after["weight_kg"], after["status"]) == (lot["version"], lot["weight_kg"], "open")   # nội dung/version không đổi
+    assert after["data_updated_at"] > lot["data_updated_at"]
+    assert match(client, "shipper_a", "LOT-A-001")["status"] == "proposals"
+    with SessionLocal() as s:  # có vết audit, không ghi giá/khách hàng
+        ev = s.execute(select(m.Event).where(m.Event.entity_id == uuid.UUID(lot["id"]), m.Event.event_type == "SHIPMENT_REFRESHED")).scalars().all()
+        assert len(ev) == 1 and set(ev[0].payload) == {"version"}
+
+
+def test_refresh_is_owner_only_and_blocked_once_held(client):
+    lot = _lot(client)
+    assert client.post(f"/v1/shipments/{lot['id']}/refresh", headers=auth("carrier_b")).status_code == 404    # không thấy lô
+    assert client.post(f"/v1/shipments/{lot['id']}/refresh", headers=auth("dispatch")).status_code == 403    # thấy nhưng không phải chủ
+    assert client.post(f"/v1/shipments/{lot['id']}/refresh", headers=auth("shipper_a2")).status_code == 200   # cùng tổ chức A
+    prop = match(client, "shipper_a", "LOT-A-001")["proposals"][0]
+    assert act(client, "shipper_a", prop, "hold").status_code == 200
+    assert client.post(f"/v1/shipments/{lot['id']}/refresh", headers=auth("shipper_a")).status_code == 409   # đã giữ → khoá
+    assert client.post(f"/v1/shipments/{uuid.uuid4()}/refresh", headers=auth("shipper_a")).status_code == 404

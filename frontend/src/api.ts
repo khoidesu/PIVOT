@@ -199,6 +199,7 @@ export const api = {
   slots: () => request<Slot[]>('/v1/slots'),
   createShipment: (b: ShipmentCreate) => post<Shipment>('/v1/shipments', b),
   updateShipment: (id: string, b: ShipmentUpdate) => request<Shipment>(`/v1/shipments/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
+  refreshShipment: (id: string) => post<Shipment>(`/v1/shipments/${id}/refresh`, {}),
   cancelShipment: (id: string) => request<Shipment>(`/v1/shipments/${id}`, { method: 'DELETE' }),
   intakeDraft: (text: string) => post<IntakeDraft>('/v1/intake/drafts', { text }),
   sendVehicleEvent: (vehicleId: string, event_type: 'VEHICLE_POSITION', payload: Record<string, unknown> = {}) =>
