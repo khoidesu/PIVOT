@@ -19,8 +19,9 @@ from ..benefits import service as benefits
 from ..booking import service as bk
 from . import payloads
 
-SUPPORTED = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED", "VEHICLE_POSITION", "VEHICLE_AVAILABLE"}
-TRIP_EVENTS = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED"}   # chỉ nhà vận tải sở hữu xe được báo
+SUPPORTED = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED", "VEHICLE_POSITION", "VEHICLE_AVAILABLE",
+             "INCIDENT_REPORTED", "CARGO_DAMAGE_REPORTED"}
+TRIP_EVENTS = {"TRIP_STARTED", "TRIP_COMPLETED", "ETA_UPDATED", "INCIDENT_REPORTED"}   # chỉ nhà vận tải sở hữu xe được báo
 VEHICLE_EVENTS = {"VEHICLE_POSITION", "VEHICLE_AVAILABLE"}        # chỉ nhà vận tải sở hữu xe được báo
 SYSTEM_EVENTS = {"MILESTONE_REACHED"}                      # chỉ hệ thống sinh ra, không nhận từ ngoài
 FINAL_QUALITY = {"applied", "late", "invalid"}
@@ -109,11 +110,10 @@ def _apply_vehicle_event(session: Session, ev: m.Event) -> str:
 
 
 def _exception(session: Session, prop: m.Proposal, ev: m.Event, exc_type: str, detail: dict) -> None:
-    for e in session.execute(select(m.ExceptionRecord).where(m.ExceptionRecord.proposal_id == prop.id)).scalars():
-        if (e.detail or {}).get("event_id") == str(ev.id):
-            return  # đã tạo cho sự kiện này (idempotent)
-    session.add(m.ExceptionRecord(proposal_id=prop.id, exc_type=exc_type, status="open",
-                                  detail={**detail, "event_id": str(ev.id)}))
+    """Mở ngoại lệ có phân mức + playbook + thông báo; idempotent theo sự kiện nguồn."""
+    from ..incidents import service as incidents
+    incidents.raise_exception(session, prop, exc_type, {**detail, "event_id": str(ev.id)}, ev.received_at, source="event",
+                              dedupe_key=f"ev:{ev.id}")
 
 
 def apply_event(session: Session, event_id: uuid.UUID, now: datetime) -> str:
@@ -158,6 +158,17 @@ def apply_event(session: Session, event_id: uuid.UUID, now: datetime) -> str:
         elif status in ("confirmed", "executing"):
             _exception(session, prop, ev, "ETA_CHANGED", {"delay_minutes": delay, "action": "needs_decision"})
             ev.quality_status = "applied"  # chỉ tạo ngoại lệ; KHÔNG sửa chuyến đã cam kết
+        else:
+            ev.quality_status = "late" if status == "completed" else "invalid"
+
+    elif ev.event_type in ("INCIDENT_REPORTED", "CARGO_DAMAGE_REPORTED"):
+        p = ev.payload or {}
+        if status in ("confirmed", "executing"):
+            if ev.event_type == "INCIDENT_REPORTED":
+                _exception(session, prop, ev, p["kind"], {"delay_minutes": p.get("delay_minutes", 0), "note": p.get("note"), "reported_by": "carrier"})
+            else:
+                _exception(session, prop, ev, "CARGO_DAMAGE", {"note": p.get("note")})
+            ev.quality_status = "applied"
         else:
             ev.quality_status = "late" if status == "completed" else "invalid"
     session.flush()

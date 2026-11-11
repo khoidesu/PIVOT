@@ -59,6 +59,7 @@ def sim_mode(proposal_id: uuid.UUID, body: SimIn, actor: Actor = Depends(current
     _sim_guard(actor, session, proposal_id)
     try:
         sim = gps.set_mode(session, proposal_id, body.mode)
+        gps.report_mode_incident(session, proposal_id, datetime.now(timezone.utc))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from None
     session.commit()

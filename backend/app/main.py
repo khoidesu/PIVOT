@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .routers import auth, benefits, core, demo, events, intake, matching, tracking
+from .routers import auth, benefits, core, demo, events, incidents, intake, matching, tracking
 from .worker import process_pending
 
 
@@ -62,6 +62,7 @@ app.include_router(events.router)
 app.include_router(benefits.router)
 app.include_router(intake.router)
 app.include_router(tracking.router)
+app.include_router(incidents.router)
 app.include_router(demo.router)
 
 

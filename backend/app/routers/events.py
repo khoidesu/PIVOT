@@ -38,31 +38,6 @@ def post_event(body: s.EventIn, response: Response, actor: Actor = Depends(curre
     return s.EventOut(event_id=ev.id, duplicate=duplicate, quality_status=ev.quality_status)
 
 
-@router.get("/exceptions", response_model=list[s.ExceptionOut])
-def list_exceptions(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
-    stmt = (select(m.ExceptionRecord).join(m.Proposal, m.Proposal.id == m.ExceptionRecord.proposal_id)
-            .join(m.Shipment, m.Shipment.id == m.Proposal.shipment_id)
-            .join(m.Vehicle, m.Vehicle.id == m.Proposal.vehicle_id)
-            .outerjoin(m.Slot, m.Slot.id == m.Proposal.slot_id))
-    if actor.role != "dispatcher":
-        stmt = stmt.where(or_(m.Shipment.tenant_id == actor.org_id, m.Vehicle.tenant_id == actor.org_id,
-                              m.Slot.node_org_id == actor.org_id))
-    return session.execute(stmt.order_by(m.ExceptionRecord.created_at.desc()).limit(200)).scalars().all()
-
-
-@router.post("/exceptions/{exception_id}/resolve", response_model=s.ExceptionOut)
-def resolve_exception(exception_id: uuid.UUID, body: s.ResolveIn, actor: Actor = Depends(current_actor),
-                      session: Session = Depends(get_session)):
-    """Người có quyền quyết định ngoại lệ; hệ thống không tự sửa/chuyển xe của chuyến đã cam kết."""
-    try:
-        ex = audit.resolve_exception(session, actor, exception_id, body.resolution, body.note, datetime.now(timezone.utc))
-        session.commit()
-    except bk.BookingError as e:
-        session.rollback()
-        raise HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message, "reasons": []}) from None
-    return ex
-
-
 @router.get("/outbox", response_model=list[s.OutboxOut])
 def list_outbox(status: str | None = None, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     _dispatcher_only(actor)

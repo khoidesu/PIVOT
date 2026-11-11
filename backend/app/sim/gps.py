@@ -50,6 +50,24 @@ def set_mode(session: Session, proposal_id: uuid.UUID, mode: str) -> m.SimTrip:
     return sim
 
 
+INCIDENT_BY_MODE = {"slow": ("TRAFFIC_INCIDENT", 30), "breakdown": ("BREAKDOWN", 0)}
+
+
+def report_mode_incident(session: Session, proposal_id: uuid.UUID, now: datetime) -> bool:
+    """Thiết bị mô phỏng báo sự cố tương ứng với chế độ nhiễu (đi qua đường nhận sự kiện thật, idempotent)."""
+    sim = session.get(m.SimTrip, proposal_id)
+    prop = session.get(m.Proposal, proposal_id)
+    if sim is None or sim.mode not in INCIDENT_BY_MODE or prop is None:
+        return False
+    kind, delay = INCIDENT_BY_MODE[sim.mode]
+    veh = session.get(m.Vehicle, prop.vehicle_id)
+    events.ingest(session, _carrier_actor(session, veh), {
+        "entity_type": "proposal", "entity_id": prop.id, "event_type": "INCIDENT_REPORTED", "occurred_at": now,
+        "source_system": "sim-gps", "source_event_id": f"sim:inc:{prop.id}:{sim.mode}:{sim.seq}",
+        "payload": {"kind": kind, "delay_minutes": delay, "note": f"simulated {sim.mode}"}}, now)
+    return True
+
+
 def tick(session: Session, now: datetime) -> int:
     """Một bước mô phỏng cho mọi chuyến đang chạy; trả số vị trí đã phát. Xác định: chỉ phụ thuộc trạng thái + `now`."""
     sent = 0

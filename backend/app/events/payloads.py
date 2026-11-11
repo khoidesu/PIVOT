@@ -25,6 +25,14 @@ def _num(v, name, lo, hi):
     return float(v)
 
 
+def _note(v) -> str | None:
+    if v is None:
+        return None
+    if not isinstance(v, str) or len(v) > 300:
+        _bad("payload.note must be a string up to 300 characters")
+    return v.strip() or None
+
+
 def _aware(v, name) -> datetime:
     try:
         d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
@@ -46,6 +54,15 @@ def validate(session: Session, event_type: str, payload: dict, occurred_at: date
         if "delay_minutes" not in p:
             _bad("payload.delay_minutes is required")
         p["delay_minutes"] = int(_num(p["delay_minutes"], "delay_minutes", 1, MAX_DELAY_MIN))
+    elif event_type == "INCIDENT_REPORTED":
+        kind = p.get("kind")
+        if kind not in ("BREAKDOWN", "TRAFFIC_INCIDENT"):
+            _bad("payload.kind must be BREAKDOWN or TRAFFIC_INCIDENT")
+        if "delay_minutes" in p:
+            p["delay_minutes"] = int(_num(p["delay_minutes"], "delay_minutes", 0, MAX_DELAY_MIN))
+        p["note"] = _note(p.get("note"))
+    elif event_type == "CARGO_DAMAGE_REPORTED":
+        p["note"] = _note(p.get("note"))
     elif event_type in ("VEHICLE_POSITION", "VEHICLE_AVAILABLE"):
         loc = p.get("location_id")
         if event_type == "VEHICLE_AVAILABLE" and loc is None:

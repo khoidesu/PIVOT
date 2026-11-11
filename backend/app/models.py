@@ -271,12 +271,50 @@ class Decision(Base):
 
 class ExceptionRecord(Base):
     __tablename__ = "exceptions"
+    __table_args__ = (UniqueConstraint("dedupe_key", name="uq_exceptions_dedupe_key"),)
     id: Mapped[uuid.UUID] = pk()
     proposal_id: Mapped[uuid.UUID] = fk("proposals.id")
     exc_type: Mapped[str] = mapped_column(String(30))  # ETA_CHANGED|DATA_STALE|SLOT_LOST ...
     status: Mapped[str] = mapped_column(String(20), default="open")  # open|resolved
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = ts(default_now=True)
+    # --- Exception Management (brief Control Tower, chức năng 5) ---
+    severity: Mapped[str] = mapped_column(String(10), default="medium", server_default="medium")  # low|medium|high|critical — theo luật có version
+    playbook_id: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    rule_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    source: Mapped[str] = mapped_column(String(20), default="event", server_default="event")  # event | sweep | manual
+    sla_due_at: Mapped[datetime | None] = ts(nullable=True)
+    escalated_at: Mapped[datetime | None] = ts(nullable=True)
+    resolved_at: Mapped[datetime | None] = ts(nullable=True)
+    dedupe_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+
+class ExceptionTask(Base):
+    """Một bước của playbook: bước tự động (hệ thống làm) hoặc bước do người quyết (chủ thể có quyền hoàn tất)."""
+    __tablename__ = "exception_tasks"
+    id: Mapped[uuid.UUID] = pk()
+    exception_id: Mapped[uuid.UUID] = fk("exceptions.id")
+    step_key: Mapped[str] = mapped_column(String(40))
+    kind: Mapped[str] = mapped_column(String(10))  # auto | human
+    owner: Mapped[str] = mapped_column(String(12))  # shipper | carrier | node | dispatcher | system
+    status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | done
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    completed_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    completed_at: Mapped[datetime | None] = ts(nullable=True)
+
+
+class Notification(Base):
+    """Thông báo cho người nhận. sms_sim/email_sim là NHẬT KÝ GIẢ LẬP (không gọi nhà cung cấp thật, không chứa PII)."""
+    __tablename__ = "notifications"
+    __table_args__ = (Index("ix_notifications_recipient", "recipient_org_id", "recipient_role", "created_at"),)
+    id: Mapped[uuid.UUID] = pk()
+    exception_id: Mapped[uuid.UUID | None] = fk("exceptions.id", nullable=True)
+    recipient_org_id: Mapped[uuid.UUID | None] = fk("organizations.id", nullable=True)
+    recipient_role: Mapped[str | None] = mapped_column(String(20), nullable=True)  # None = mọi người trong tổ chức
+    channel: Mapped[str] = mapped_column(String(10), default="in_app")  # in_app | sms_sim | email_sim
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = ts(default_now=True)
+    read_at: Mapped[datetime | None] = ts(nullable=True)
 
 
 class BenefitLedger(Base):
