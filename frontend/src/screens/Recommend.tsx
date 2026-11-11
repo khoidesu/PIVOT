@@ -58,7 +58,7 @@ function ProposalCard({ p, rank, onHold, busy }: { p: Proposal; rank: number; on
       <ul className="why">{mainReasons(p, t).map((r, i) => <li key={i}>{r}</li>)}</ul>
       <div className="small muted">
         {p.eta && <>{t('rec.eta')} <b>{fmtTime(p.eta.pickup)}</b>{p.eta.pickup_p90 && <span className="muted"> – {fmtTime(p.eta.pickup_p90)}</span>}{p.eta.cutoff_risk_p90 && <> <Chip kind="warn" title={t('eta.riskTip')}>{t('eta.risk')}</Chip></>}</>}
-        {p.slot && <> · {t('rec.slot')} <b>{fmtTime(p.slot.start_at)}–{fmtTime(p.slot.end_at).slice(-5)}</b></>}
+        {p.slot && <> · <b>{p.slot.node_org_name}</b> · {t('rec.slot')} <b>{fmtTime(p.slot.start_at)}–{fmtTime(p.slot.end_at).slice(-5)}</b></>}
         {p.estimated_saving_vnd != null && <> · ≈ <b>{fmtVnd(p.estimated_saving_vnd)}</b></>}
       </div>
       {p.my_actions.hold
@@ -87,6 +87,7 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
   const lots = useData(() => api.shipments())
   const open = (lots.data ?? []).filter((s) => s.status === 'open')
   const [lotId, setLotId] = useState(query.get('lot') ?? '')
+  const [pickedIcd, setPickedIcd] = useState('')
   const [run, setRun] = useState<MatchRun | null>(null)
   const [busy, setBusy] = useState(false)
   const [holding, setHolding] = useState<string | null>(null)
@@ -96,6 +97,10 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
   useEffect(() => { if (!lotId && open.length) setLotId(open[0].id) }, [open.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const vehicles = useData(() => api.vehicles())
+  const slotList = useData(() => api.slots())
+  const destId = open.find((s) => s.id === lotId)?.dest_location_id
+  const icds = [...new Map((slotList.data ?? []).filter((s) => s.location_id === destId && s.node_org_name).map((s) => [s.node_org_id, s.node_org_name as string])).entries()]
+  const nodeId = icds.some(([id]) => id === pickedIcd) ? pickedIcd : '' // ICD không còn hợp lệ cho lô này → về tự động
   const isStale = (gate: string) => !!run?.rejections.some((r) => r.reasons.some((g) => g.gate === gate && g.reason_code === 'DATA_STALE'))
   const staleLot = run?.status === 'no_feasible_option' && isStale('shipment_fresh')
   const staleVeh = run?.status === 'no_feasible_option' && isStale('data_fresh')
@@ -104,7 +109,7 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
     try {
       if (kind === 'lot') await api.refreshShipment(lotId)
       else { for (const v of (vehicles.data ?? []).filter((x) => x.tenant_id === me?.org_id)) await api.sendVehicleEvent(v.id, 'VEHICLE_POSITION'); await new Promise((r) => setTimeout(r, 1600)) }
-      setRun(await api.match(lotId)); void lots.reload(true)
+      setRun(await api.match(lotId, nodeId)); void lots.reload(true)
     } catch (e) { setError(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) }
     finally { setBusy(false) }
   }
@@ -112,14 +117,14 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
   const allowed = me ? CAN_MATCH.has(me.role) : false
   async function doRun() {
     setBusy(true); setError(null)
-    try { setRun(await api.match(lotId)) }
+    try { setRun(await api.match(lotId, nodeId)) }
     catch (e) { setError(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) }
     finally { setBusy(false) }
   }
   async function hold(p: Proposal) {
     setHolding(p.id); setError(null)
     try { await api.act(p, 'hold'); go('/confirm') }
-    catch (e) { setError(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))); setRun(await api.match(lotId).catch(() => run)) }
+    catch (e) { setError(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))); setRun(await api.match(lotId, nodeId).catch(() => run)) }
     finally { setHolding(null) }
   }
 
@@ -133,6 +138,12 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
             <label className="inline">{t('rec.pick')}
               <select value={lotId} onChange={(e) => setLotId(e.target.value)} disabled={!allowed}>
                 {open.map((s) => <option key={s.id} value={s.id}>{s.code} · {t(`cargo.${s.cargo_type}`)} · {s.weight_kg == null ? '?' : `${fmtNum(s.weight_kg)} kg`}{s.missing_fields.length ? ' ⚠' : ''}</option>)}
+              </select>
+            </label>
+            <label className="inline">{t('rec.icd')}
+              <select value={nodeId} onChange={(e) => setPickedIcd(e.target.value)} disabled={!allowed}>
+                <option value="">{t('rec.icdAuto')}</option>
+                {icds.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
               </select>
             </label>
             <button className="btn primary" onClick={doRun} disabled={!allowed || busy || !lotId}>{busy ? t('rec.running') : t('rec.run')}</button>

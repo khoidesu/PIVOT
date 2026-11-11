@@ -20,7 +20,7 @@ export interface Vehicle {
   status: string; position_updated_at: string | null; is_simulated: boolean
 }
 export interface Slot {
-  id: string; node_org_id: string; location_id: string; start_at: string; end_at: string
+  id: string; node_org_id: string; node_org_name: string | null; location_id: string; start_at: string; end_at: string
   capacity: number; remaining: number; source: string; is_simulated: boolean
 }
 export interface GateItem { gate: string; status: 'PASS' | 'FAIL' | 'UNKNOWN'; reason_code: string; detail: Record<string, unknown> }
@@ -214,7 +214,7 @@ export const api = {
       entity_type: 'vehicle', entity_id: vehicleId, event_type, payload, occurred_at: new Date().toISOString(),
       source_system: 'ui-carrier', source_event_id: crypto.randomUUID(),
     }),
-  match: (shipment_id: string) => post<MatchRun>('/v1/match-runs', { shipment_id }),
+  match: (shipment_id: string, node_org_id?: string) => post<MatchRun>('/v1/match-runs', { shipment_id, node_org_id: node_org_id || null }),
   proposals: () => request<Proposal[]>('/v1/proposals'),
   act: (p: Pick<Proposal, 'id' | 'version'>, action: 'hold' | 'accept' | 'reject') =>
     post<Proposal>(`/v1/proposals/${p.id}/${action}`, { version: p.version }, crypto.randomUUID()),

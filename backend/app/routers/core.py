@@ -173,4 +173,6 @@ def list_vehicles(actor: Actor = Depends(current_actor), session: Session = Depe
 
 @router.get("/slots", response_model=list[s.SlotOut])
 def list_slots(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
-    return session.execute(select(m.Slot).order_by(m.Slot.start_at)).scalars().all()
+    names = dict(session.execute(select(m.Organization.id, m.Organization.name).where(m.Organization.org_type == "node")).all())
+    return [s.SlotOut.model_validate(x).model_copy(update={"node_org_name": names.get(x.node_org_id)})
+            for x in session.execute(select(m.Slot).order_by(m.Slot.start_at)).scalars().all()]

@@ -40,7 +40,7 @@ function ProposalRow({ p, onDone }: { p: Proposal; onDone: () => void }) {
           <Chip key={k} kind={v.accepted ? 'good' : p.status === 'pending_acceptance' ? 'warn' : undefined} title={v.org_name ?? undefined}>
             {v.accepted ? '✓' : '○'} {t(`party.${k}`)}
           </Chip>))}
-        {p.slot && <Chip title={t('cf.srcTip', { src: p.slot.source })}>{t('rec.slot')} {fmtTime(p.slot.start_at)}–{fmtTime(p.slot.end_at).slice(-5)}</Chip>}
+        {p.slot && <Chip title={t('cf.srcTip', { src: p.slot.source })}>{p.slot.node_org_name} · {fmtTime(p.slot.start_at)}–{fmtTime(p.slot.end_at).slice(-5)}</Chip>}
         {left != null && (left > 0 ? <span className="countdown">{t('cf.countdown', { s: left })}</span> : <Chip kind="FAIL">{t('cf.holdExpired')}</Chip>)}
       </div>
       {error && <ErrorNote error={error} />}

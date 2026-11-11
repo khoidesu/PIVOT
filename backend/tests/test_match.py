@@ -203,3 +203,34 @@ def test_proposals_are_spread_across_icds_so_every_icd_gets_a_request(client):
     assert len(props) >= 2
     assert {p["slot"]["node_org_name"] for p in props} == {"ICD Cảng C (Node)", "ICD Khác (test)"}
     assert all(p["gates"] and all(g["status"] == "PASS" for g in p["gates"]) for p in props)   # slot đổi vẫn qua hard gate
+
+
+def test_shipper_can_choose_the_icd_and_every_proposal_uses_it(client):
+    from app.db import SessionLocal
+    with SessionLocal() as s:
+        org = m.Organization(name="ICD Khác (test)", org_type="node")
+        s.add(org)
+        s.flush()
+        for sl in s.execute(select(m.Slot)).scalars().all():
+            s.add(m.Slot(node_org_id=org.id, location_id=sl.location_id, start_at=sl.start_at + timedelta(minutes=1),
+                         end_at=sl.end_at + timedelta(minutes=1), capacity=sl.capacity, remaining=sl.remaining, source="mock"))
+        s.commit()
+        other_id = str(org.id)
+    slots = client.get("/v1/slots", headers=auth("shipper_a")).json()
+    assert {x["node_org_name"] for x in slots} == {"ICD Cảng C (Node)", "ICD Khác (test)"}      # giao diện cần tên ICD để chọn
+    sid = next(x["id"] for x in client.get("/v1/shipments", headers=auth("shipper_a")).json() if x["code"] == "LOT-A-001")
+    r = client.post("/v1/match-runs", json={"shipment_id": sid, "node_org_id": other_id}, headers=auth("shipper_a"))
+    assert r.status_code == 200
+    assert r.json()["proposals"] and {p["slot"]["node_org_name"] for p in r.json()["proposals"]} == {"ICD Khác (test)"}
+
+
+def test_choosing_an_icd_without_slots_is_rejected_not_silently_switched(client):
+    from app.db import SessionLocal
+    with SessionLocal() as s:
+        org = m.Organization(name="ICD rỗng", org_type="node")
+        s.add(org)
+        s.commit()
+        empty_id = str(org.id)
+    sid = next(x["id"] for x in client.get("/v1/shipments", headers=auth("shipper_a")).json() if x["code"] == "LOT-A-001")
+    r = client.post("/v1/match-runs", json={"shipment_id": sid, "node_org_id": empty_id}, headers=auth("shipper_a"))
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "NODE_HAS_NO_SLOTS"
