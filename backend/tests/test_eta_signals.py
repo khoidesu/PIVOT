@@ -145,6 +145,89 @@ def test_estimate_scales_with_remaining_fraction():
 def test_estimate_degrades_honestly_when_sources_missing():
     now = at_local_hour(12)
     none = signals.estimate(None, None, 1.0, now, ASSUMPTIONS_V1)
-    assert none["status"] == "fallback" and none["p50"] is None and "low" in none["confidence"] and none["sources"] == {"route": None, "weather": None}
+    assert none["status"] == "fallback" and none["p50"] is None and "low" in none["confidence"] and none["sources"] == {"route": None, "weather": None, "traffic": None}
     partial = signals.estimate(ROAD, None, 1.0, now, ASSUMPTIONS_V1)             # có đường, thiếu thời tiết
     assert partial["status"] == "partial" and partial["components"]["weather_factor"] == 1.0 and partial["sources"]["weather"] is None
+
+
+# ------------------------------------------------------------------ kẹt xe thật (Mapbox)
+WPS = [START, PICKUP, DEST]
+
+
+def mapbox_response(duration_s, levels, n=None):
+    """Phản hồi Mapbox giả: đường thẳng len(levels)+1 điểm, mỗi đoạn một mức kẹt (gom vào 2 leg)."""
+    n = len(levels) + 1
+    coords = [[START[1] + (DEST[1] - START[1]) * i / (n - 1), START[0] + (DEST[0] - START[0]) * i / (n - 1)] for i in range(n)]
+    half = len(levels) // 2
+    return {"code": "Ok", "routes": [{"duration": duration_s, "distance": 20000.0, "geometry": {"coordinates": coords},
+                                      "legs": [{"annotation": {"congestion": levels[:half]}}, {"annotation": {"congestion": levels[half:]}}]}]}
+
+
+@pytest.fixture()
+def token(monkeypatch):
+    monkeypatch.setattr(settings, "mapbox_token", "pk.SECRET-TEST-TOKEN")
+
+
+def fake_mapbox(live_s=1800.0, typical_s=1200.0, levels=("low", "low", "heavy", "severe", "moderate", "low")):
+    def f(url, params=None):
+        assert "pk.SECRET" in params["access_token"]
+        if "/driving-traffic/" in url:
+            return mapbox_response(live_s, list(levels))
+        return mapbox_response(typical_s, list(levels))
+    return f
+
+
+def test_traffic_needs_a_token_and_never_calls_the_network_without_one(monkeypatch):
+    monkeypatch.setattr(settings, "mapbox_token", None)
+    monkeypatch.setattr(signals, "_get_json", lambda *a, **k: pytest.fail("no token → no call"))
+    assert signals.traffic_configured() is False and signals.fetch_traffic(WPS) is None
+
+
+def test_live_traffic_parses_ratio_segments_and_congestion_share(monkeypatch, token):
+    monkeypatch.setattr(signals, "_get_json", fake_mapbox())
+    t = signals.fetch_traffic(WPS)
+    assert t["source"] == "mapbox" and t["live_min"] == 30.0 and t["typical_min"] == 20.0
+    assert [g["level"] for g in t["segments"]] == ["low", "heavy", "severe", "moderate", "low"]   # gộp đoạn liền kề cùng mức
+    assert t["share"]["heavy"] > 0 and t["share"]["severe"] > 0 and abs(sum(t["share"].values()) - 1.0) < 0.01
+    assert all(len(g["points"]) >= 2 and len(g["points"][0]) == 2 for g in t["segments"])
+
+
+def test_traffic_is_cached_and_failure_falls_back_without_leaking_the_token(monkeypatch, token):
+    calls = []
+    monkeypatch.setattr(signals, "_get_json", lambda u, p=None: calls.append(u) or fake_mapbox()(u, p))
+    signals.fetch_traffic(WPS)
+    signals.fetch_traffic(WPS)
+    assert len(calls) == 2                                           # 1 live + 1 điển hình, lần sau dùng cache (tiết kiệm hạn mức)
+    signals.clear_cache()
+
+    def down(url, params=None):
+        raise RuntimeError(f"401 for {url}?access_token={params['access_token']}")
+    monkeypatch.setattr(signals, "_get_json", down)
+    assert signals.fetch_traffic(WPS) is None
+    assert "SECRET" not in str(signals.health())                      # lỗi chứa token không được lọt vào health/log
+
+
+def test_segment_length_mismatch_drops_colors_but_keeps_duration(monkeypatch, token):
+    def f(url, params=None):
+        r = mapbox_response(1500.0, ["low", "heavy", "low", "low"])
+        r["routes"][0]["legs"][0]["annotation"]["congestion"] = ["low"]   # thiếu đoạn → không đoán màu
+        return r
+    monkeypatch.setattr(signals, "_get_json", f)
+    t = signals.fetch_traffic(WPS)
+    assert t["segments"] == [] and t["live_min"] == 25.0
+
+
+def test_estimate_uses_live_ratio_instead_of_the_time_band_rule():
+    now = at_local_hour(12)                                          # khung giờ thường: luật ×1.0
+    live = {"live_min": 30.0, "typical_min": 20.0, "share": {"heavy": 0.3, "severe": 0.1}, "source": "mapbox", "segments": []}
+    base = signals.estimate(ROAD, wx(), 1.0, now, ASSUMPTIONS_V1)
+    jam = signals.estimate(ROAD, wx(), 1.0, now, ASSUMPTIONS_V1, live)
+    assert jam["components"]["traffic_kind"] == "live" and jam["components"]["traffic_factor"] == 1.5 and base["components"]["traffic_kind"] == "rule"
+    assert jam["minutes_p50"] == pytest.approx(base["minutes_p50"] * 1.5, abs=0.2) and jam["sources"]["traffic"] == "mapbox"
+    clear = signals.estimate(ROAD, wx(), 1.0, now, ASSUMPTIONS_V1, {**live, "live_min": 20.0, "share": {}})
+    assert clear["minutes_p90"] - clear["minutes_p50"] < jam["minutes_p90"] - jam["minutes_p50"]   # kẹt nặng → P90 rộng hơn
+
+
+def test_live_ratio_is_clamped_against_absurd_values():
+    e = signals.estimate(ROAD, wx(), 1.0, at_local_hour(12), ASSUMPTIONS_V1, {"live_min": 900.0, "typical_min": 20.0, "share": {}, "source": "mapbox", "segments": []})
+    assert e["components"]["traffic_factor"] == 3.0

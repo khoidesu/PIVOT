@@ -7,6 +7,7 @@
 Nguyên tắc: tín hiệu chỉ là thông tin MỀM (hiển thị + cảnh báo), không đổi hard gate. Mọi lỗi mạng/timeout/dữ liệu sai → trả None,
 ETA tự hạ về luật và UI ghi rõ nguồn nào không có (không bịa số). Tham số có version `eta-signals-v1`.
 """
+import logging
 import time
 from datetime import datetime, timedelta
 from threading import Lock
@@ -16,6 +17,8 @@ import httpx
 from ..config import settings
 from ..tracking import geo
 from . import baseline
+
+logging.getLogger("httpx").setLevel(logging.WARNING)  # URL gọi Mapbox có access_token: không để httpx ghi log mức INFO
 
 VERSION = "eta-signals-v1"
 PARAMS = {
@@ -30,7 +33,8 @@ PARAMS = {
 _ROUTE_TTL, _WEATHER_TTL, _FAIL_TTL = 24 * 3600, 600, 60
 _cache: dict[str, tuple[float, object]] = {}
 _lock = Lock()
-_health: dict[str, dict] = {"osrm": {"ok": None, "at": None, "error": None}, "weather": {"ok": None, "at": None, "error": None}}
+_health: dict[str, dict] = {k: {"ok": None, "at": None, "error": None} for k in ("osrm", "weather", "traffic")}
+_TRAFFIC_TTL, _TYPICAL_TTL = 120, 24 * 3600
 
 
 def enabled() -> bool:
@@ -142,27 +146,96 @@ def weather_factor(w: dict | None) -> float:
     return round(f, 3)
 
 
+# ------------------------------------------------------------------ kẹt xe thật (Mapbox Directions)
+LEVELS = ("low", "moderate", "heavy", "severe")
+
+
+def traffic_configured() -> bool:
+    return enabled() and bool(settings.mapbox_token)
+
+
+def _segments(coords: list[list[float]], cong: list[str]) -> tuple[list[dict], dict]:
+    """Gộp các đoạn liên tiếp cùng mức kẹt thành polyline; trả (đoạn, tỷ lệ km theo mức). Lệch độ dài → bỏ phần màu (không đoán)."""
+    if len(cong) != len(coords) - 1 or not cong:
+        return [], {}
+    km = {k: 0.0 for k in (*LEVELS, "unknown")}
+    groups: list[dict] = []
+    for i, lv in enumerate(cong):
+        lv = lv if lv in LEVELS else "unknown"
+        a, b = (coords[i][1], coords[i][0]), (coords[i + 1][1], coords[i + 1][0])
+        km[lv] += geo.haversine_km(a, b)
+        if groups and groups[-1]["level"] == lv:
+            groups[-1]["points"].append(b)
+        else:
+            groups.append({"level": lv, "points": [a, b]})
+    total = sum(km.values()) or 1.0
+    stride = max(1, -(-sum(len(g["points"]) for g in groups) // PARAMS["max_points"]))  # giảm điểm, luôn giữ điểm cuối mỗi nhóm
+    for g in groups:
+        p = g["points"]
+        g["points"] = [list(x) for x in (p[::stride] + ([p[-1]] if (len(p) - 1) % stride else []))]
+    return groups, {k: round(v / total, 3) for k, v in km.items()}
+
+
+def fetch_traffic(waypoints: list[geo.Point]) -> dict | None:
+    """Kẹt xe THẬT trên tuyến (Mapbox `driving-traffic`) so với thời gian điển hình (`driving`). None nếu tắt/không có khoá/lỗi.
+    live_min/typical_min: phút theo giao thông hiện tại / điển hình; ratio dùng thay hệ số luật theo khung giờ."""
+    token = settings.mapbox_token
+    if not (enabled() and token) or len(waypoints) < 2:
+        return None
+    coords = ";".join(f"{lng:.5f},{lat:.5f}" for lat, lng in waypoints)
+    base = f"{settings.mapbox_url.rstrip('/')}/directions/v5/mapbox"
+
+    def call(profile: str, annotations: str | None) -> dict:
+        q = {"access_token": token, "overview": "full", "geometries": "geojson", "steps": "false"}
+        if annotations:
+            q["annotations"] = annotations
+        d = _get_json(f"{base}/{profile}/{coords}", q)
+        if d.get("code") != "Ok" or not d.get("routes"):
+            raise ValueError("Mapbox: no route")
+        return d["routes"][0]
+
+    def live():
+        r = call("driving-traffic", "congestion")
+        cong = [c for leg in r["legs"] for c in leg.get("annotation", {}).get("congestion", [])]
+        segs, share = _segments(r["geometry"]["coordinates"], cong)
+        return {"live_min": round(r["duration"] / 60, 1), "distance_km": round(r["distance"] / 1000, 2), "segments": segs, "share": share,
+                "fetched_at": datetime.now().astimezone().isoformat(), "source": "mapbox"}
+
+    typical = _cached(f"mbx-typ:{coords}", _TYPICAL_TTL, lambda: round(call("driving", None)["duration"] / 60, 1))
+    now = _cached(f"mbx-live:{coords}", _TRAFFIC_TTL, live)
+    _mark("traffic", bool(now and typical), None if (now and typical) else "unavailable")
+    if not now or not typical or typical <= 0:
+        return None
+    return {**now, "typical_min": typical}
+
+
 # ------------------------------------------------------------------ ETA điều chỉnh
-def adjusted_minutes(free_flow_min: float, band: str, wx_factor: float) -> dict:
-    """P50/P90 (phút) từ thời gian lái thông thoáng × hệ số xe tải × hệ số khung giờ × hệ số thời tiết."""
+def adjusted_minutes(free_flow_min: float, band: str, wx_factor: float, live_factor: float | None = None, bad_share: float = 0.0) -> dict:
+    """P50/P90 (phút) từ thời gian lái thông thoáng × hệ số xe tải × hệ số giao thông × hệ số thời tiết.
+    Có `live_factor` (kẹt xe thật) → thay hệ số LUẬT theo khung giờ; độ rộng P90 theo tỷ lệ đoạn kẹt nặng thay vì theo khung giờ."""
     cfg = PARAMS
-    p50 = free_flow_min * cfg["truck_factor"] * cfg["traffic_factor"][band] * wx_factor
-    spread = 0.15 + (wx_factor - 1.0) * cfg["p90_extra_weather"] + {"night": 0.0, "normal": 0.1, "peak_am": 0.25, "peak_pm": 0.3}[band]
+    tf = live_factor if live_factor is not None else cfg["traffic_factor"][band]
+    p50 = free_flow_min * cfg["truck_factor"] * tf * wx_factor
+    band_spread = 0.1 + 0.6 * bad_share if live_factor is not None else {"night": 0.0, "normal": 0.1, "peak_am": 0.25, "peak_pm": 0.3}[band]
+    spread = 0.15 + (wx_factor - 1.0) * cfg["p90_extra_weather"] + band_spread
     return {"p50": round(p50, 1), "p90": round(p50 * (1 + spread) + 10, 1)}
 
 
-def estimate(road: dict | None, weather: dict | None, remaining_fraction: float, now: datetime, params: dict) -> dict:
+def estimate(road: dict | None, weather: dict | None, remaining_fraction: float, now: datetime, params: dict, traffic: dict | None = None) -> dict:
     """ETA có tín hiệu thật cho phần quãng đường còn lại. Thiếu tuyến → status 'fallback' (không có p50/p90, UI dùng ETA luật)."""
     band = baseline.band_for(now, params)
     out = {"method": "rule-based+signals", "version": VERSION, "band": band, "sources": {"route": road["source"] if road else None,
-           "weather": weather["source"] if weather else None}, "simulated_positions": True}
+           "weather": weather["source"] if weather else None, "traffic": traffic["source"] if traffic else None}, "simulated_positions": True}
     if not road:
         return {**out, "status": "fallback", "reason": "road_route_unavailable", "confidence": "low (rule-based)", "p50": None, "p90": None}
     wf = weather_factor(weather)
-    mins = adjusted_minutes(road["duration_min"] * max(remaining_fraction, 0.0), band, wf)
+    live = round(min(max(traffic["live_min"] / traffic["typical_min"], 0.7), 3.0), 3) if traffic else None  # kẹt xe thật: tỷ lệ so với điển hình
+    share = traffic.get("share", {}) if traffic else {}
+    mins = adjusted_minutes(road["duration_min"] * max(remaining_fraction, 0.0), band, wf, live, share.get("heavy", 0.0) + share.get("severe", 0.0))
     status = "ok" if weather else "partial"  # partial: có tuyến thật nhưng thiếu thời tiết
     return {**out, "status": status, "confidence": "medium" if weather else "low-medium", "p50": (now + timedelta(minutes=mins["p50"])).isoformat(),
             "p90": (now + timedelta(minutes=mins["p90"])).isoformat(), "minutes_p50": mins["p50"], "minutes_p90": mins["p90"],
             "components": {"road_km": road["distance_km"], "free_flow_min": road["duration_min"], "remaining_fraction": round(remaining_fraction, 3),
-                           "truck_factor": PARAMS["truck_factor"], "traffic_factor": PARAMS["traffic_factor"][band], "weather_factor": wf},
-            "weather": weather}
+                           "truck_factor": PARAMS["truck_factor"], "traffic_factor": live if live is not None else PARAMS["traffic_factor"][band],
+                           "traffic_kind": "live" if live is not None else "rule", "weather_factor": wf},
+            "weather": weather, "traffic": traffic}

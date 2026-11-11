@@ -105,8 +105,9 @@ export interface EtaModel {
 export interface EtaSignals {
   status: 'ok' | 'partial' | 'fallback' | 'disabled'; method: string; version: string; confidence?: string; reason?: string
   p50?: string | null; p90?: string | null; minutes_p50?: number; minutes_p90?: number; band?: string
-  sources?: { route: string | null; weather: string | null }
-  components?: { road_km: number; free_flow_min: number; remaining_fraction: number; truck_factor: number; traffic_factor: number; weather_factor: number }
+  sources?: { route: string | null; weather: string | null; traffic?: string | null }
+  components?: { road_km: number; free_flow_min: number; remaining_fraction: number; truck_factor: number; traffic_factor: number; traffic_kind?: 'live' | 'rule'; weather_factor: number }
+  traffic?: { live_min: number; typical_min: number; share: Record<string, number>; segments: { level: string; points: [number, number][] }[]; fetched_at: string; source: string } | null
   weather?: { precip_mm_h: number; weather_code: number; wind_kmh: number; observed_at?: string | null; source: string } | null
 }
 export interface TripTrack {

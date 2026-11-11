@@ -8,9 +8,10 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty' // bản đồ 
 const BLANK: maplibregl.StyleSpecification = { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#e8eef0' } }] }
 const TEAL = '#0f766e'
 const ROAD = '#5b7c99'
+const JAM = ['match', ['get', 'level'], 'low', '#2e9e5b', 'moderate', '#e0a100', 'heavy', '#d64545', 'severe', '#7a1212', 'rgba(0,0,0,0)'] as maplibregl.ExpressionSpecification // mức kẹt xe thật
 type LngLat = [number, number]
 type Geom = { type: 'LineString'; coordinates: LngLat[] } | { type: 'Polygon'; coordinates: LngLat[][] }
-type Feat = { type: 'Feature'; properties: Record<string, never>; geometry: Geom }
+type Feat = { type: 'Feature'; properties: Record<string, string>; geometry: Geom }
 type Fc = { type: 'FeatureCollection'; features: Feat[] }
 
 const fc = (features: Feat[]): Fc => ({ type: 'FeatureCollection', features })
@@ -66,11 +67,12 @@ export function RouteMap({ trip, late }: { trip: TripTrack; late?: boolean }) {
           m.addLayer({ id: 'bld3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building', minzoom: 14,
             paint: { 'fill-extrusion-color': '#cfd8dc', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8], 'fill-extrusion-opacity': 0.85 } })
         }
-        for (const id of ['route', 'track', 'fences']) m.addSource(id, { type: 'geojson', data: fc([]) })
+        for (const id of ['route', 'traffic', 'track', 'fences']) m.addSource(id, { type: 'geojson', data: fc([]) })
         m.addLayer({ id: 'fences-fill', type: 'fill', source: 'fences', paint: { 'fill-color': TEAL, 'fill-opacity': 0.14 } })
         m.addLayer({ id: 'fences-line', type: 'line', source: 'fences', paint: { 'line-color': TEAL, 'line-width': 1.5 } })
         m.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 9 } })
         m.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ROAD, 'line-width': 5 } })
+        m.addLayer({ id: 'traffic', type: 'line', source: 'traffic', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': JAM, 'line-width': 5, 'line-opacity': 0.9 } })
         m.addLayer({ id: 'track', type: 'line', source: 'track', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': TEAL, 'line-width': 5 } })
         setReady(true)
       })
@@ -85,6 +87,8 @@ export function RouteMap({ trip, late }: { trip: TripTrack; late?: boolean }) {
     const route = trip.route.map((p) => [p.lng, p.lat] as LngLat)
     const src = (id: string) => m.getSource(id) as maplibregl.GeoJSONSource
     src('route').setData(fc([line(route)]))
+    const jam = trip.eta_signals?.traffic?.segments ?? [] // lớp kẹt xe thật (Mapbox) — chỉ có khi cấu hình khoá
+    src('traffic').setData(fc(jam.map((g) => ({ type: 'Feature', properties: { level: g.level }, geometry: { type: 'LineString', coordinates: g.points.map(([la, ln]) => [ln, la] as LngLat) } }))))
     src('track').setData(fc(trip.track && trip.track.length > 1 ? [line(trip.track.map((p) => [p.lng, p.lat] as LngLat))] : []))
     src('fences').setData(fc(trip.geofences.map((f) => ring(f.lng, f.lat, f.radius_m))))
     m.setPaintProperty('route', 'line-dasharray', trip.route_source === 'osrm' ? [1, 0] : [1.2, 1.6]) // đường bộ thật: nét liền; mô phỏng: nét đứt

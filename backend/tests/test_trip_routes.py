@@ -57,7 +57,7 @@ def test_eta_signals_apply_weather_and_label_sources(client, net):
     prop = _confirmed(client)
     client.post(f"/v1/tracking/{prop['id']}/road-route", headers=auth("shipper_a"))
     e = client.get(f"/v1/tracking/{prop['id']}", headers=auth("shipper_a")).json()["eta_signals"]
-    assert e["status"] == "ok" and e["method"] == "rule-based+signals" and e["sources"] == {"route": "osrm", "weather": "open-meteo"}
+    assert e["status"] == "ok" and e["method"] == "rule-based+signals" and e["sources"] == {"route": "osrm", "weather": "open-meteo", "traffic": None}
     assert e["components"]["weather_factor"] > 1.0 and e["minutes_p90"] > e["minutes_p50"] > 0 and e["simulated_positions"] is True
 
 
@@ -98,3 +98,24 @@ def test_route_geometry_is_frozen_once_the_trip_runs_and_sim_still_reaches_the_g
     assert d2["route"] == d1["route"]                               # hình học bất biến suốt chuyến
     assert {x["code"] for x in d2["milestones"] if x["reached"]} >= {"AT_PICKUP", "DEPARTED_PICKUP", "AT_ICD_GATE"}
     assert client.post(f"/v1/tracking/{prop['id']}/road-route", headers=auth("shipper_a")).json()["route_source"] == "osrm"
+
+
+def test_trip_eta_carries_live_traffic_and_never_exposes_the_token(client, net, monkeypatch):
+    monkeypatch.setattr(settings, "mapbox_token", "pk.SECRET-TEST-TOKEN")
+
+    def both(url, params=None):
+        if "api.mapbox.com" in url:
+            n = 9
+            coords = [[106.74 + 0.01 * i, 10.9 - 0.005 * i] for i in range(n)]
+            return {"code": "Ok", "routes": [{"duration": 3000.0 if "driving-traffic" in url else 2000.0, "distance": 30000.0,
+                                              "geometry": {"coordinates": coords},
+                                              "legs": [{"annotation": {"congestion": ["low"] * 4 + ["heavy"] * 4}}]}]}
+        return fake_network(url, params)
+    monkeypatch.setattr(signals, "_get_json", both)
+    prop = _confirmed(client)
+    client.post(f"/v1/tracking/{prop['id']}/road-route", headers=auth("shipper_a"))
+    r = client.get(f"/v1/tracking/{prop['id']}", headers=auth("shipper_a"))
+    e = r.json()["eta_signals"]
+    assert e["sources"]["traffic"] == "mapbox" and e["components"]["traffic_kind"] == "live" and e["components"]["traffic_factor"] == pytest.approx(1.5, abs=0.01)
+    assert {g["level"] for g in e["traffic"]["segments"]} == {"low", "heavy"}
+    assert "SECRET" not in r.text                                    # khoá API không bao giờ ra giao diện

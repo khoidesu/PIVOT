@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     osrm_url: str = "https://router.project-osrm.org"  # máy chủ demo công khai (fair use); tự dựng OSRM riêng cho production
     weather_url: str = "https://api.open-meteo.com/v1/forecast"
     signals_timeout_s: float = 2.5
+    mapbox_token: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường PIVOT_MAPBOX_TOKEN. Có → kẹt xe thật (Mapbox Directions driving-traffic)
+    mapbox_url: str = "https://api.mapbox.com"
     allow_dev_tokens: bool = True  # chỉ cho prototype local; tắt khi có OIDC thật
 
 

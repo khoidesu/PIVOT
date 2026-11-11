@@ -175,7 +175,9 @@ def signals_view(session: Session, prop: m.Proposal, view: dict, now: datetime) 
     mid = road.points[len(road.points) // 2]
     wx = signals.fetch_weather(pos["lat"] if pos else mid[0], pos["lng"] if pos else mid[1])
     frac = (view["remaining_km"] / view["total_km"]) if view["total_km"] else 1.0
+    pts = road.points  # kẹt xe thật theo cả tuyến kế hoạch (xe → điểm lấy → ICD), cache theo tuyến chứ không theo vị trí xe → tiết kiệm hạn mức API
+    wps = [tuple(pts[0]), tuple(pts[road.pickup_index]), tuple(pts[-1])] if road.pickup_index > 0 else [tuple(pts[0]), tuple(pts[-1])]
     out = signals.estimate({"source": road.source, "distance_km": road.distance_km, "duration_min": road.duration_min}, wx, frac, now,
-                           get_active(session).params)
+                           get_active(session).params, signals.fetch_traffic(wps))
     out["health"] = signals.health()
     return out
