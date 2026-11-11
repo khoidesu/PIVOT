@@ -1,4 +1,5 @@
 """CLI: chạy 6 kịch bản demo trên API đang chạy và in báo cáo.  python -m app.demo.run_scenarios [http://127.0.0.1:8000]"""
+import os
 import sys
 import time
 
@@ -17,6 +18,8 @@ def main() -> int:
         for s in res["steps"]:
             print(f"   {'✓' if s['ok'] else '✗'} {s['label']}" + (f"  — {s['detail']}" if s["detail"] else ""))
         failed += 0 if res["passed"] else 1
+    # trả dữ liệu mẫu cho người đã đăng nhập (kịch bản chạy trên dữ liệu seed thuần)
+    httpx.post(f"{base}/v1/demo/reset", headers={"Authorization": "Bearer dev:dispatch", **({"X-Admin-Key": os.environ["PIVOT_ADMIN_KEY"]} if os.environ.get("PIVOT_ADMIN_KEY") else {})}, timeout=30)
     print(f"\n{len(SCENARIOS) - failed}/{len(SCENARIOS)} kịch bản đạt")
     return 1 if failed else 0
 

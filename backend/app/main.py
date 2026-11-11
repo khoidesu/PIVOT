@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .routers import benefits, core, demo, events, intake, matching
+from .routers import auth, benefits, core, demo, events, intake, matching
 from .worker import process_pending
 
 
@@ -41,6 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(core.router)
 app.include_router(matching.router)
 app.include_router(events.router)

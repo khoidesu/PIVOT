@@ -5,6 +5,7 @@ import { I18nProvider, useI18n } from './i18n'
 import { Benefits } from './screens/Benefits'
 import { Confirm } from './screens/Confirm'
 import { Demo } from './screens/Demo'
+import { Login } from './screens/Login'
 import { Fleet } from './screens/Fleet'
 import { Recommend } from './screens/Recommend'
 import { Request } from './screens/Request'
@@ -31,10 +32,11 @@ function useHashRoute(): [Route, URLSearchParams, (to: string) => void] {
 
 function Shell() {
   const { t, lang } = useI18n()
-  const { fatal } = useApp()
+  const { fatal, session } = useApp()
   const [route, query, go] = useHashRoute()
   useEffect(() => { document.documentElement.lang = lang }, [lang])
   useEffect(() => { window.scrollTo(0, 0) }, [route])
+  if (!session) return <Login />
   return (
     <>
       <TopBar />

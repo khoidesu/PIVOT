@@ -22,13 +22,13 @@ def _guard(actor: Actor) -> None:
 
 
 @router.post("/reset")
-def reset(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+def reset(provision: bool = True, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     """Đưa toàn bộ dữ liệu MÔ PHỎNG về trạng thái seed chuẩn (xoá đề xuất, sự kiện, sổ lợi ích)."""
     _guard(actor)
-    from ..seed import reset as do_reset, seed
+    from ..seed import reset_and_seed
 
-    do_reset(session)
-    info = seed(session)
+    # giữ danh tính người đã đăng nhập; provision=false → chưa cấp dữ liệu mẫu cho họ (kịch bản demo cần dữ liệu seed thuần)
+    info = reset_and_seed(session, provision=provision)
     session.commit()
     return {"reset": True, **info}
 
@@ -60,4 +60,11 @@ def run(scenario_id: str, actor: Actor = Depends(current_actor), session: Sessio
 
     from ..main import app
 
-    return run_scenario(scenario_id, lambda: TestClient(app))
+    try:
+        return run_scenario(scenario_id, lambda: TestClient(app))
+    finally:  # kịch bản chạy trên dữ liệu seed thuần → cấp lại dữ liệu mẫu cho người đã đăng nhập sau khi xong
+        from ..accounts import provision_registered
+        from ..db import SessionLocal
+        with SessionLocal() as s:
+            provision_registered(s)
+            s.commit()

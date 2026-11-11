@@ -26,6 +26,11 @@ export function Fleet({ go }: { go: (to: string) => void }) {
   }
   const cancel = (s: Shipment) => guard(async () => { await api.cancelShipment(s.id); setAskCancel(null); setMsg(t('fleet.cancelled', { code: s.code })); await lots.reload(true) })
   const sendPos = (id: string) => guard(async () => { await api.sendVehicleEvent(id, 'VEHICLE_POSITION'); setMsg(t('fleet.posSent')); setTimeout(() => { void vehicles.reload(true) }, 1600) })
+  const mine = (vehicles.data ?? []).filter((v) => !!me && v.tenant_id === me.org_id)
+  const sendAll = () => guard(async () => {
+    for (const v of mine) await api.sendVehicleEvent(v.id, 'VEHICLE_POSITION')
+    setMsg(t('fleet.updateAllDone', { n: mine.length })); setTimeout(() => { void vehicles.reload(true) }, 1600)
+  })
   const ownerOf = (s: Shipment) => !!me && CAN_EDIT.has(me.role) && s.tenant_id === me.org_id
   const visibleLots = (lots.data ?? []).filter((s) => showCancelled || s.status !== 'cancelled')
 
@@ -75,7 +80,8 @@ export function Fleet({ go }: { go: (to: string) => void }) {
 
       <div className="grid2">
         <section className="card">
-          <div className="card-h"><h2>{t('fleet.vehicles')}</h2><span className="muted">{t('fleet.vehiclesHint', { n: staleLimit })}</span></div>
+          <div className="card-h"><h2>{t('fleet.vehicles')}</h2><span className="muted">{t('fleet.vehiclesHint', { n: staleLimit })}</span>
+            {me?.role === 'carrier' && mine.length > 0 && <button className="btn sm" onClick={sendAll}>{t('fleet.updateAll')}</button>}</div>
           {vehicles.error && <ErrorNote error={vehicles.error} />}
           {vehicles.loading && !vehicles.data ? <Loading /> : vehicles.data && vehicles.data.length === 0 ? <div className="empty">{t('fleet.empty')}</div> : (
             <div className="table-wrap"><table>

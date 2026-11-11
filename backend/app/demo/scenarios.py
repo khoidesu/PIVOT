@@ -34,7 +34,7 @@ class Run:
 
     # ---- thao tác thường dùng ----
     def reset(self):
-        r = self.req("phu", "POST", "/v1/demo/reset")
+        r = self.req("phu", "POST", "/v1/demo/reset?provision=false")  # dữ liệu seed thuần: kết quả kịch bản xác định
         self.step("Reset dữ liệu mô phỏng về trạng thái chuẩn", r.status_code == 200, f"HTTP {r.status_code}")
 
     def lot(self, code: str, who="nguyen") -> str:

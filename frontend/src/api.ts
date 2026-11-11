@@ -1,15 +1,10 @@
 // Client API. Hợp đồng lấy từ OpenAPI của FastAPI (backend/app/schemas.py).
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://127.0.0.1:8000'
 
-export type UserKey = 'shipper_a' | 'shipper_a2' | 'carrier_b' | 'node_c' | 'dispatch'
-
-export const DEMO_USERS: { key: UserKey; org: 'A' | 'B' | 'C'; role: 'shipper' | 'carrier' | 'node_operator' | 'dispatcher' }[] = [
-  { key: 'shipper_a', org: 'A', role: 'shipper' },
-  { key: 'shipper_a2', org: 'A', role: 'shipper' },
-  { key: 'carrier_b', org: 'B', role: 'carrier' },
-  { key: 'node_c', org: 'C', role: 'node_operator' },
-  { key: 'dispatch', org: 'C', role: 'dispatcher' },
-]
+export type Role = 'shipper' | 'carrier' | 'node_operator' | 'dispatcher'
+export const ROLES: Role[] = ['shipper', 'carrier', 'node_operator', 'dispatcher']
+export interface Session { token: string; name: string; role: Role }
+export interface LoginResult { token: string; is_new: boolean; me: Me }
 
 export interface Me { user_id: string; user_name: string; org_id: string; org_name: string; org_type: string; role: string }
 export interface Meta { data_mode: 'mock' | 'live'; is_simulated: boolean; server_time: string; stale_position_minutes: number; admin_key_required: boolean }
@@ -97,14 +92,17 @@ export class ApiError extends Error {
   }
 }
 
-let currentUser: UserKey = (() => {
-  try { return (localStorage.getItem('pivot.user') as UserKey) || 'shipper_a' } catch { return 'shipper_a' }
+// Phiên đăng nhập lưu ở sessionStorage → MỖI TAB MỘT NGƯỜI (mở tab mới là chưa đăng nhập). Ngôn ngữ vẫn ở localStorage.
+let session: Session | null = (() => {
+  try { const raw = sessionStorage.getItem('pivot.session'); return raw ? (JSON.parse(raw) as Session) : null } catch { return null }
 })()
-export const getUser = () => currentUser
-export function setUser(u: UserKey) {
-  currentUser = u
-  try { localStorage.setItem('pivot.user', u) } catch { /* localStorage có thể bị chặn */ }
+export const getSession = () => session
+export function setSession(s: Session | null) {
+  session = s
+  try { s ? sessionStorage.setItem('pivot.session', JSON.stringify(s)) : sessionStorage.removeItem('pivot.session') } catch { /* sessionStorage có thể bị chặn */ }
 }
+let onUnauthorized: (() => void) | null = null
+export const setOnUnauthorized = (fn: (() => void) | null) => { onUnauthorized = fn }
 
 // Mã quản trị (chỉ cần khi triển khai công khai): giữ trong sessionStorage — đóng tab là mất, không lưu lâu dài.
 let adminKey = (() => { try { return sessionStorage.getItem('pivot.adminKey') ?? '' } catch { return '' } })()
@@ -116,7 +114,7 @@ export function setAdminKey(k: string) {
 
 async function request<T>(path: string, init: RequestInit & { idem?: string } = {}): Promise<T> {
   const headers: Record<string, string> = {
-    Authorization: `Bearer dev:${currentUser}`,
+    ...(session ? { Authorization: `Bearer dev:${session.token}` } : {}),
     ...(init.body ? { 'Content-Type': 'application/json' } : {}),
     ...(init.idem ? { 'Idempotency-Key': init.idem } : {}),
     ...(adminKey && path.startsWith('/v1/demo/') ? { 'X-Admin-Key': adminKey } : {}),
@@ -126,6 +124,10 @@ async function request<T>(path: string, init: RequestInit & { idem?: string } = 
     res = await fetch(`${API_URL}${path}`, { ...init, headers })
   } catch {
     throw new ApiError(0, 'NETWORK', 'Cannot reach the API')
+  }
+  if (res.status === 401 && session && !path.startsWith('/v1/auth/')) { // phiên không còn hợp lệ (vd dữ liệu đã reset)
+    setSession(null)
+    onUnauthorized?.()
   }
   if (!res.ok) {
     let body: unknown = null
@@ -148,6 +150,7 @@ const post = <T,>(path: string, body: unknown, idem?: string) =>
   request<T>(path, { method: 'POST', body: JSON.stringify(body), idem })
 
 export const api = {
+  login: (name: string, role: Role) => post<LoginResult>('/v1/auth/login', { name, role }),
   me: () => request<Me>('/v1/me'),
   meta: () => request<Meta>('/v1/meta'),
   locations: () => request<Location[]>('/v1/locations'),

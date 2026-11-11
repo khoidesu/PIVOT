@@ -66,3 +66,7 @@ docker run --rm -p 127.0.0.1:18000:8000 --network <tên-mạng-compose> \
 | Mở link báo 502/đang khởi động | Service đang thức dậy hoặc đang chạy migration; chờ rồi tải lại; xem Logs |
 | Không kết nối được DB | `PIVOT_DATABASE_URL` phải trỏ tới DB của Render (internal URL); mã tự đổi `postgres://` → `postgresql+psycopg://` |
 | Tab Demo báo cần mã quản trị | Nhập đúng `PIVOT_ADMIN_KEY`; mã chỉ lưu trong tab đang mở |
+
+
+## Đăng nhập đơn giản (tên + vai trò)
+Bản demo công khai dùng đăng nhập **không mật khẩu**: ai cũng nhập được tên + vai trò, kể cả *Điều phối viên*. Đã giảm rủi ro bằng: trần số người đăng ký (`MAX_REGISTERED_USERS = 500` trong `backend/app/accounts.py`, vượt thì 429); tên chỉ cho 2–40 ký tự an toàn; chỉ chạy khi `PIVOT_DATA_MODE=mock`; reset/kịch bản/làm tuổi dữ liệu vẫn cần **mã quản trị** (`PIVOT_ADMIN_KEY`). **Không dùng cho dữ liệu thật.** Mỗi người mới tạo một tổ chức + dữ liệu mẫu nhỏ nên cơ sở dữ liệu sẽ lớn dần theo số người đăng nhập; reset toàn bộ giữ danh tính, muốn xoá hẳn thì dọn bảng `users/organizations` có `is_registered = true`.

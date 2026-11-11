@@ -46,13 +46,30 @@ TABLES = [
 ]
 
 
-def reset(session: Session) -> None:
+def reset(session: Session, keep_registered: bool = False) -> None:
     if settings.data_mode != "mock":  # chốt chặn: không bao giờ TRUNCATE khi không phải môi trường mô phỏng
         raise RuntimeError("Refusing to reset: PIVOT_DATA_MODE is not 'mock'")
     # DELETE theo thứ tự khoá ngoại (con trước cha) thay vì TRUNCATE: TRUNCATE cần khoá độc quyền trên mọi bảng nên
     # bế tắc (deadlock) với worker nền / request đang chạy song song. DELETE chỉ khoá theo dòng, tương thích MVCC.
     for table in TABLES:
-        session.execute(text(f"DELETE FROM {table}"))
+        if not keep_registered:
+            session.execute(text(f"DELETE FROM {table}"))
+        elif table == "memberships":  # giữ người dùng/tổ chức tự đăng nhập (is_registered) — chỉ xoá dữ liệu mẫu của seed
+            session.execute(text("DELETE FROM memberships WHERE user_id IN (SELECT id FROM users WHERE NOT is_registered)"))
+        elif table in ("users", "organizations"):
+            session.execute(text(f"DELETE FROM {table} WHERE NOT is_registered"))
+        else:
+            session.execute(text(f"DELETE FROM {table}"))
+
+
+def reset_and_seed(session: Session, now: datetime | None = None, keep_registered: bool = True, provision: bool = True) -> dict:
+    """Reset dữ liệu mô phỏng về trạng thái chuẩn: giữ danh tính người đã đăng nhập và cấp lại dữ liệu mẫu cho họ."""
+    from .accounts import provision_registered
+
+    reset(session, keep_registered=keep_registered)
+    info = seed(session, now)
+    info["registered_orgs_reprovisioned"] = provision_registered(session, now) if (keep_registered and provision) else 0
+    return info
 
 
 def seed(session: Session, now: datetime | None = None) -> dict:
@@ -192,6 +209,14 @@ def retime(session: Session, now: datetime | None = None) -> timedelta:
     anchor = aset.params.get("anchor_at")
     delta = now - datetime.fromisoformat(anchor) if anchor else timedelta(0)  # thiếu anchor → chỉ ghi anchor mới
     reset_open_commitments(session, now)  # hold/đề xuất đang mở được expire thay vì lệch thời gian
+    from .accounts import registered_org_ids
+
+    skip = registered_org_ids(session)  # dữ liệu của người tự đăng nhập tạo SAU mốc anchor → không dịch (tránh lệch mốc)
+    veh_owner = {v.id: v.tenant_id for v in session.query(m.Vehicle).all()}
+    owner_of = {
+        m.Shipment: lambda r: r.tenant_id, m.Vehicle: lambda r: r.tenant_id,
+        m.AvailabilityWindow: lambda r: veh_owner.get(r.vehicle_id), m.Slot: lambda r: r.node_org_id,
+    }
     for model, cols in (
         (m.Shipment, ("ready_at", "pickup_deadline", "cutoff_at", "data_updated_at")),
         (m.Vehicle, ("position_updated_at",)),
@@ -199,6 +224,8 @@ def retime(session: Session, now: datetime | None = None) -> timedelta:
         (m.Slot, ("start_at", "end_at")),
     ):
         for row in session.query(model).all():
+            if owner_of[model](row) in skip:
+                continue
             for col in cols:
                 value = getattr(row, col)
                 if value is not None:
@@ -227,8 +254,7 @@ def main() -> None:
             session.commit()
             print(f"Retime OK: dịch mốc thời gian {delta} (dữ liệu MÔ PHỎNG).")
         else:
-            reset(session)
-            info = seed(session)
+            info = reset_and_seed(session)
             session.commit()
             print("Seed OK (dữ liệu MÔ PHỎNG):", info)
     engine.dispose()

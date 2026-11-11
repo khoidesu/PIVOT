@@ -31,8 +31,12 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 ```
 
-Bộ chọn vai trò ở thanh trên: **Nguyên / Phước** (Chủ hàng, tổ chức A) · **Minh** (Nhà vận tải, tổ chức B) · **Khôi** (Điều hành ICD, tổ chức C) · **Phú** (Điều phối viên).
-Đăng nhập là token dev cho prototype local (`Authorization: Bearer dev:<user>`); backend vẫn kiểm tra tổ chức + quyền ở mọi API.
+**Đăng nhập đơn giản: chỉ nhập tên + chọn vai trò** (không mật khẩu — chỉ dành cho demo). **Mỗi tab trình duyệt là MỘT người**; muốn thử nhiều bên (A, B khác nhau) thì mở thêm tab và đặt tên khác.
+- Vai trò: **Chủ hàng**, **Nhà vận tải**, **Điều hành ICD**, **Điều phối viên**.
+- Tên tự đặt. Cùng tên + cùng vai trò = cùng một tài khoản; **tên mới = tổ chức riêng + dữ liệu mẫu mô phỏng** (chủ hàng 4 lô, nhà vận tải 4 xe, ICD 8 slot), nên hai tab chủ hàng tên khác nhau là hai công ty tách biệt và ghép chéo được với nhau.
+- Tài khoản mẫu có sẵn (kịch bản demo/test dùng): **Nguyên, Phước** (Chủ hàng, tổ chức A) · **Minh** (Nhà vận tải, B) · **Khôi** (Điều hành ICD, C) · **Phú** (Điều phối viên) — đăng nhập đúng tên + vai trò đó thì vào các tài khoản này.
+- Đóng tab hoặc bấm **Đăng xuất / Đổi người** để thoát; backend vẫn kiểm tra tổ chức + quyền ở mọi API (token `Authorization: Bearer dev:<khoá>`).
+- Nút reset toàn bộ (tab Kịch bản demo) **giữ danh tính** người đã đăng nhập và cấp lại dữ liệu mẫu cho họ; nút *Làm mới dữ liệu demo* chỉ làm tươi dữ liệu seed.
 
 ### Đưa demo về trạng thái chuẩn
 | Việc | Cách |
@@ -43,7 +47,7 @@ Bộ chọn vai trò ở thanh trên: **Nguyên / Phước** (Chủ hàng, tổ 
 
 ## Kiểm thử
 ```bash
-cd backend && .venv/bin/python -m pytest      # 135 test (DB test riêng: pivot_test)
+cd backend && .venv/bin/python -m pytest      # 155 test (DB test riêng: pivot_test)
 cd frontend && npm test && npx tsc --noEmit
 ```
 

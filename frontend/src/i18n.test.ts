@@ -39,8 +39,15 @@ describe('i18n', () => {
   it('mọi mã ghi chú nhập liệu và mã lỗi mới đều có bản dịch', () => {
     for (const lang of ['vi', 'en'] as const) {
       for (const n of ['MISSING', 'AMBIGUOUS', 'QUOTE_NOT_FOUND_IN_SOURCE', 'INVALID_VALUE', 'RELATIVE_DATE_ASSUMED', 'TIME_ORDER_INVALID']) expect(dictionaries[lang][`in.note.${n}`], `${lang}:${n}`).toBeTruthy()
-      for (const c of ['SHIPMENT_LOCKED', 'NOT_INDEPENDENT', 'NO_INDEPENDENT_VERIFIER', 'NOT_MEASURED', 'VERSION_CONFLICT']) expect(dictionaries[lang][`err.${c}`], `${lang}:${c}`).toBeTruthy()
+      for (const c of ['INVALID_NAME', 'INVALID_ROLE', 'REGISTRATION_LIMIT', 'SHIPMENT_LOCKED', 'NOT_INDEPENDENT', 'NO_INDEPENDENT_VERIFIER', 'NOT_MEASURED', 'VERSION_CONFLICT']) expect(dictionaries[lang][`err.${c}`], `${lang}:${c}`).toBeTruthy()
     }
+  })
+  it('màn hình đăng nhập có đủ chữ cho 4 vai trò ở cả hai ngôn ngữ', () => {
+    for (const lang of ['vi', 'en'] as const)
+      for (const r of ['shipper', 'carrier', 'node_operator', 'dispatcher']) {
+        expect(dictionaries[lang][`role.${r}`], `${lang}:role.${r}`).toBeTruthy()
+        expect(dictionaries[lang][`rd.${r}`], `${lang}:rd.${r}`).toBeTruthy()
+      }
   })
   it('mã lỗi không biết vẫn hiển thị được (không vỡ UI)', () => {
     const t = (k: string, p?: Record<string, string | number>) => translate('vi', k, p)

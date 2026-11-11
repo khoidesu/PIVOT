@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError, DEMO_USERS, getAdminKey, type UserKey } from '../api'
+import { api, ApiError, getAdminKey } from '../api'
 import { useI18n } from '../i18n'
 import { fmtClock, nowMs } from '../fmt'
 import { useApp } from '../store'
@@ -7,7 +7,7 @@ import { Chip } from './ui'
 
 export function TopBar() {
   const { t, lang, setLang } = useI18n()
-  const { user, me, meta, switchUser, bump, syncClock } = useApp()
+  const { me, meta, logout, bump, syncClock } = useApp()
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [, tick] = useState(0)
@@ -34,17 +34,16 @@ export function TopBar() {
             <Chip kind={sim ? 'sim' : 'good'}>● {sim ? t('badge.mock') : t('badge.live')}</Chip>
             {meta && <span className="small">{t('topbar.dataAge', { age: fmtClock(new Date(nowMs()).toISOString()) })}</span>}
           </div>
-          <label className="ctrl">
-            {t('topbar.role')}
-            <select value={user} onChange={(e) => switchUser(e.target.value as UserKey)} aria-label={t('topbar.role')}>
-              {DEMO_USERS.map((u) => <option key={u.key} value={u.key}>{t(`user.${u.key}`)} — {t(`role.${u.role}`)} · {t(`org.${u.org}`)}</option>)}
-            </select>
-          </label>
+          {me && (
+            <div className="who" aria-label={t('topbar.role')}>
+              <b>{me.user_name}</b><span className="muted small"> — {t(`role.${me.role}`)}{me.org_name.startsWith(`${me.user_name} ·`) ? '' : ` · ${me.org_name}`}</span>
+            </div>)}
           <div className="seg" role="group" aria-label={t('topbar.lang')}>
             {(['vi', 'en'] as const).map((l) => (
               <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>
             ))}
           </div>
+          <button className="btn sm" onClick={logout}>{t('topbar.logout')}</button>
           {me?.role === 'dispatcher' && (
             <button className="btn sm" onClick={retime} disabled={busy || (!!meta?.admin_key_required && !getAdminKey())} title={meta?.admin_key_required && !getAdminKey() ? t('topbar.retimeNeedKey') : undefined}>{t('topbar.retime')}</button>
           )}

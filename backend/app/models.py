@@ -38,7 +38,9 @@ class Organization(Base):
     __tablename__ = "organizations"
     id: Mapped[uuid.UUID] = pk()
     name: Mapped[str] = mapped_column(String(200))
-    org_type: Mapped[str] = mapped_column(String(20))  # shipper | carrier | node
+    org_type: Mapped[str] = mapped_column(String(20))  # shipper | carrier | node | platform
+    # tổ chức do người dùng tự đăng nhập tạo ra (khác dữ liệu seed): reset giữ lại, retime không dịch dữ liệu của họ
+    is_registered: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
 
 class User(Base):
@@ -46,6 +48,7 @@ class User(Base):
     id: Mapped[uuid.UUID] = pk()
     email: Mapped[str] = mapped_column(String(200), unique=True)
     name: Mapped[str] = mapped_column(String(200))
+    is_registered: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
 
 class Membership(Base):

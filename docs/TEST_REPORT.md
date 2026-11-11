@@ -6,8 +6,8 @@ Dữ liệu: **mô phỏng** (3 tổ chức, 5 thành viên, 10 xe, 20 lô, 20 s
 ## Kết quả tổng
 | Bộ test | Số test | Kết quả |
 |---|---|---|
-| Backend (pytest) | 126 | **126 đạt** |
-| Frontend (vitest) + `tsc` + `vite build` | 7 | **7 đạt**, kiểu và build sạch |
+| Backend (pytest) | 155 | **155 đạt** |
+| Frontend (vitest) + `tsc` + `vite build` | 8 | **8 đạt**, kiểu và build sạch |
 | Kịch bản demo (CLI trên API thật) | 6 | **6/6 đạt** (0,2–1,2 giây mỗi kịch bản), chạy lặp lại nhiều lần đều đạt |
 
 Theo file (backend): access 9 · benefits_audit 12 · booking 14 · events 10 · gates 11 · intake 14 · integrity 17 · match 16 · perf 1 · scenarios 8 · shipment_edit 8 · vehicle_events 6.
@@ -28,6 +28,12 @@ Theo file (backend): access 9 · benefits_audit 12 · booking 14 · events 10 ·
 | **Sửa/huỷ yêu cầu** | Không sửa lặng lẽ chuyến đã cam kết | sửa có khoá lạc quan; làm mới `data_updated_at`; vô hiệu đề xuất cũ; bị chặn khi đã giữ/cam kết (`SHIPMENT_LOCKED`); huỷ là xoá mềm giữ audit; vết audit chỉ ghi tên trường, không ghi giá/khách hàng | Đạt |
 | **Nhập liệu có dẫn nguồn** | Chỉ bản nháp; trường thiếu → needs_review; văn bản là dữ liệu không tin cậy | xem mục "Nhập liệu" bên dưới | Đạt (với giới hạn nêu rõ) |
 | Hiệu năng | Match P95 < 2 s cho 20 xe × 50 lô | `test_perf`: **p50 = 50 ms, p95 = 93 ms, max = 241 ms** (50 lượt qua HTTP + DB local; số đo thay đổi theo tải máy, lần chạy trước 30 ms). Danh sách đề xuất: 15 đề xuất → **8 truy vấn** (trước 79) | Đạt |
+
+## Đăng nhập đơn giản, mỗi tab một người
+- `test_login` (13 test): tên/vai trò sai → 422; người mới có tổ chức riêng + dữ liệu mẫu đúng vai trò; đăng nhập lại = cùng tài khoản (không nhân đôi dữ liệu); **hai chủ hàng tên khác nhau không đọc/sửa/huỷ được lô của nhau (404)**; luồng ghép–giữ–xác nhận **giữa ba tổ chức mới** (chủ hàng → nhà vận tải → ICD) ra `confirmed`, người ngoài không thấy đề xuất; biển số xe của các nhà vận tải không trùng; **reset giữ danh tính** và cấp lại dữ liệu mẫu; retime không dịch dữ liệu của người đăng ký; đăng nhập bị chặn ngoài chế độ mô phỏng; trần số người đăng ký; 6 lần đăng nhập đồng thời cùng tên mới → đúng một tài khoản.
+- **Kịch bản demo vẫn xác định khi đã có người tự đăng nhập** (`test_login_scenarios`, 7 test): lỗi này được phát hiện khi chạy trên server thật có Hoa/Lan/Cường — họ có xe/slot riêng nên ghép có thể chọn trúng, làm 3/6 kịch bản lỗi dù test cũ xanh. Sửa: kịch bản chạy trên dữ liệu seed thuần (reset `provision=false`) rồi cấp lại dữ liệu mẫu cho người đăng ký sau khi xong (kịch bản xoá dữ liệu nghiệp vụ của mọi người, kể cả lô họ tự tạo). 6/6 đạt 2 lần liên tiếp trên server thật.
+- Kiểm tra trên trình duyệt với **3 tab thật** (Hoa/Chủ hàng, Lan/Nhà vận tải, Cường/Điều hành ICD): mở tab mới thì chưa đăng nhập; cả ba lần lượt xác nhận → `confirmed`; đăng xuất ở một tab **không** ảnh hưởng tab khác; sau reset các tab vẫn đăng nhập. Màn hình đăng nhập không tràn ngang ở 375px.
+- Giới hạn: **không có mật khẩu** (theo yêu cầu) nên ai biết tên + vai trò là vào được tài khoản đó; hai tên chỉ khác dấu (Hòa/Hoa) là cùng một tài khoản; nhân đôi tab trình duyệt sao chép phiên.
 
 ## Nhập liệu có dẫn nguồn (DRAFT 6.1)
 - **Bộ trích xuất mặc định là bộ phân tích theo luật (regex), KHÔNG phải AI**, và giao diện/API gắn nhãn đúng như vậy.
