@@ -1,4 +1,4 @@
-"""6 kịch bản demo bắt buộc (DRAFT mục 10 / CLAUDE.md mục 4) — chạy qua API thật bằng token dev của từng thành viên.
+"""10 kịch bản demo (6 bắt buộc + 4 cho Control Tower) (DRAFT mục 10 / CLAUDE.md mục 4) — chạy qua API thật bằng token dev của từng thành viên.
 
 Mỗi kịch bản bắt đầu bằng reset dữ liệu mô phỏng nên LẶP LẠI ĐƯỢC. Cùng một mã chạy ở ba nơi:
   - endpoint POST /v1/demo/scenarios/{id}/run (nút trên tab Demo)
@@ -206,9 +206,104 @@ def s6_duplicate_restart(r: Run):
     return "#/timeline"
 
 
+def _tracked_trip(r: Run, code="LOT-A-001") -> dict:
+    p = r.match(code)["proposals"][0]
+    return r.confirm(p)
+
+
+def s7_tracking(r: Run):
+    r.reset()
+    p = _tracked_trip(r)
+    st = r.req("minh", "POST", f"/v1/sim/{p['id']}/start?speedup=10000")
+    r.step("Nhà vận tải bật bộ giả lập GPS (tin vị trí đi qua đường sự kiện thật)", st.status_code == 200, f"HTTP {st.status_code}")
+    r.worker()
+    for _ in range(24):
+        r.req("minh", "POST", "/v1/sim/tick")
+        r.worker()
+    d = r.req("nguyen", "GET", f"/v1/tracking/{p['id']}").json()
+    reached = [m["code"] for m in d["milestones"] if m["reached"]]
+    r.step("Mốc hành trình suy ra từ vị trí, đúng thứ tự", reached == ["ASSIGNED", "AT_PICKUP", "DEPARTED_PICKUP", "AT_ICD_GATE"], str(reached))
+    tl = r.req("nguyen", "GET", f"/v1/proposals/{p['id']}/timeline").json()
+    ms = [i["code"] for i in tl["items"] if i["code"] == "MILESTONE_REACHED"]
+    r.step("Mỗi mốc chỉ phát sinh MỘT lần (sự kiện hệ thống idempotent)", len(ms) == 3, str(len(ms)))
+    r.step("Vệt di chuyển + ETA trực tiếp có P50 ≤ P90; dữ liệu gắn nhãn mô phỏng", len(d["track"]) >= 3 and d["is_simulated"] is True and d["eta"] is not None)
+    r.step("Không lộ giá/khách hàng qua Tracking", "price" not in str(d).lower() and "customer" not in str(d).lower())
+    return "#/tracking"
+
+
+def s8_breakdown_replan(r: Run):
+    r.reset()
+    p = _tracked_trip(r)
+    plate = p["vehicle"]["plate"]
+    r.event("minh", p["id"], "INCIDENT_REPORTED", {"kind": "BREAKDOWN", "note": "Nổ lốp"})
+    r.worker()
+    ex = next((e for e in r.req("nguyen", "GET", "/v1/exceptions").json() if e["proposal_id"] == p["id"]), None)
+    r.step("Hỏng xe → ngoại lệ mức critical theo luật có version", bool(ex) and ex["severity"] == "critical" and ex["rule_version"].startswith("sev-"), ex["rule_version"] if ex else "")
+    r.step("Playbook sinh bước tự động (báo các bên) + bước do người quyết, có SLA", bool(ex) and ex["tasks"][0]["status"] == "done" and any(t["kind"] == "human" for t in ex["tasks"]) and bool(ex["sla_due_at"]))
+    n = r.req("nguyen", "GET", "/v1/notifications").json()
+    r.step("Chủ hàng nhận thông báo (SMS/email là nhật ký mô phỏng)", n["unread"] >= 1)
+    mine = next((t for t in (ex or {"tasks": []})["tasks"] if t["owner"] == "carrier"), None)
+    if mine:
+        x = r.req("minh", "POST", f"/v1/exceptions/{ex['id']}/tasks/{mine['id']}/complete")
+        r.step("Nhà vận tải hoàn tất bước của mình; bên khác không làm thay được", x.status_code == 200 and r.req("nguyen", "POST", f"/v1/exceptions/{ex['id']}/tasks/{mine['id']}/complete").status_code == 403)
+    rp = r.req("nguyen", "POST", f"/v1/proposals/{p['id']}/replan", {"version": r.view(p["id"])["version"]})
+    r.step("Chủ hàng bấm Ghép lại: chuyến cũ huỷ, lô về chờ ghép, có phương án mới", rp.status_code == 200 and rp.json()["shipment_status"] == "open" and rp.json()["new_proposals"] >= 1, rp.text[:120])
+    new = [x for x in r.req("nguyen", "GET", f"/v1/proposals?shipment_id={r.lot('LOT-A-001')}").json() if x["status"] == "proposed"]
+    r.step("Xe hỏng không được đề xuất lại; hệ thống không tự chọn thay", all(x["vehicle"]["plate"] != plate for x in new) and bool(new))
+    return "#/exceptions"
+
+
+def s9_dock(r: Run):
+    r.reset()
+    p = _tracked_trip(r)
+    a = next((x for x in r.req("khoi", "GET", "/v1/docks/board").json()["appointments"] if x["proposal_id"] == p["id"]), None)
+    r.step("Xác nhận chuyến → hệ thống xếp dock tự động trong khung slot", bool(a) and a["status"] == "scheduled", a["dock_code"] if a else "")
+    if not a:
+        return "#/docks"
+    r.event("minh", p["id"], "ETA_UPDATED", {"delay_minutes": 180})
+    r.worker()
+    b = next(x for x in r.req("khoi", "GET", "/v1/docks/board").json()["appointments"] if x["proposal_id"] == p["id"])
+    r.step("ETA đổi → CHỈ đề xuất khung mới, lịch cũ giữ nguyên", bool(b["suggestion"]) and b["window_start"] == a["window_start"], str(b["suggestion"] and b["suggestion"]["window_start"]))
+    bad = r.req("nguyen", "POST", f"/v1/dock-appointments/{b['id']}/accept-suggestion", {"version": b["version"]})
+    ok = r.req("khoi", "POST", f"/v1/dock-appointments/{b['id']}/accept-suggestion", {"version": b["version"]})
+    r.step("Chỉ ICD chấp nhận mới áp dụng đề xuất", bad.status_code == 404 and ok.status_code == 200)
+    p2 = _tracked_trip(r, "LOT-A-002")
+    boards = r.req("khoi", "GET", "/v1/docks/board").json()["appointments"]
+    a2 = next(x for x in boards if x["proposal_id"] == p2["id"])
+    a1 = next(x for x in boards if x["proposal_id"] == p["id"])
+    start = a2["window_start"]
+    res = []
+
+    def go(appt):
+        res.append(r.req("khoi", "POST", f"/v1/dock-appointments/{appt['id']}/reschedule",
+                         {"version": appt["version"], "window_start": start, "dock_id": a2["dock_id"]}, client=r.factory()).status_code)
+    ts = [threading.Thread(target=go, args=(x,)) for x in (a1, a2)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    r.step("Hai yêu cầu dời cùng khung dock cùng lúc: chỉ một thành công", sorted(res)[-1] == 409 and 200 in res, str(sorted(res)))
+    return "#/docks"
+
+
+def s10_eta_model(r: Run):
+    r.reset()
+    r.req("phu", "POST", "/v1/eta/train", {"drift": 0})
+    m1 = r.req("phu", "GET", "/v1/eta/model").json()
+    r.step("ML trên lịch sử MÔ PHỎNG: giảm MAE ≥ 15% và độ phủ P90 đạt → được promote", m1["status"] == "promoted", str(m1["metrics"] and m1["metrics"]["improvement_pct"]))
+    when = datetime.now(timezone.utc).isoformat()
+    w1 = r.req("minh", "POST", "/v1/eta/predict", {"depart_at": when}).json()
+    r.step("Dự báo what-if dùng ML, luôn gắn nhãn mô phỏng", w1["used"] == "ml" and w1["is_simulated"] is True)
+    m2 = r.req("phu", "POST", "/v1/eta/train", {"drift": 0.15}).json()
+    w2 = r.req("minh", "POST", "/v1/eta/predict", {"depart_at": when}).json()
+    r.step("Dữ liệu trôi → độ phủ tụt → tự hạ về ETA luật", m2["status"] == "rule_fallback" and w2["used"] == "rule" and w2["ml"] is None, m2["reason"])
+    r.req("phu", "POST", "/v1/eta/train", {"drift": 0})
+    r.step("Khoảng P50 ≤ P90 ở cả hai nhánh", w1["rule"]["p50"] <= w1["rule"]["p90"] and w1["ml"]["p50_minutes"] <= w1["ml"]["p90_minutes"])
+    return "#/tracking"
+
+
 SCENARIOS = [
     ("success", s1_success), ("incompatible", s2_incompatible), ("stale", s3_stale),
     ("race", s4_race), ("eta_change", s5_eta), ("duplicate_restart", s6_duplicate_restart),
+    ("tracking", s7_tracking), ("breakdown_replan", s8_breakdown_replan), ("dock", s9_dock), ("eta_model", s10_eta_model),
 ]
 
 

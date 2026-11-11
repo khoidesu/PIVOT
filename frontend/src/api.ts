@@ -124,7 +124,7 @@ export interface DockBoard {
   appointments: DockAppt[]; busy: { dock_id: string; window_start: string; window_end: string }[]
   kpis: { dock_count: number; utilization_pct: number; queue: number; no_show: number; avg_dwell_minutes: number | null; scheduled: number }
 }
-export const SCENARIO_IDS = ['success', 'incompatible', 'stale', 'race', 'eta_change', 'duplicate_restart'] as const
+export const SCENARIO_IDS = ['success', 'incompatible', 'stale', 'race', 'eta_change', 'duplicate_restart', 'tracking', 'breakdown_replan', 'dock', 'eta_model'] as const
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public reasons: GateItem[] = []) {

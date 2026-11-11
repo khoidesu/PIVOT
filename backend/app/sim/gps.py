@@ -31,7 +31,7 @@ def start(session: Session, proposal_id: uuid.UUID, now: datetime, time_scale: f
         sim = m.SimTrip(proposal_id=proposal_id, running=True, mode="normal", along_km=0.0, time_scale=time_scale, updated_at=now)
         session.add(sim)
     else:
-        sim.running, sim.updated_at = True, now
+        sim.running, sim.updated_at, sim.time_scale = True, now, time_scale
     if prop.status == "confirmed":  # chuyến bắt đầu bằng sự kiện thật, không đổi trạng thái trực tiếp
         events.ingest(session, _carrier_actor(session, veh), {
             "entity_type": "proposal", "entity_id": prop.id, "event_type": "TRIP_STARTED", "occurred_at": now,

@@ -44,10 +44,10 @@ def _sim_guard(actor: Actor, session: Session, proposal_id: uuid.UUID):
 
 
 @router.post("/sim/{proposal_id}/start")
-def sim_start(proposal_id: uuid.UUID, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+def sim_start(proposal_id: uuid.UUID, speedup: float = 20.0, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
     _sim_guard(actor, session, proposal_id)
     try:
-        sim = gps.start(session, proposal_id, datetime.now(timezone.utc))
+        sim = gps.start(session, proposal_id, datetime.now(timezone.utc), time_scale=max(1.0, min(speedup, 20000.0)))
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
     session.commit()
