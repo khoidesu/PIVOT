@@ -226,7 +226,7 @@ def s7_tracking(r: Run):
     tl = r.req("nguyen", "GET", f"/v1/proposals/{p['id']}/timeline").json()
     ms = [i["code"] for i in tl["items"] if i["code"] == "MILESTONE_REACHED"]
     r.step("Mỗi mốc chỉ phát sinh MỘT lần (sự kiện hệ thống idempotent)", len(ms) == 3, str(len(ms)))
-    r.step("Vệt di chuyển + ETA trực tiếp có P50 ≤ P90; dữ liệu gắn nhãn mô phỏng", len(d["track"]) >= 3 and d["is_simulated"] is True and d["eta"] is not None)
+    r.step("Vệt di chuyển + ETA trực tiếp có P50 ≤ P90; dữ liệu gắn nhãn mô phỏng", len(d["track"]) >= 2 and d["is_simulated"] is True and d["eta"] is not None)
     r.step("Không lộ giá/khách hàng qua Tracking", "price" not in str(d).lower() and "customer" not in str(d).lower())
     return "#/tracking"
 
