@@ -184,3 +184,22 @@ def test_dev_tokens_refuse_to_start_outside_mock(monkeypatch):
     with pytest.raises(RuntimeError):
         with TestClient(app):
             pass
+
+
+def test_proposals_are_spread_across_icds_so_every_icd_gets_a_request(client):
+    """Hai ICD cùng có slot đạt: trước đây ICD có slot sớm nhất nhận hết đề xuất, ICD kia không bao giờ thấy yêu cầu nào."""
+    from sqlalchemy import select
+    from app import models as m
+    from app.db import SessionLocal
+    with SessionLocal() as s:
+        org = m.Organization(name="ICD Khác (test)", org_type="node")
+        s.add(org)
+        s.flush()
+        for sl in s.execute(select(m.Slot)).scalars().all():
+            s.add(m.Slot(node_org_id=org.id, location_id=sl.location_id, start_at=sl.start_at + timedelta(minutes=1),
+                         end_at=sl.end_at + timedelta(minutes=1), capacity=sl.capacity, remaining=sl.remaining, source="mock"))
+        s.commit()
+    props = match(client, "shipper_a", "LOT-A-001")["proposals"]
+    assert len(props) >= 2
+    assert {p["slot"]["node_org_name"] for p in props} == {"ICD Cảng C (Node)", "ICD Khác (test)"}
+    assert all(p["gates"] and all(g["status"] == "PASS" for g in p["gates"]) for p in props)   # slot đổi vẫn qua hard gate
