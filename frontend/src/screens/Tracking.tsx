@@ -85,6 +85,24 @@ function EtaModelCard() {
   )
 }
 
+/** Màn trống: nói rõ vì sao (đề xuất chưa đủ 3 bên xác nhận) thay vì để người dùng tưởng hỏng. */
+function WaitingNote() {
+  const { t } = useI18n()
+  const props = useData(() => api.proposals(), 4000)
+  const waiting = (props.data ?? []).filter((p) => p.status === 'pending_acceptance')
+  if (!waiting.length) return <div className="empty">{t('tk.empty')}</div>
+  const who = [...new Set(waiting.flatMap((p) => Object.entries(p.parties).filter(([, v]) => !v.accepted).map(([k]) => t(`party.${k}`))))].join(', ')
+  return (
+    <Note kind="warn">
+      <div className="stack">
+        <span>{t('tk.waiting', { n: waiting.length })}</span>
+        <span className="small">{t('tk.waitingWho', { who })}</span>
+        <a className="btn sm" href="#/confirm">{t('nav.confirm')}</a>
+      </div>
+    </Note>
+  )
+}
+
 export function Tracking({ query }: { query: URLSearchParams }) {
   const { t } = useI18n()
   const { me } = useApp()
@@ -118,7 +136,7 @@ export function Tracking({ query }: { query: URLSearchParams }) {
       <div className="card stack">
         <div className="card-h"><h1>{t('tk.title')}</h1><Chip kind="sim">{t('badge.mock')}</Chip></div>
         {list.error && <ErrorNote error={list.error} />}
-        {!trips.length ? <div className="empty">{t('tk.empty')}</div> : (
+        {!trips.length ? <WaitingNote /> : (
           <div className="row">
             {trips.map((x) => (
               <button key={x.proposal_id} className={`tab${x.proposal_id === pid ? ' on' : ''}`} onClick={() => setPid(x.proposal_id)}>
