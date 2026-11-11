@@ -1,13 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError, ROLES, type Role } from '../api'
-import { Brand } from '../components/TopBar'
-import { Chip, ErrorNote, Hint, Note } from '../components/ui'
+import { ErrorNote, Hint, Note } from '../components/ui'
 import { useI18n } from '../i18n'
-import { useApp } from '../store'
 
-export function Login() {
-  const { t, lang, setLang } = useI18n()
-  const { login, notice } = useApp()
+/** Biểu mẫu tên + vai trò (không mật khẩu, chỉ cho dữ liệu mô phỏng). `compact` = dạng gọn trong ngăn "Thêm người". */
+export function LoginForm({ onLogin, compact = false }: { onLogin: (name: string, role: Role) => Promise<void>; compact?: boolean }) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
   const [role, setRole] = useState<Role>('shipper')
   const [busy, setBusy] = useState(false)
@@ -20,28 +18,21 @@ export function Login() {
     const n = name.trim()
     if (n.length < 2) { setLocalErr(t('login.nameRequired')); return }
     setBusy(true)
-    try { await login(n, role) }
+    try { await onLogin(n, role); setName('') }
     catch (err) { setError(err instanceof ApiError ? err : new ApiError(0, 'UNKNOWN', String(err))) }
     finally { setBusy(false) }
   }
 
-  return (
-    <main className="login">
-      <div className="login-top">
-        <Brand />
-        <div className="row">
-          <Chip kind="sim">● {t('badge.mock')}</Chip>
-          <div className="seg" role="group" aria-label="Language">
-            {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
-          </div>
-        </div>
-      </div>
-      <form className="card login-card stack" onSubmit={submit} aria-label={t('login.title')}>
-        <h1>{t('login.title')} <Hint text={t('login.tip')} /></h1>
-        {notice === 'expired' && <Note kind="warn">{t('login.expired')}</Note>}
-        <label>{t('login.name')}
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('login.namePh')} maxLength={40} autoFocus autoComplete="off" />
+  const fields = (
+    <>
+      <label>{t('login.name')}
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('login.namePh')} maxLength={40} autoFocus autoComplete="off" />
+      </label>
+      {compact ? (
+        <label>{t('login.role')}
+          <select value={role} onChange={(e) => setRole(e.target.value as Role)}>{ROLES.map((r) => <option key={r} value={r}>{t(`role.${r}`)}</option>)}</select>
         </label>
+      ) : (
         <fieldset className="roles">
           <legend>{t('login.role')}</legend>
           {ROLES.map((r) => (
@@ -50,10 +41,13 @@ export function Login() {
               <span><b>{t(`role.${r}`)}</b><small>{t(`rd.${r}`)}</small></span>
             </label>))}
         </fieldset>
-        {localErr && <Note kind="err">{localErr}</Note>}
-        {error && <ErrorNote error={error} />}
-        <button className="btn primary" type="submit" disabled={busy}>{busy ? t('login.entering') : t('login.submit')}</button>
-      </form>
-    </main>
+      )}
+      {localErr && <Note kind="err">{localErr}</Note>}
+      {error && <ErrorNote error={error} />}
+      <button className="btn primary" type="submit" disabled={busy}>{busy ? t('login.entering') : t('login.submit')}</button>
+    </>
   )
+  return compact
+    ? <form className="stack ws-form" onSubmit={submit} aria-label={t('ws.other')}>{fields}</form>
+    : <form className="card login-card stack" onSubmit={submit} aria-label={t('login.title')}><h1>{t('login.title')} <Hint text={t('login.tip')} /></h1>{fields}</form>
 }

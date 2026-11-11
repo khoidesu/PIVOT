@@ -5,7 +5,7 @@ import { dictionaries, reasonText, translate } from './i18n'
 import { allowedRoute, defaultRoute, navFor } from './nav'
 
 const REASON_CODES = ['CAPACITY_EXCEEDED', 'CARGO_INCOMPATIBLE', 'DATA_STALE', 'PICKUP_WINDOW_MISSED', 'CUTOFF_RISK',
-  'VEHICLE_UNAVAILABLE', 'SLOT_FULL', 'SLOT_WINDOW_MISSED', 'SLOT_LOCATION_MISMATCH', 'MISSING_FIELD', 'SHIPMENT_NOT_OPEN', 'ID_UNRESOLVED']
+  'VEHICLE_UNAVAILABLE', 'SLOT_FULL', 'SLOT_WINDOW_MISSED', 'SLOT_LOCATION_MISMATCH', 'SLOT_AFTER_CUTOFF', 'MISSING_FIELD', 'SHIPMENT_NOT_OPEN', 'ID_UNRESOLVED']
 
 describe('i18n', () => {
   it('vi và en có cùng bộ khoá', () => {
@@ -63,13 +63,13 @@ const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).fl
 const wordsOf = (lang: 'vi' | 'en') => Object.values(dictionaries[lang]).reduce((n, v) => n + v.split(/\s+/).filter(Boolean).length, 0)
 
 describe('giao diện gọn chữ', () => {
-  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ)', () => {
-    expect(wordsOf('vi')).toBeLessThanOrEqual(2000)
+  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ; nới 2.000 → 2.200 khi thêm ETA tín hiệu thật, nhiều cửa sổ, màn Xác nhận mới)', () => {
+    expect(wordsOf('vi')).toBeLessThanOrEqual(2200)
   })
   it('mọi khoá i18n đều được mã nguồn dùng (không để chuỗi chết)', () => {
     const code = walk(SRC).filter((f) => /\.(tsx?)$/.test(f) && !/i18n(\.test)?\.ts$/.test(f)).map((f) => readFileSync(f, 'utf8')).join('\n')
     const dynamic = ['status.', 'ps.', 'cargo.', 'role.', 'rd.', 'party.', 'gate.', 'reason.', 'tl.code.', 'tl.q.', 'tl.resolve.', 'tl.exc.', 'in.note.', 'in.f.', 'err.',
-      'demo.s.', 'rec.comp.', 'rec.s.', 'bf.status.', 'bf.sub.', 'nav.', 'fleet.tab.', 'cf.ok.', 'tk.ms.', 'tk.mode.', 'ex.sev.', 'ex.cat.', 'ex.step.', 'ex.owner.', 'ex.kind.', 'dk.status.', 'eta.status.', 'eta.reason.', 'eta.band.']
+      'demo.s.', 'rec.comp.', 'rec.s.', 'bf.status.', 'bf.sub.', 'nav.', 'fleet.tab.', 'cf.ok.', 'tk.ms.', 'tk.mode.', 'ex.sev.', 'ex.cat.', 'ex.step.', 'ex.owner.', 'ex.kind.', 'dk.status.', 'eta.status.', 'eta.reason.', 'eta.band.', 'ws.layout.']
     const dead = Object.keys(dictionaries.vi).filter((k) => !dynamic.some((p) => k.startsWith(p)) && !code.includes(`'${k}'`) && !code.includes(`\`${k}\``))
     expect(dead).toEqual([])
   })

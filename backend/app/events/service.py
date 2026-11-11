@@ -7,9 +7,9 @@
   không tự sửa/chuyển xe.
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ NODE_EVENTS = {"UNLOAD_STARTED", "UNLOAD_COMPLETED"}  # chỉ ICD (node) của s
 VEHICLE_EVENTS = {"VEHICLE_POSITION", "VEHICLE_AVAILABLE"}        # chỉ nhà vận tải sở hữu xe được báo
 SYSTEM_EVENTS = {"MILESTONE_REACHED"}                      # chỉ hệ thống sinh ra, không nhận từ ngoài
 FINAL_QUALITY = {"applied", "late", "invalid"}
+CLOCK_TOLERANCE = timedelta(minutes=15)  # lệch đồng hồ máy khách tới mức này vẫn coi vị trí là "vừa nhận"
 
 
 def _authorize(session: Session, actor: Actor, entity_type: str, entity_id, event_type: str):
@@ -88,9 +89,16 @@ def _apply_vehicle_event(session: Session, ev: m.Event) -> str:
                           .order_by(m.AvailabilityWindow.free_from.desc()).with_for_update()).scalars().first()
     p = ev.payload or {}
     if ev.event_type == "VEHICLE_POSITION":
-        if veh.position_updated_at is not None and ev.occurred_at <= veh.position_updated_at:
+        last = session.execute(select(func.max(m.Event.occurred_at)).where(
+            m.Event.entity_type == "vehicle", m.Event.entity_id == veh.id, m.Event.event_type == "VEHICLE_POSITION",
+            m.Event.quality_status == "applied", m.Event.id != ev.id)).scalar_one()
+        ref = last if last is not None else veh.position_updated_at  # chưa có tin nào → so với dữ liệu hiện có (seed)
+        if ref is not None and ev.occurred_at <= ref:
             return "late"  # tin cũ hơn dữ liệu đang có: không kéo tuổi dữ liệu lùi
-        veh.position_updated_at = min(ev.occurred_at, ev.received_at)
+        # Tuổi dữ liệu đo bằng giờ MÁY CHỦ khi nhận: đồng hồ máy khách chậm/nhanh không làm vị trí vừa gửi thành "cũ".
+        # Chỉ khi tin thực sự cũ (muộn hơn ngưỡng chịu lệch) mới tính theo giờ xảy ra.
+        fresh = ev.received_at - ev.occurred_at <= CLOCK_TOLERANCE
+        veh.position_updated_at = ev.received_at if fresh else ev.occurred_at
         if p.get("location_id") and win is not None:
             win.location_id = uuid.UUID(p["location_id"])
         if "lat" in p:

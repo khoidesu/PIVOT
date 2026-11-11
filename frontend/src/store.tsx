@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, ApiError, getSession, setOnUnauthorized, setSession, type Location, type Me, type Meta, type Role, type Session } from './api'
+import { api, ApiError, EMBED, getSession, setOnUnauthorized, setSession, type Location, type Me, type Meta, type Role, type Session } from './api'
 import { setServerTime } from './fmt'
 
 interface AppCtx {
@@ -28,10 +28,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState<'expired' | null>(null)
 
   const clear = useCallback(() => { setMe(null); setMeta(null); setLocations([]); setFatal(null) }, [])
-  useEffect(() => { // 401 ở bất kỳ API nào → về màn hình đăng nhập kèm thông báo
-    setOnUnauthorized(() => { setSessionState(null); clear(); setNotice('expired') })
+  useEffect(() => { // 401 ở bất kỳ API nào → về màn hình đăng nhập kèm thông báo (trong cửa sổ nhúng: nhờ trang bao ngoài đăng nhập lại)
+    setOnUnauthorized(() => {
+      setSessionState(null); clear()
+      if (EMBED) window.parent.postMessage({ type: 'logection:expired' }, location.origin)
+      else setNotice('expired')
+    })
     return () => setOnUnauthorized(null)
   }, [clear])
+
+  useEffect(() => { // cửa sổ nhúng: xin phiên từ trang bao ngoài (bắt tay), nhận lại khi token đổi
+    if (!EMBED) return
+    const on = (e: MessageEvent) => {
+      if (e.origin !== location.origin || e.source !== window.parent) return
+      const d = e.data as { type?: string; session?: Session } | null
+      if (d?.type !== 'logection:session' || !d.session) return
+      setSession(d.session); setSessionState(d.session); setNotice(null); setEpoch((n) => n + 1)
+    }
+    window.addEventListener('message', on)
+    window.parent.postMessage({ type: 'logection:ready' }, location.origin)
+    return () => window.removeEventListener('message', on)
+  }, [])
 
   const load = useCallback(async () => {
     if (!getSession()) return
@@ -54,7 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const s: Session = { token: r.token, name: r.me.user_name, role: r.me.role as Role }
       setSession(s); setSessionState(s); setNotice(null); setMe(r.me); setEpoch((n) => n + 1)
     },
-    logout: () => { setSession(null); setSessionState(null); clear(); setNotice(null) },
+    logout: () => { setSession(null); setSessionState(null); clear(); setNotice(null); if (EMBED) window.parent.postMessage({ type: 'logection:logout' }, location.origin) },
     bump: () => setEpoch((n) => n + 1),
     syncClock: () => { api.meta().then((mt) => { setServerTime(mt.server_time); setMeta(mt) }).catch(() => {}) },
   }), [session, me, meta, locations, epoch, fatal, notice, clear])

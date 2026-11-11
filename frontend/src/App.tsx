@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { TopBar } from './components/TopBar'
-import { ErrorNote } from './components/ui'
+import { EmbedBridge } from './components/EmbedBridge'
+import { ErrorNote, Loading } from './components/ui'
 import { I18nProvider, useI18n } from './i18n'
 import { Benefits } from './screens/Benefits'
 import { Confirm } from './screens/Confirm'
 import { Demo } from './screens/Demo'
 import { navFor, allowedRoute, defaultRoute, type Route } from './nav'
-import { Login } from './screens/Login'
+import { Workspace } from './screens/Workspace'
 import { Docks } from './screens/Docks'
 import { Exceptions } from './screens/Exceptions'
 import { Fleet } from './screens/Fleet'
@@ -14,6 +15,7 @@ import { Recommend } from './screens/Recommend'
 import { Request } from './screens/Request'
 import { Timeline } from './screens/Timeline'
 import { Tracking } from './screens/Tracking'
+import { EMBED } from './api'
 import { AppProvider, useApp } from './store'
 
 const ROUTES: Route[] = ['request', 'fleet', 'recommend', 'confirm', 'timeline', 'benefits', 'demo', 'tracking', 'exceptions', 'docks']
@@ -40,10 +42,12 @@ function Shell() {
   const role = me?.role ?? session?.role
   const route: Route = allowedRoute(role, wanted) ? wanted : defaultRoute(role) // đường dẫn không được phép → về mục mặc định
   useEffect(() => { document.documentElement.lang = lang }, [lang])
+  useEffect(() => { document.documentElement.classList.toggle('embed', EMBED) }, [])
   useEffect(() => { window.scrollTo(0, 0) }, [route])
-  if (!session) return <Login />
+  if (!session) return <main><Loading /></main> // chỉ xảy ra trong cửa sổ nhúng, lúc chờ trang bao ngoài đưa phiên vào
   return (
     <>
+      {EMBED && <EmbedBridge />}
       <TopBar />
       <nav className="nav-wrap" aria-label="Menu">
         <div className="nav">
@@ -69,5 +73,5 @@ function Shell() {
 }
 
 export default function App() {
-  return <I18nProvider><AppProvider><Shell /></AppProvider></I18nProvider>
+  return <I18nProvider>{EMBED ? <AppProvider><Shell /></AppProvider> : <Workspace />}</I18nProvider>
 }

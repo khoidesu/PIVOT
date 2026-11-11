@@ -140,12 +140,13 @@ def test_slot_at_wrong_location_is_rejected():
                            cutoff_at=NOW + timedelta(hours=9))
     window = SimpleNamespace(free_from=NOW, free_to=NOW + timedelta(hours=9))
     params = {"deadhead_minutes": 25, "transit_minutes": 90, "handling_minutes": 20}
-    good = SimpleNamespace(id="s", location_id="icd", remaining=2, source="mock", end_at=NOW + timedelta(hours=8))
+    start = NOW + timedelta(hours=1)
+    good = SimpleNamespace(id="s", location_id="icd", remaining=2, source="mock", start_at=start, end_at=NOW + timedelta(hours=8))
     assert gates.gate_slot(good, ship, window, NOW, params).status == "PASS"
-    bad = SimpleNamespace(id="s", location_id="elsewhere", remaining=2, source="mock", end_at=NOW + timedelta(hours=8))
+    bad = SimpleNamespace(id="s", location_id="elsewhere", remaining=2, source="mock", start_at=start, end_at=NOW + timedelta(hours=8))
     r = gates.gate_slot(bad, ship, window, NOW, params)
     assert (r.status, r.reason_code) == ("FAIL", gates.SLOT_LOCATION_MISMATCH)
-    late = SimpleNamespace(id="s", location_id="icd", remaining=2, source="mock", end_at=NOW + timedelta(minutes=30))
+    late = SimpleNamespace(id="s", location_id="icd", remaining=2, source="mock", start_at=start, end_at=NOW + timedelta(minutes=30))
     assert gates.gate_slot(late, ship, window, NOW, params).reason_code == gates.SLOT_WINDOW_MISSED
 
 

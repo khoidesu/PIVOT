@@ -80,7 +80,10 @@ def assign(session: Session, prop: m.Proposal, ship: m.Shipment, veh: m.Vehicle,
     docks = lock_docks(session, slot.node_org_id, slot.location_id)
     arrive = arrival_at_icd(session, prop) or slot.start_at
     earliest = max(slot.start_at, arrive)
-    found = find_window(session, docks, earliest, slot.end_at + OVERFLOW, max((d.handling_minutes for d in docks), default=30)) if docks else None
+    latest_start = slot.end_at + OVERFLOW
+    if ship.cutoff_at is not None:
+        latest_start = min(latest_start, ship.cutoff_at)  # khung dock không được bắt đầu sau giờ chốt của lô
+    found = find_window(session, docks, earliest, latest_start, max((d.handling_minutes for d in docks), default=30)) if docks else None
     if found is None:
         from ..incidents.service import raise_exception
         raise_exception(session, prop, "DOCK_CONGESTION", {"delay_minutes": 0, "reason": "NO_DOCK_WINDOW"}, now, source="event",
@@ -114,7 +117,11 @@ def on_eta_delay(session: Session, prop: m.Proposal, delay_minutes: int) -> None
         appt.suggested_dock_id = appt.suggested_start = appt.suggested_end = appt.suggestion_reason = None
         return
     docks = lock_docks(session, dock.node_org_id, dock.location_id)
-    found = find_window(session, docks, appt.eta_at, appt.eta_at + SUGGEST_HORIZON, dock.handling_minutes, exclude=appt.id)
+    ship = session.get(m.Shipment, prop.shipment_id)
+    horizon = appt.eta_at + SUGGEST_HORIZON
+    if ship is not None and ship.cutoff_at is not None:
+        horizon = min(horizon, ship.cutoff_at)  # không đề xuất khung sau cut-off (người quyết định xử lý ngoại lệ ETA)
+    found = find_window(session, docks, appt.eta_at, horizon, dock.handling_minutes, exclude=appt.id)
     if found:
         d, start = found
         appt.suggested_dock_id, appt.suggested_start = d.id, start

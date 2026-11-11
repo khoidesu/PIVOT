@@ -141,12 +141,17 @@ export class ApiError extends Error {
 }
 
 // Phiên đăng nhập lưu ở sessionStorage → MỖI TAB MỘT NGƯỜI (mở tab mới là chưa đăng nhập). Ngôn ngữ vẫn ở localStorage.
+// Chế độ nhúng (`?embed=1`): ứng dụng chạy trong một cửa sổ của không gian nhiều cửa sổ; phiên chỉ nằm trong bộ nhớ của khung
+// (trang bao ngoài đưa token vào qua postMessage) vì sessionStorage được chia sẻ giữa các khung cùng nguồn gốc.
+export const EMBED = typeof location !== 'undefined' && new URLSearchParams(location.search).get('embed') === '1'
 let session: Session | null = (() => {
+  if (EMBED) return null
   try { const raw = sessionStorage.getItem('pivot.session'); return raw ? (JSON.parse(raw) as Session) : null } catch { return null }
 })()
 export const getSession = () => session
 export function setSession(s: Session | null) {
   session = s
+  if (EMBED) return
   try { s ? sessionStorage.setItem('pivot.session', JSON.stringify(s)) : sessionStorage.removeItem('pivot.session') } catch { /* sessionStorage có thể bị chặn */ }
 }
 let onUnauthorized: (() => void) | null = null

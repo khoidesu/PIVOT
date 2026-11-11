@@ -16,7 +16,7 @@ SAFE_KEYS = {
     "PICKUP_WINDOW_MISSED": ("pickup_deadline",),
     "CUTOFF_RISK": ("cutoff_at",),
     "VEHICLE_UNAVAILABLE": ("reserved",),
-    "SLOT_FULL": (), "SLOT_WINDOW_MISSED": (), "SLOT_LOCATION_MISMATCH": (),
+    "SLOT_FULL": (), "SLOT_WINDOW_MISSED": (), "SLOT_LOCATION_MISMATCH": (), "SLOT_AFTER_CUTOFF": ("slot_start_at", "cutoff_at"),
     "MISSING_FIELD": ("missing",), "SHIPMENT_NOT_OPEN": ("status",), "ID_UNRESOLVED": (),
 }
 OWN_SHIPMENT_GATES = {"shipment_fresh", "shipment_open"}  # gate về chính lô của người xem → giữ nguyên

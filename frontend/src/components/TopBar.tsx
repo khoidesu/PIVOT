@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useData } from '../useData'
 import { api, ApiError, getAdminKey } from '../api'
+import { ageMinutes } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
 import { Chip, Hint } from './ui'
@@ -39,6 +40,27 @@ function Bell() {
   )
 }
 
+/** Nhà vận tải: nhắc ngay ở thanh đầu khi có xe quá hạn vị trí; bấm để gửi vị trí cả các xe đó (không cần mở bảng xe). */
+function StaleFleet() {
+  const { t } = useI18n()
+  const { me, meta } = useApp()
+  const vehicles = useData(() => api.vehicles(), 15000)
+  const [busy, setBusy] = useState(false)
+  const limit = meta?.stale_position_minutes ?? 5
+  const stale = (vehicles.data ?? []).filter((v) => v.tenant_id === me?.org_id && v.status !== 'offline' && (() => { const a = ageMinutes(v.position_updated_at); return a == null || a > limit })())
+  if (!stale.length) return null
+  async function fix() {
+    setBusy(true)
+    try { for (const v of stale) await api.sendVehicleEvent(v.id, 'VEHICLE_POSITION'); await new Promise((r) => setTimeout(r, 1600)); await vehicles.reload(true) }
+    finally { setBusy(false) }
+  }
+  return (
+    <button className="stale-chip" disabled={busy} title={t('bar.staleTip')} onClick={fix}>
+      {t('bar.stale', { n: stale.length, m: limit })} · <b>{t('bar.staleFix')}</b>
+    </button>
+  )
+}
+
 export function TopBar() {
   const { t, lang, setLang } = useI18n()
   const { me, meta, logout, bump } = useApp()
@@ -73,6 +95,7 @@ export function TopBar() {
           <Chip kind={sim ? 'sim' : 'good'}>● {sim ? t('badge.mock') : t('badge.live')}</Chip>
           {sim && <Hint text={t('badge.mockTip')} />}
         </div>
+        {me?.role === 'carrier' && <StaleFleet />}
         {me && <Bell />}
         {me && (
           <div className="menu-wrap" ref={wrap}>

@@ -34,7 +34,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 ```
 
-**Đăng nhập đơn giản: chỉ nhập tên + chọn vai trò** (không mật khẩu — chỉ dành cho demo). **Mỗi tab trình duyệt là MỘT người**; muốn thử nhiều bên (A, B khác nhau) thì mở thêm tab và đặt tên khác.
+**Đăng nhập đơn giản: chỉ nhập tên + chọn vai trò** (không mật khẩu — chỉ dành cho demo). **Một trang, nhiều người:** thanh dọc bên trái liệt kê từng người; bấm **+** để thêm (4 người của nhóm bấm một lần, hoặc "Mở cả chuỗi ba bên", hoặc tên khác để có bên A, B khác nhau). Mỗi người là một cửa sổ riêng (lưới / cột / tập trung, kéo để đổi chỗ, thu nhỏ vẫn chạy nền, số đỏ là việc đang chờ). Tối đa 8 người; bản cũ "mỗi tab một người" không còn cần thiết.
 - Vai trò: **Chủ hàng**, **Nhà vận tải**, **Điều hành ICD**, **Điều phối viên**.
 - Tên tự đặt. Cùng tên + cùng vai trò = cùng một tài khoản; **tên mới = tổ chức riêng + dữ liệu mẫu mô phỏng** (chủ hàng 4 lô, nhà vận tải 4 xe, ICD 8 slot), nên hai tab chủ hàng tên khác nhau là hai công ty tách biệt và ghép chéo được với nhau.
 - Tài khoản mẫu có sẵn (kịch bản demo/test dùng): **Nguyên, Phước** (Chủ hàng, tổ chức A) · **Minh** (Nhà vận tải, B) · **Khôi** (Điều hành ICD, C) · **Phú** (Điều phối viên) — đăng nhập đúng tên + vai trò đó thì vào các tài khoản này.
@@ -50,7 +50,7 @@ cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 
 ## Kiểm thử
 ```bash
-cd backend && .venv/bin/python -m pytest      # 204 test (DB test riêng: pivot_test)
+cd backend && .venv/bin/python -m pytest      # 240 test (DB test riêng: pivot_test)
 cd frontend && npm test && npx tsc --noEmit
 ```
 

@@ -4,6 +4,7 @@ import { RouteMap } from '../components/RouteMap'
 import { Chip, ErrorNote, Hint, Loading, More, Note } from '../components/ui'
 import { fmtTime } from '../fmt'
 import { useI18n } from '../i18n'
+import { allowedRoute } from '../nav'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
@@ -90,9 +91,18 @@ function EtaModelCard() {
 /** Màn trống: nói rõ vì sao (đề xuất chưa đủ 3 bên xác nhận) thay vì để người dùng tưởng hỏng. */
 function WaitingNote() {
   const { t } = useI18n()
+  const { me } = useApp()
   const props = useData(() => api.proposals(), 4000)
   const waiting = (props.data ?? []).filter((p) => p.status === 'pending_acceptance')
-  if (!waiting.length) return <div className="empty">{t('tk.empty')}</div>
+  if (!waiting.length) {
+    return (
+      <div className="empty stack" style={{ justifyItems: 'center' }}>
+        <b>{t('tk.emptyTitle')}</b>
+        <span className="muted">{t('tk.emptyHint')}</span>
+        {allowedRoute(me?.role, 'recommend') && <a className="btn primary" href="#/recommend">{t('tk.emptyCta')}</a>}
+      </div>
+    )
+  }
   const who = [...new Set(waiting.flatMap((p) => Object.entries(p.parties).filter(([, v]) => !v.accepted).map(([k]) => t(`party.${k}`))))].join(', ')
   return (
     <Note kind="warn">

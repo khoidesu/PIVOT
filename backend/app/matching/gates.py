@@ -23,6 +23,7 @@ DATA_STALE = "DATA_STALE"
 ID_UNRESOLVED = "ID_UNRESOLVED"
 SLOT_WINDOW_MISSED = "SLOT_WINDOW_MISSED"  # xe tới ICD sau khung giờ của slot
 SLOT_LOCATION_MISMATCH = "SLOT_LOCATION_MISMATCH"  # slot không ở điểm đến của lô
+SLOT_AFTER_CUTOFF = "SLOT_AFTER_CUTOFF"  # slot bắt đầu sau giờ cut-off của lô
 MISSING_FIELD = "MISSING_FIELD"
 OK = "OK"
 
@@ -147,6 +148,9 @@ def gate_slot(slot, shipment, window, now: datetime, params: dict) -> GateResult
         return GateResult("slot", "FAIL", SLOT_LOCATION_MISMATCH,
                           detail | {"slot_location_id": str(slot.location_id),
                                     "dest_location_id": str(shipment.dest_location_id)})
+    if shipment.cutoff_at is not None and slot.start_at > shipment.cutoff_at:  # lịch hẹn ở ICD phải nằm trước giờ chốt của lô
+        return GateResult("slot", "FAIL", SLOT_AFTER_CUTOFF,
+                          detail | {"slot_start_at": slot.start_at.isoformat(), "cutoff_at": shipment.cutoff_at.isoformat()})
     if slot.remaining <= 0:
         return GateResult("slot", "FAIL", SLOT_FULL, detail)
     eta = pickup_eta(window, shipment, now, params)
