@@ -2,13 +2,13 @@
 // "Kịch bản demo" không nằm ở menu chính mà ở menu avatar của Điều phối viên.
 import type { Role } from './api'
 
-export type Route = 'request' | 'fleet' | 'recommend' | 'confirm' | 'timeline' | 'benefits' | 'demo' | 'tracking' | 'exceptions'
+export type Route = 'request' | 'fleet' | 'recommend' | 'confirm' | 'timeline' | 'benefits' | 'demo' | 'tracking' | 'exceptions' | 'docks'
 
 const NAV: Record<Role, Route[]> = {
   shipper: ['request', 'fleet', 'recommend', 'confirm', 'tracking', 'exceptions', 'timeline', 'benefits'],
-  carrier: ['fleet', 'recommend', 'confirm', 'tracking', 'exceptions', 'timeline', 'benefits'],
-  node_operator: ['fleet', 'confirm', 'tracking', 'exceptions', 'timeline'],
-  dispatcher: ['fleet', 'recommend', 'confirm', 'tracking', 'exceptions', 'timeline', 'benefits'],
+  carrier: ['fleet', 'recommend', 'confirm', 'docks', 'tracking', 'exceptions', 'timeline', 'benefits'],
+  node_operator: ['fleet', 'confirm', 'docks', 'tracking', 'exceptions', 'timeline'],
+  dispatcher: ['fleet', 'recommend', 'confirm', 'docks', 'tracking', 'exceptions', 'timeline', 'benefits'],
 }
 // được vào bằng đường dẫn/nút dù không nằm ở menu (nhà vận tải có thể là forwarder tạo yêu cầu)
 const EXTRA: Record<Role, Route[]> = { shipper: [], carrier: ['request'], node_operator: [], dispatcher: ['demo'] }

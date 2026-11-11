@@ -102,6 +102,18 @@ export interface TripTrack {
   geofences: { code: string; lat: number; lng: number; radius_m: number }[]
   track?: { at: string; lat: number; lng: number; speed_kmh: number | null }[]
 }
+export interface DockAppt {
+  id: string; proposal_id: string; dock_id: string; dock_code: string; status: 'scheduled' | 'checked_in' | 'unloading' | 'completed' | 'no_show' | 'cancelled'
+  window_start: string; window_end: string; eta_at: string | null; checked_in_at: string | null; dwell_minutes: number | null; version: number
+  shipment_code: string; plate: string; late_minutes: number
+  suggestion: { dock_code: string | null; window_start: string; window_end: string; reason: string } | null
+  can_reschedule: boolean; can_accept_suggestion: boolean; can_check_in: boolean; can_start: boolean; can_complete: boolean
+}
+export interface DockBoard {
+  docks: { id: string; code: string; node_org_name: string | null; handling_minutes: number }[]
+  appointments: DockAppt[]; busy: { dock_id: string; window_start: string; window_end: string }[]
+  kpis: { dock_count: number; utilization_pct: number; queue: number; no_show: number; avg_dwell_minutes: number | null; scheduled: number }
+}
 export const SCENARIO_IDS = ['success', 'incompatible', 'stale', 'race', 'eta_change', 'duplicate_restart'] as const
 
 export class ApiError extends Error {
@@ -206,6 +218,9 @@ export const api = {
     post<{ cancelled_proposal_id: string; shipment_id: string; new_proposals: number }>(`/v1/proposals/${p.id}/replan`, { version: p.version }),
   notifications: () => request<NotificationList>('/v1/notifications'),
   readNotifications: () => post<{ ok: boolean }>('/v1/notifications/read', {}),
+  dockBoard: () => request<DockBoard>('/v1/docks/board'),
+  dockReschedule: (id: string, version: number, window_start: string, dock_id: string) => post<unknown>(`/v1/dock-appointments/${id}/reschedule`, { version, window_start, dock_id }),
+  dockAccept: (id: string, version: number) => post<unknown>(`/v1/dock-appointments/${id}/accept-suggestion`, { version }),
   benefits: () => request<BenefitList>('/v1/benefits'),
   benefit: (id: string) => request<Benefit>(`/v1/benefits/${id}`),
   verify: (id: string) => post<Benefit>(`/v1/benefits/${id}/verify`, {}),

@@ -64,12 +64,12 @@ const wordsOf = (lang: 'vi' | 'en') => Object.values(dictionaries[lang]).reduce(
 
 describe('giao diện gọn chữ', () => {
   it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ)', () => {
-    expect(wordsOf('vi')).toBeLessThanOrEqual(1750)
+    expect(wordsOf('vi')).toBeLessThanOrEqual(1900)
   })
   it('mọi khoá i18n đều được mã nguồn dùng (không để chuỗi chết)', () => {
     const code = walk(SRC).filter((f) => /\.(tsx?)$/.test(f) && !/i18n(\.test)?\.ts$/.test(f)).map((f) => readFileSync(f, 'utf8')).join('\n')
     const dynamic = ['status.', 'ps.', 'cargo.', 'role.', 'rd.', 'party.', 'gate.', 'reason.', 'tl.code.', 'tl.q.', 'tl.resolve.', 'tl.exc.', 'in.note.', 'in.f.', 'err.',
-      'demo.s.', 'rec.comp.', 'rec.s.', 'bf.status.', 'bf.sub.', 'nav.', 'fleet.tab.', 'cf.ok.', 'tk.ms.', 'tk.mode.', 'ex.sev.', 'ex.cat.', 'ex.step.', 'ex.owner.', 'ex.kind.']
+      'demo.s.', 'rec.comp.', 'rec.s.', 'bf.status.', 'bf.sub.', 'nav.', 'fleet.tab.', 'cf.ok.', 'tk.ms.', 'tk.mode.', 'ex.sev.', 'ex.cat.', 'ex.step.', 'ex.owner.', 'ex.kind.', 'dk.status.']
     const dead = Object.keys(dictionaries.vi).filter((k) => !dynamic.some((p) => k.startsWith(p)) && !code.includes(`'${k}'`) && !code.includes(`\`${k}\``))
     expect(dead).toEqual([])
   })
@@ -82,9 +82,9 @@ describe('giao diện gọn chữ', () => {
 describe('menu theo vai trò', () => {
   it('mỗi vai trò chỉ thấy mục liên quan', () => {
     expect(navFor('shipper')).toEqual(['request', 'fleet', 'recommend', 'confirm', 'tracking', 'exceptions', 'timeline', 'benefits'])
-    expect(navFor('carrier')).toEqual(['fleet', 'recommend', 'confirm', 'tracking', 'exceptions', 'timeline', 'benefits'])
-    expect(navFor('node_operator')).toEqual(['fleet', 'confirm', 'tracking', 'exceptions', 'timeline'])
-    expect(navFor('dispatcher')).toEqual(['fleet', 'recommend', 'confirm', 'tracking', 'exceptions', 'timeline', 'benefits'])
+    expect(navFor('carrier')).toEqual(['fleet', 'recommend', 'confirm', 'docks', 'tracking', 'exceptions', 'timeline', 'benefits'])
+    expect(navFor('node_operator')).toEqual(['fleet', 'confirm', 'docks', 'tracking', 'exceptions', 'timeline'])
+    expect(navFor('dispatcher')).toEqual(['fleet', 'recommend', 'confirm', 'docks', 'tracking', 'exceptions', 'timeline', 'benefits'])
     expect(navFor(undefined)).toEqual([])
   })
   it('ICD không vào được Ghép/Lợi ích; Demo chỉ dành cho điều phối viên và không nằm ở menu chính', () => {

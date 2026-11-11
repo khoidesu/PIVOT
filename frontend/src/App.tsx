@@ -7,6 +7,7 @@ import { Confirm } from './screens/Confirm'
 import { Demo } from './screens/Demo'
 import { navFor, allowedRoute, defaultRoute, type Route } from './nav'
 import { Login } from './screens/Login'
+import { Docks } from './screens/Docks'
 import { Exceptions } from './screens/Exceptions'
 import { Fleet } from './screens/Fleet'
 import { Recommend } from './screens/Recommend'
@@ -15,7 +16,7 @@ import { Timeline } from './screens/Timeline'
 import { Tracking } from './screens/Tracking'
 import { AppProvider, useApp } from './store'
 
-const ROUTES: Route[] = ['request', 'fleet', 'recommend', 'confirm', 'timeline', 'benefits', 'demo', 'tracking', 'exceptions']
+const ROUTES: Route[] = ['request', 'fleet', 'recommend', 'confirm', 'timeline', 'benefits', 'demo', 'tracking', 'exceptions', 'docks']
 
 function useHashRoute(): [Route, URLSearchParams, (to: string) => void] {
   const read = () => {
@@ -57,6 +58,7 @@ function Shell() {
         {route === 'recommend' && <Recommend go={go} query={query} />}
         {route === 'confirm' && <Confirm />}
         {route === 'tracking' && <Tracking query={query} />}
+        {route === 'docks' && <Docks />}
         {route === 'exceptions' && <Exceptions go={go} />}
         {route === 'timeline' && <Timeline query={query} />}
         {route === 'benefits' && <Benefits query={query} />}

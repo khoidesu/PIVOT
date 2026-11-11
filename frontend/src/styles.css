@@ -225,3 +225,19 @@ label.inline select { min-width: 220px; width: auto; }
 .bell-list { min-width: 280px; max-height: 360px; overflow: auto; }
 .bell-list .it { text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 8px; cursor: pointer; display: grid; gap: 2px; }
 .bell-list .it:hover { background: var(--teal-weak); } .bell-list .it.unread b::before { content: "● "; color: var(--fail); }
+
+/* ---- Lịch dock (Gantt bằng CSS grid) ---- */
+.kpis .chip { font-size: 13px; }
+.gantt-scroll { overflow-x: auto; }
+.gantt { min-width: 760px; display: grid; gap: 6px; }
+.g-head, .g-row { display: grid; grid-template-columns: 44px 1fr; gap: 8px; align-items: center; }
+.g-head .g-track { height: 18px; } .g-head i { position: absolute; transform: translateX(-50%); font-style: normal; font-size: 11px; color: var(--muted); }
+.g-track { position: relative; height: 44px; background: repeating-linear-gradient(90deg, #f3f6f7 0, #f3f6f7 calc(10% - 1px), var(--line) calc(10% - 1px), var(--line) 10%); border-radius: 8px; }
+.g-head .g-track { background: none; }
+.g-now { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--fail); z-index: 2; }
+.g-blk { position: absolute; top: 5px; height: 34px; border-radius: 6px; border: 1px solid var(--teal); background: var(--teal-weak); color: var(--teal-strong); font-size: 11px; font-weight: 600; overflow: hidden; white-space: nowrap; padding: 0 4px; cursor: pointer; z-index: 1; }
+.g-blk.checked_in, .g-blk.unloading { background: var(--unknown-bg); border-color: var(--unknown); color: var(--unknown); }
+.g-blk.completed { background: var(--pass-bg); border-color: var(--pass); color: var(--pass); }
+.g-blk.no_show { background: var(--fail-bg); border-color: var(--fail); color: var(--fail); }
+.g-blk.busy { background: repeating-linear-gradient(45deg, #e4e9eb, #e4e9eb 4px, #f3f6f7 4px, #f3f6f7 8px); border-color: var(--line); cursor: default; }
+.g-blk.sug { outline: 2px dashed var(--unknown); } .g-blk.sel { box-shadow: 0 0 0 2px var(--teal); }
