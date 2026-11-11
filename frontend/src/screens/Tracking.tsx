@@ -46,7 +46,9 @@ function SignalsBlock({ sig }: { sig: EtaSignals }) {
       <div className="row muted small">
         <Chip title={t('tk.road.tip')}>{t('eta.sig.route', { km: c.road_km, min: Math.round(c.free_flow_min) })}</Chip>
         <Chip>{t('eta.sig.truck', { f: c.truck_factor })}</Chip>
-        <Chip title={t('eta.sig.trafficTip')}>{t('eta.sig.traffic', { band: t(`eta.band.${sig.band ?? 'normal'}`), f: c.traffic_factor })}</Chip>
+        {c.traffic_kind === 'live'
+          ? <Chip kind={c.traffic_factor > 1.15 ? 'warn' : 'teal'} title={t('eta.sig.liveTip')}>{t('eta.sig.live', { f: c.traffic_factor })}</Chip>
+          : <Chip title={t('eta.sig.trafficTip')}>{t('eta.sig.traffic', { band: t(`eta.band.${sig.band ?? 'normal'}`), f: c.traffic_factor })}</Chip>}
         {w
           ? <Chip kind={c.weather_factor > 1 ? 'warn' : ''}>{t(w.precip_mm_h > 0 ? 'eta.sig.weather' : 'eta.sig.dry', { f: c.weather_factor, mm: w.precip_mm_h })}</Chip>
           : <Chip kind="warn">{t('eta.sig.noWeather')}</Chip>}
