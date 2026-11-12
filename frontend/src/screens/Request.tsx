@@ -9,7 +9,7 @@ import { useI18n } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
-const CAN_CREATE = new Set(['shipper', 'carrier'])
+const CAN_CREATE = new Set(['shipper']) // chỉ chủ hàng tạo/sửa lô (khớp API)
 // trường của bản nháp → trường của form (để đánh dấu "cần xem lại")
 const FORM_FIELD: Record<string, string> = { cargo_type: 'cargo_type', weight_kg: 'weight_kg', volume_m3: 'volume_m3', origin: 'origin', dest: 'dest', ready_at: 'ready', pickup_deadline: 'deadline', cutoff_at: 'cutoff' }
 const DRAFT_ORDER = ['cargo_type', 'weight_kg', 'volume_m3', 'origin', 'dest', 'ready_at', 'pickup_deadline', 'cutoff_at', 'price_vnd', 'customer_name'] as const

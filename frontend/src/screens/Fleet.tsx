@@ -9,7 +9,8 @@ import { useData } from '../useData'
 
 type Tab = 'lots' | 'vehicles' | 'slots'
 const CAN_MATCH = new Set(['shipper', 'carrier', 'dispatcher'])
-const CAN_EDIT = new Set(['shipper', 'carrier'])
+const CAN_EDIT = new Set(['shipper']) // tạo/sửa/huỷ lô: chỉ chủ hàng (khớp API)
+const SEES_PRICE = new Set(['shipper', 'carrier'])
 const firstTab = (role?: string): Tab => (role === 'carrier' ? 'vehicles' : role === 'node_operator' ? 'slots' : 'lots') // mặc định theo vai trò
 
 export function Fleet({ go }: { go: (to: string) => void }) {
@@ -25,6 +26,7 @@ export function Fleet({ go }: { go: (to: string) => void }) {
   const [error, setError] = useState<ApiError | null>(null)
   const staleLimit = meta?.stale_position_minutes ?? 5
   const canEdit = !!me && CAN_EDIT.has(me.role)
+  const seesPrice = !!me && SEES_PRICE.has(me.role)
 
   const guard = async (fn: () => Promise<void>) => {
     setError(null); setMsg(null)
@@ -67,13 +69,13 @@ export function Fleet({ go }: { go: (to: string) => void }) {
           {lots.data?.some((x) => x.status === 'cancelled') && <label className="check small"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />{t('fleet.showCancelled')}</label>}
           {visibleLots.length === 0 ? <div className="empty">{t('fleet.empty')}</div> : (
             <div className="table-wrap"><table>
-              <thead><tr><th>{t('col.lot')}</th><th className="num">{t('col.load')}</th><th>{t('col.due')}</th>{canEdit && <th className="num">{t('col.price')}</th>}<th>{t('col.status')}</th><th /></tr></thead>
+              <thead><tr><th>{t('col.lot')}</th><th className="num">{t('col.load')}</th><th>{t('col.due')}</th>{seesPrice && <th className="num">{t('col.price')}</th>}<th>{t('col.status')}</th><th /></tr></thead>
               <tbody>{visibleLots.map((s) => (
                 <tr key={s.id}>
                   <td><b>{s.code}</b><div className="muted small">{t(`cargo.${s.cargo_type}`)}</div></td>
                   <td className="num">{s.weight_kg == null ? '—' : `${fmtNum(s.weight_kg)} kg`}<div className="muted small">{s.volume_m3 == null ? '—' : `${s.volume_m3} m³`}</div></td>
                   <td className="nw">{fmtTime(s.pickup_deadline)}<div className="muted small">{fmtTime(s.cutoff_at)}</div></td>
-                  {canEdit && <td className="num">{s.price_vnd != null ? fmtVnd(s.price_vnd) : '—'}</td>}
+                  {seesPrice && <td className="num">{s.price_vnd != null ? fmtVnd(s.price_vnd) : '—'}</td>}
                   <td>
                     <Chip kind={s.status === 'open' ? 'teal' : s.status === 'completed' ? 'good' : undefined}>{t(`status.${s.status}`)}</Chip>
                     {s.missing_fields.length > 0 && <div><Chip kind="UNKNOWN" title={t('fleet.needsTip', { fields: s.missing_fields.join(', ') })}>{t('fleet.needs')}</Chip></div>}

@@ -59,6 +59,9 @@ const vi: Dict = {
   'reason.PICKUP_WINDOW_MISSED.short': 'Xe không kịp hạn lấy hàng {pickup_deadline}.',
   'reason.CUTOFF_RISK.short': 'Xe không kịp cut-off {cutoff_at}.',
   'reason.VEHICLE_UNAVAILABLE.short': 'Xe không khả dụng.',
+  'reason.CAPACITY_EXCEEDED.short.weight': 'Lô {weight_kg} kg vượt trọng tải xe này.',
+  'reason.CAPACITY_EXCEEDED.short.volume': 'Lô {volume_m3} m³ vượt thể tích xe này.',
+  'reason.SLOT_WINDOW_MISSED.short': 'Không kịp slot (hết {slot_end_at}).',
   'reason.CAPACITY_EXCEEDED': 'Lô {weight_kg} kg / {volume_m3} m³ vượt tải xe ({capacity_kg} kg / {capacity_m3} m³).',
   'reason.CARGO_INCOMPATIBLE': 'Hàng "{cargo_type}" không phù hợp; xe chỉ chở: {vehicle_accepts}.',
   'reason.DATA_STALE': 'Vị trí xe đã {age_minutes} phút, quá giới hạn {limit_minutes} phút — không tự đề xuất.',
@@ -110,6 +113,10 @@ const vi: Dict = {
   'tk.mode.breakdown': 'Hỏng xe',
   'tk.mode.detour': 'Đi lệch tuyến',
   'tk.ms.ASSIGNED': 'Đã phân xe',
+  'tk.done.ask': 'Đã tới ICD. Hoàn tất chuyến để ghi lợi ích.',
+  'tk.done.wait': 'Đã tới ICD. Chờ nhà vận tải bấm hoàn tất.',
+  'tk.done.km': 'Km rỗng thực tế',
+  'tk.done.btn': 'Hoàn tất chuyến',
   'tk.ms.AT_PICKUP': 'Tới điểm lấy',
   'tk.ms.DEPARTED_PICKUP': 'Rời điểm lấy',
   'tk.ms.AT_ICD_GATE': 'Tới cổng ICD',
@@ -442,6 +449,14 @@ const vi: Dict = {
   'rec.holding': 'Đang giữ…',
   'rec.noAction': 'Chỉ chủ hàng hoặc điều phối viên giữ slot.',
   'rec.rejected': 'Xe bị loại ({n})',
+  'rec.breakdown': 'Xe theo lý do loại',
+  'pf.title': 'Kiểm tra trước',
+  'pf.lot': 'Lô {n}′',
+  'pf.pickup': 'Hạn lấy {t}',
+  'pf.cutoff': 'Cut-off {t}',
+  'pf.gps': 'GPS cũ {n}/{m} xe',
+  'pf.past': 'Mốc giờ đã qua: làm mới không giúp, sửa giờ lô.',
+  'pf.edit': 'Sửa giờ lô',
   'rec.unknown': 'Thiếu dữ liệu ({n})',
   'rec.comp.fit': 'Lấp đầy',
   'rec.comp.time_margin': 'Dư thời gian',
@@ -529,6 +544,7 @@ const vi: Dict = {
   'bf.sub.measured': 'Nhà vận tải báo số đo thực',
   'bf.sub.verified': 'Đối tác độc lập đã xác nhận',
   'bf.empty': 'Chưa có chuyến hoàn tất.',
+  'bf.emptyHow': 'Chỉ ghi khi nhà vận tải bấm “Hoàn tất chuyến” sau khi tới ICD.',
   'bf.col.trip': 'Chuyến',
   'bf.col.km': 'Km rỗng',
   'bf.col.net': 'Lợi ích',
@@ -661,6 +677,9 @@ const en: Dict = {
   'reason.PICKUP_WINDOW_MISSED.short': 'The vehicle cannot make the {pickup_deadline} pickup deadline.',
   'reason.CUTOFF_RISK.short': 'The vehicle cannot make the {cutoff_at} cut-off.',
   'reason.VEHICLE_UNAVAILABLE.short': 'The vehicle is unavailable.',
+  'reason.CAPACITY_EXCEEDED.short.weight': 'Lot {weight_kg} kg exceeds this vehicle\'s weight limit.',
+  'reason.CAPACITY_EXCEEDED.short.volume': 'Lot {volume_m3} m³ exceeds this vehicle\'s volume.',
+  'reason.SLOT_WINDOW_MISSED.short': 'The vehicle cannot make the slot window (ends {slot_end_at}).',
   'reason.CAPACITY_EXCEEDED': 'Lot {weight_kg} kg / {volume_m3} m³ exceeds vehicle capacity ({capacity_kg} kg / {capacity_m3} m³).',
   'reason.CARGO_INCOMPATIBLE': 'Cargo "{cargo_type}" is incompatible; vehicle carries only: {vehicle_accepts}.',
   'reason.DATA_STALE': 'Vehicle position is {age_minutes} min old, over the {limit_minutes} min limit — not auto-proposed.',
@@ -712,6 +731,10 @@ const en: Dict = {
   'tk.mode.breakdown': 'Breakdown',
   'tk.mode.detour': 'Off route',
   'tk.ms.ASSIGNED': 'Assigned',
+  'tk.done.ask': 'At the ICD. Complete the trip to record the benefit.',
+  'tk.done.wait': 'At the ICD. Waiting for the carrier to complete the trip.',
+  'tk.done.km': 'Actual empty km',
+  'tk.done.btn': 'Complete trip',
   'tk.ms.AT_PICKUP': 'At pickup',
   'tk.ms.DEPARTED_PICKUP': 'Left pickup',
   'tk.ms.AT_ICD_GATE': 'At ICD gate',
@@ -1044,6 +1067,14 @@ const en: Dict = {
   'rec.holding': 'Holding…',
   'rec.noAction': 'Only the shipper or a dispatcher holds slots.',
   'rec.rejected': 'Rejected vehicles ({n})',
+  'rec.breakdown': 'Vehicles by rejection reason',
+  'pf.title': 'Pre-check',
+  'pf.lot': 'Lot {n}′',
+  'pf.pickup': 'Pickup by {t}',
+  'pf.cutoff': 'Cut-off {t}',
+  'pf.gps': 'Stale GPS {n}/{m} vehicles',
+  'pf.past': 'The lot\'s deadlines have passed: refreshing won\'t help, edit the times.',
+  'pf.edit': 'Edit lot times',
   'rec.unknown': 'Needs data ({n})',
   'rec.comp.fit': 'Fill',
   'rec.comp.time_margin': 'Time margin',
@@ -1131,6 +1162,7 @@ const en: Dict = {
   'bf.sub.measured': 'Carrier reported a real measurement',
   'bf.sub.verified': 'An independent party confirmed it',
   'bf.empty': 'No completed trips yet.',
+  'bf.emptyHow': 'Recorded only when the carrier presses “Complete trip” after reaching the ICD.',
   'bf.col.trip': 'Trip',
   'bf.col.km': 'Empty km',
   'bf.col.net': 'Benefit',
@@ -1231,9 +1263,16 @@ export function reasonText(item: GateItem, t: TFn, fmtTime: (iso: string) => str
   if (item.reason_code === 'DATA_STALE' && d.subject === 'shipment') key = 'reason.DATA_STALE.shipment'
   if (item.reason_code === 'VEHICLE_UNAVAILABLE' && d.reserved) key = 'reason.VEHICLE_UNAVAILABLE.reserved'
   if (d.redacted && `${key}.short` in dictionaries.vi) key = `${key}.short` // dữ liệu đội xe của tổ chức khác đã được che
+  const over = Array.isArray(d.over) && d.over.length === 1 ? `${key}.${d.over[0]}` : ''
+  if (d.redacted && over in dictionaries.vi) key = over // nói rõ vượt trọng lượng hay thể tích
   if (!(key in dictionaries.vi)) key = 'reason.unknown'
+  // Phòng vệ: template cần trường đã bị che/thiếu → dùng bản rút gọn, rồi câu chung; không bao giờ lộ "{placeholder}".
+  const fits = (k: string) => k in dictionaries.vi && placeholders(dictionaries.vi[k]).every((p) => p in params)
+  if (!fits(key)) key = [`reason.${item.reason_code}.short`, 'reason.unknown'].find(fits) ?? 'reason.unknown'
   return t(key, params)
 }
+
+const placeholders = (tpl: string) => [...tpl.matchAll(/\{(\w+)\}/g)].map((m) => m[1])
 
 interface Ctx { lang: Lang; setLang: (l: Lang) => void; t: TFn }
 const I18nContext = createContext<Ctx>({ lang: 'vi', setLang: () => {}, t: (k) => k })

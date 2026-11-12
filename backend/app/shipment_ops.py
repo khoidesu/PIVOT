@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import models as m
+from .access import CAN_EDIT_SHIPMENT
 from .auth import Actor
 from .booking.service import BookingError
 
@@ -25,14 +26,15 @@ LOCKING = ("pending_acceptance", "confirmed", "executing")
 SENSITIVE = {"price_vnd", "customer_name"}
 
 
-def _lock(session: Session, actor: Actor, shipment_id: uuid.UUID) -> tuple[m.Shipment, list[m.Proposal]]:
+def _lock(session: Session, actor: Actor, shipment_id: uuid.UUID,
+          roles: frozenset = frozenset(CAN_EDIT_SHIPMENT)) -> tuple[m.Shipment, list[m.Proposal]]:
     # thứ tự khoá cố định proposal → shipment (cùng thứ tự với hold/accept) để không deadlock với giữ chỗ song song
     props = session.execute(select(m.Proposal).where(m.Proposal.shipment_id == shipment_id)
                             .order_by(m.Proposal.id).with_for_update()).scalars().all()
     ship = session.execute(select(m.Shipment).where(m.Shipment.id == shipment_id).with_for_update()).scalar_one_or_none()
     if ship is None or ship.tenant_id != actor.org_id and actor.role != "dispatcher":
         raise BookingError("NOT_FOUND", "Shipment not found", 404)
-    if actor.role not in ("shipper", "carrier") or ship.tenant_id != actor.org_id:
+    if actor.role not in roles or ship.tenant_id != actor.org_id:
         raise BookingError("FORBIDDEN", "Only the owner can modify a shipment", 403)
     return ship, props
 
@@ -94,7 +96,7 @@ def refresh(session: Session, actor: Actor, shipment_id: uuid.UUID, now: datetim
     Không đổi nội dung, không tăng version, không vô hiệu đề xuất (không có đầu vào nào đổi). Có ghi audit
     SHIPMENT_REFRESHED để thấy ai xác nhận lúc nào; vẫn bị khoá khi lô đã giữ/cam kết.
     """
-    ship, props = _lock(session, actor, shipment_id)
+    ship, props = _lock(session, actor, shipment_id, roles=frozenset({"shipper", "carrier"}))
     _ensure_unlocked(ship, props, now)
     ship.data_updated_at = now
     _audit(session, actor, ship, "SHIPMENT_REFRESHED", {"version": ship.version}, now)

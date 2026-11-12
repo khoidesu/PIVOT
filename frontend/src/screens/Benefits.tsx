@@ -49,7 +49,7 @@ export function Benefits({ query }: { query: URLSearchParams }) {
       </section>
 
       {list.error && <ErrorNote error={list.error} />}
-      {list.loading && !list.data ? <Loading /> : items.length === 0 ? <div className="card empty">{t('bf.empty')}</div> : (
+      {list.loading && !list.data ? <Loading /> : items.length === 0 ? <div className="card empty stack"><span>{t('bf.empty')}</span><span className="small muted">{t('bf.emptyHow')}</span><a className="btn sm" href="#/tracking">{t('nav.tracking')}</a></div> : (
         <div className="grid2" style={{ alignItems: 'start' }}>
           <section className="card">
             <div className="table-wrap"><table>

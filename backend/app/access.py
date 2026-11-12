@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 from . import models as m
 from .auth import Actor
 
-CAN_CREATE_SHIPMENT = {"shipper", "carrier"}
+# 12/11/2026 (BUG-02): chỉ chủ hàng tạo/sửa/huỷ lô; nhà vận tải quản lý xe, không tự tạo lô (thay quyết định "carrier = forwarder").
+CAN_CREATE_SHIPMENT = {"shipper"}
+CAN_EDIT_SHIPMENT = {"shipper"}
 
 
 def _participant_ids(actor: Actor):

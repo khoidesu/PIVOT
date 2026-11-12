@@ -39,6 +39,35 @@ describe('i18n', () => {
       expect(txt).not.toMatch(/capacity_kg/)
     }
   })
+  it('BUG-01: SLOT_WINDOW_MISSED đầy đủ / bị che / thiếu trường không bao giờ lộ placeholder', () => {
+    const iso = '2026-11-12T09:00:00+07:00'
+    for (const lang of ['vi', 'en'] as const) {
+      const t = (k: string, p?: Record<string, string | number>) => translate(lang, k, p)
+      const r = (detail: Record<string, unknown>) => reasonText({ gate: 'slot', status: 'FAIL', reason_code: 'SLOT_WINDOW_MISSED', detail }, t, () => '09:00')
+      const full = r({ eta_icd: iso, slot_end_at: iso })                       // nhà vận tải chủ xe
+      const redacted = r({ slot_end_at: iso, redacted: true })                // chủ hàng: chỉ giờ của slot, không có ETA xe bên khác
+      const missing = r({ redacted: true })                                   // field thiếu ngoài dự kiến
+      for (const txt of [full, redacted, missing]) expect(txt, `${lang}: ${txt}`).not.toMatch(/\{\w+\}/)
+      expect(redacted).toContain('09:00')
+      expect(missing.length).toBeGreaterThan(5)
+    }
+  })
+  it('mọi template lý do: thiếu hết dữ kiện vẫn ra câu đọc được (phòng vệ redaction)', () => {
+    const t = (k: string, p?: Record<string, string | number>) => translate('vi', k, p)
+    const codes = Object.keys(dictionaries.vi).filter((k) => /^reason\.[A-Z_]+$/.test(k)).map((k) => k.slice(7))
+    for (const code of codes) {
+      for (const detail of [{}, { redacted: true }]) expect(reasonText({ gate: 'x', status: 'FAIL', reason_code: code, detail }, t, (x) => x), code).not.toMatch(/\{\w+\}/)
+    }
+  })
+  it('BUG-03: chủ hàng thấy vượt thể tích hay trọng lượng, không thấy capacity xe', () => {
+    for (const lang of ['vi', 'en'] as const) {
+      const t = (k: string, p?: Record<string, string | number>) => translate(lang, k, p)
+      const vol = reasonText({ gate: 'capacity', status: 'FAIL', reason_code: 'CAPACITY_EXCEEDED', detail: { weight_kg: 1000, volume_m3: 30, over: ['volume'], redacted: true } }, t, (x) => x)
+      expect(vol).toContain('30 m³'); expect(vol).not.toContain('1000'); expect(vol).toMatch(/thể tích|volume/)
+      const kg = reasonText({ gate: 'capacity', status: 'FAIL', reason_code: 'CAPACITY_EXCEEDED', detail: { weight_kg: 30000, volume_m3: 30, over: ['weight'], redacted: true } }, t, (x) => x)
+      expect(kg).toContain('30000'); expect(kg).toMatch(/trọng tải|weight/)
+    }
+  })
   it('mọi mã ghi chú nhập liệu và mã lỗi mới đều có bản dịch', () => {
     for (const lang of ['vi', 'en'] as const) {
       for (const n of ['MISSING', 'AMBIGUOUS', 'QUOTE_NOT_FOUND_IN_SOURCE', 'INVALID_VALUE', 'RELATIVE_DATE_ASSUMED', 'TIME_ORDER_INVALID']) expect(dictionaries[lang][`in.note.${n}`], `${lang}:${n}`).toBeTruthy()
@@ -63,8 +92,8 @@ const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).fl
 const wordsOf = (lang: 'vi' | 'en') => Object.values(dictionaries[lang]).reduce((n, v) => n + v.split(/\s+/).filter(Boolean).length, 0)
 
 describe('giao diện gọn chữ', () => {
-  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ; nới 2.000 → 2.200 khi thêm ETA tín hiệu thật, nhiều cửa sổ, màn Xác nhận mới; 2.300 khi thêm đọc ảnh; 2.330 khi thêm cảnh báo bản nháp: thiếu/nhiều lô/sai thứ/giờ đã qua; 2.345 khi thêm hero màn bắt đầu; 2.430 khi thêm trang mở đầu + hướng dẫn 4 bước; 2.465 khi thêm đọc PDF + lỗi tệp PDF; 2.500 khi thêm thông báo giới hạn lượt theo IP/toàn hệ thống mỗi phút)', () => {
-    expect(wordsOf('vi')).toBeLessThanOrEqual(2500)
+  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ; nới 2.000 → 2.200 khi thêm ETA tín hiệu thật, nhiều cửa sổ, màn Xác nhận mới; 2.300 khi thêm đọc ảnh; 2.330 khi thêm cảnh báo bản nháp: thiếu/nhiều lô/sai thứ/giờ đã qua; 2.345 khi thêm hero màn bắt đầu; 2.430 khi thêm trang mở đầu + hướng dẫn 4 bước; 2.465 khi thêm đọc PDF + lỗi tệp PDF; 2.500 khi thêm thông báo giới hạn lượt theo IP/toàn hệ thống mỗi phút; 2.600 khi sửa BUG_REPORT 12/11: lý do loại theo trọng lượng/thể tích + slot, bảng lý do, kiểm tra trước khi ghép, hướng dẫn hoàn tất chuyến)', () => {
+    expect(wordsOf('vi')).toBeLessThanOrEqual(2600)
   })
   it('mọi khoá i18n đều được mã nguồn dùng (không để chuỗi chết)', () => {
     const code = walk(SRC).filter((f) => /\.(tsx?)$/.test(f) && !/i18n(\.test)?\.ts$/.test(f)).map((f) => readFileSync(f, 'utf8')).join('\n')
@@ -94,8 +123,10 @@ describe('menu theo vai trò', () => {
     expect(allowedRoute('dispatcher', 'demo')).toBe(true)
     expect(navFor('dispatcher')).not.toContain('demo')
   })
-  it('nhà vận tải vào được "Yêu cầu" (forwarder) dù không ở menu; điều phối viên không tạo được yêu cầu', () => {
-    expect(allowedRoute('carrier', 'request')).toBe(true)
+  it('chỉ chủ hàng vào được "Yêu cầu": nhà vận tải (kể cả deep link) và điều phối viên không tạo lô (BUG-02)', () => {
+    expect(allowedRoute('shipper', 'request')).toBe(true)
+    expect(allowedRoute('carrier', 'request')).toBe(false)
+    expect(allowedRoute('node_operator', 'request')).toBe(false)
     expect(allowedRoute('dispatcher', 'request')).toBe(false)
   })
   it('mục mặc định theo vai trò', () => {

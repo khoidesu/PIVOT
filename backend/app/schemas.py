@@ -25,6 +25,7 @@ class MetaOut(BaseModel):
     is_simulated: bool
     server_time: datetime
     stale_position_minutes: int
+    stale_shipment_minutes: int = 60
     admin_key_required: bool = False
     image_intake_enabled: bool = False
     pdf_intake_enabled: bool = False

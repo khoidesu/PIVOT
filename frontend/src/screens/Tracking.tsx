@@ -89,6 +89,40 @@ function EtaModelCard() {
 }
 
 /** Màn trống: nói rõ vì sao (đề xuất chưa đủ 3 bên xác nhận) thay vì để người dùng tưởng hỏng. */
+/** Bước còn thiếu để có lợi ích (BUG-05): tới ICD / dỡ hàng KHÔNG tự ghi sổ; chỉ TRIP_COMPLETED của nhà vận tải mới ghi.
+ *  Km rỗng thực tế tuỳ chọn: có → dòng "đã đo", để trống → "ước tính". Số liệu vẫn là mô phỏng. */
+function CompleteTrip({ trip, isCarrier, onDone }: { trip: TripTrack; isCarrier: boolean; onDone: () => Promise<void> }) {
+  const { t } = useI18n()
+  const [km, setKm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<ApiError | null>(null)
+  const [sent, setSent] = useState(false)
+  const atIcd = trip.milestones.some((m) => m.code === 'AT_ICD_GATE' && m.reached)
+  if (trip.status !== 'executing' || !atIcd) return null
+  if (!isCarrier) return <Note kind="info">{t('tk.done.wait')}</Note>
+  async function send() {
+    setBusy(true); setErr(null)
+    try {
+      await api.sendEvent(trip.proposal_id, 'TRIP_COMPLETED', km.trim() === '' ? {} : { actual_empty_km: Number(km) })
+      setSent(true); await onDone()
+    } catch (e) { setErr(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) } finally { setBusy(false) }
+  }
+  return (
+    <Note kind="warn">
+      <div className="stack">
+        <span>{t('tk.done.ask')}</span>
+        <div className="row">
+          <label className="inline small">{t('tk.done.km')}
+            <input type="number" min={0} max={500} step={0.1} value={km} onChange={(e) => setKm(e.target.value)} style={{ width: '6rem' }} /></label>
+          <button className="btn sm primary" disabled={busy || sent} onClick={send}>{t('tk.done.btn')}</button>
+          {sent && <a className="btn sm" href="#/benefits">{t('nav.benefits')}</a>}
+        </div>
+        {err && <ErrorNote error={err} />}
+      </div>
+    </Note>
+  )
+}
+
 function WaitingNote() {
   const { t } = useI18n()
   const { me } = useApp()
@@ -170,6 +204,7 @@ export function Tracking({ query }: { query: URLSearchParams }) {
             <div className="row">
               {trip.milestones.map((ms) => <Chip key={ms.code} kind={ms.reached ? 'good' : ''}>{ms.reached ? '✓ ' : ''}{t(`tk.ms.${ms.code}`)}</Chip>)}
             </div>
+            <CompleteTrip trip={trip} isCarrier={me?.role === 'carrier'} onDone={async () => { await detail.reload(true); await list.reload(true) }} />
             <EtaBlock trip={trip} />
             {trip.eta_signals && <SignalsBlock sig={trip.eta_signals} />}
             {canSim && (

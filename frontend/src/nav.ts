@@ -10,8 +10,8 @@ const NAV: Record<Role, Route[]> = {
   node_operator: ['fleet', 'confirm', 'docks', 'tracking', 'exceptions', 'timeline'],
   dispatcher: ['fleet', 'recommend', 'confirm', 'docks', 'tracking', 'exceptions', 'timeline', 'benefits'],
 }
-// được vào bằng đường dẫn/nút dù không nằm ở menu (nhà vận tải có thể là forwarder tạo yêu cầu)
-const EXTRA: Record<Role, Route[]> = { shipper: [], carrier: ['request'], node_operator: [], dispatcher: ['demo'] }
+// được vào bằng đường dẫn/nút dù không nằm ở menu. Nhà vận tải KHÔNG vào được "request" (12/11: chỉ chủ hàng tạo lô; deep link về mặc định)
+const EXTRA: Record<Role, Route[]> = { shipper: [], carrier: [], node_operator: [], dispatcher: ['demo'] }
 
 export const navFor = (role: string | undefined): Route[] => (role && NAV[role as Role]) || []
 export const defaultRoute = (role: string | undefined): Route => (role === 'shipper' ? 'request' : 'fleet')

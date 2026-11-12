@@ -89,7 +89,8 @@ def gate_capacity(shipment, vehicle) -> GateResult:
     over_kg = shipment.weight_kg > vehicle.capacity_kg
     over_m3 = shipment.volume_m3 > vehicle.capacity_m3
     detail = {"weight_kg": shipment.weight_kg, "capacity_kg": vehicle.capacity_kg,
-              "volume_m3": shipment.volume_m3, "capacity_m3": vehicle.capacity_m3}
+              "volume_m3": shipment.volume_m3, "capacity_m3": vehicle.capacity_m3,
+              "over": [k for k, hit in (("weight", over_kg), ("volume", over_m3)) if hit]}  # vượt trọng lượng hay thể tích (không lộ capacity)
     if over_kg or over_m3:
         return GateResult("capacity", "FAIL", CAPACITY_EXCEEDED, detail)
     return GateResult("capacity", "PASS", OK, detail)

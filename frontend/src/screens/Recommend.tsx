@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, type GateItem, type MatchRun, type Proposal, type Rejection } from '../api'
 import { Chip, ErrorNote, Loading, More, Note } from '../components/ui'
-import { fmtNum, fmtTime, fmtVnd } from '../fmt'
+import { fmtNum, fmtTime, fmtVnd, nowMs } from '../fmt'
+import { preflight } from '../preflight'
 import { reasonText, useI18n, type TFn } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
@@ -46,6 +47,13 @@ function RejectionList({ title, items, kind }: { title: string; items: Rejection
   )
 }
 
+/** Số xe theo từng mã lý do: "22 xe đã xét" ≠ "22 xe quá tải" (một xe có thể trượt nhiều điều kiện). */
+export function reasonBreakdown(items: Rejection[]): [string, number][] {
+  const n = new Map<string, number>()
+  for (const r of items) for (const code of new Set(r.reasons.map((x) => x.reason_code))) n.set(code, (n.get(code) ?? 0) + 1)
+  return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+}
+
 function ProposalCard({ p, rank, onHold, busy }: { p: Proposal; rank: number; onHold: (p: Proposal) => void; busy: boolean }) {
   const { t } = useI18n()
   const c = p.score_components
@@ -83,7 +91,7 @@ function ProposalCard({ p, rank, onHold, busy }: { p: Proposal; rank: number; on
 
 export function Recommend({ go, query }: { go: (to: string) => void; query: URLSearchParams }) {
   const { t } = useI18n()
-  const { me } = useApp()
+  const { me, meta } = useApp()
   const lots = useData(() => api.shipments())
   const open = (lots.data ?? []).filter((s) => s.status === 'open')
   const [lotId, setLotId] = useState(query.get('lot') ?? '')
@@ -115,6 +123,8 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
   }
 
   const allowed = me ? CAN_MATCH.has(me.role) : false
+  const lot = open.find((s) => s.id === lotId)
+  const pf = lot ? preflight(lot, vehicles.data ?? [], nowMs(), meta?.stale_shipment_minutes ?? 60, meta?.stale_position_minutes ?? 5) : null
   async function doRun() {
     setBusy(true); setError(null)
     try { setRun(await api.match(lotId, nodeId)) }
@@ -149,6 +159,20 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
             <button className="btn primary" onClick={doRun} disabled={!allowed || busy || !lotId}>{busy ? t('rec.running') : t('rec.run')}</button>
           </div>
         )}
+        {pf && lot && (
+          <div className="stack">
+            <div className="row small" aria-label={t('pf.title')}>
+              <span className="muted">{t('pf.title')}:</span>
+              <Chip kind={pf.lotStale ? 'warn' : 'good'}>{t('pf.lot', { n: pf.lotAge })}</Chip>
+              <Chip kind={pf.pickupPassed ? 'bad' : 'good'}>{t('pf.pickup', { t: fmtTime(lot.pickup_deadline) })}</Chip>
+              <Chip kind={pf.cutoffPassed ? 'bad' : 'good'}>{t('pf.cutoff', { t: fmtTime(lot.cutoff_at) })}</Chip>
+              {pf.gpsTotal > 0 && <Chip kind={pf.gpsStale ? 'warn' : 'good'}>{t('pf.gps', { n: pf.gpsStale, m: pf.gpsTotal })}</Chip>}
+            </div>
+            {(pf.pickupPassed || pf.cutoffPassed) && (
+              <Note kind="warn">{t('pf.past')}{' '}
+                {me?.role === 'shipper' && lot.tenant_id === me.org_id && <button className="btn sm" onClick={() => go(`/request?edit=${lot.id}`)}>{t('pf.edit')}</button>}
+              </Note>)}
+          </div>)}
       </section>
 
       {error && <ErrorNote error={error} />}
@@ -158,6 +182,11 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
           <Note kind={run.status === 'proposals' ? 'ok' : run.status === 'needs_data' ? 'warn' : 'err'}>
             {t(`rec.s.${run.status}`, { n: run.proposals.length, v: run.evaluated_vehicles })}
           </Note>
+          {run.rejections.length > 0 && (
+            <div className="small" aria-label={t('rec.breakdown')}>
+              <span className="muted">{t('rec.breakdown')}:</span>{' '}
+              {reasonBreakdown(run.rejections).map(([code, n], i) => <span key={code}>{i > 0 && ' · '}<span className="code">{code}</span> <b>{n}</b></span>)}
+            </div>)}
           {(staleLot || staleVeh) && (
             <Note kind="warn">
               <div className="stack">

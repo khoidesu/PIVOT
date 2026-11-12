@@ -217,7 +217,8 @@ def test_incomplete_draft_cannot_create_a_valid_shipment_and_a_reviewed_one_reco
         assert ev.payload["draft_id"] == good["draft_id"] and ev.payload["reviewed_by"]
     other = client.post("/v1/shipments", json=_body_from_draft(client, good, code="LOT-DRAFT-2", draft_id="00000000-0000-0000-0000-000000000000"), headers=auth("shipper_a"))
     assert other.status_code == 422                                              # draft_id không tồn tại
-    foreign = client.post("/v1/shipments", json=_body_from_draft(client, good, code="LOT-DRAFT-3"), headers=auth("carrier_b"))
+    stranger = client.post("/v1/auth/login", json={"name": "Chủ hàng khác", "role": "shipper"}).json()["token"]  # chủ hàng tổ chức khác
+    foreign = client.post("/v1/shipments", json=_body_from_draft(client, good, code="LOT-DRAFT-3"), headers=auth(stranger))
     assert foreign.status_code == 422                                            # bản nháp của tổ chức khác không dùng được
 
 
