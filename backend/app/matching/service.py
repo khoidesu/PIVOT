@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from .. import models as m
 from ..assumptions import get_active
 from ..auth import Actor
+from .. import nodes
 from ..booking import service as bk
 from ..eta import baseline as eta_mod
 from . import gates, score
@@ -94,6 +95,7 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
         raise HTTPException(status_code=409, detail={"code": "SHIPMENT_NOT_OPEN",
                                                      "message": f"Shipment is '{shipment.status}'"})
     bk.expire_stale(session, now)  # tài nguyên hết hạn phải được trả về trước khi ghép
+    nodes.ensure_supply(session, now)  # lịch slot MÔ PHỎNG của mọi ICD còn phía trước (slot sinh ra vẫn qua hard gate như mọi slot)
     aset = get_active(session)
     params = aset.params
     run_id = str(uuid.uuid4())

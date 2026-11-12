@@ -57,6 +57,8 @@ cd frontend && npm test && npx tsc --noEmit
 
 **Đội xe + sandbox lợi ích** (12–13/11): nhà vận tải đăng nhập → vị trí + khung rảnh của xe rảnh được làm tươi tự động (sự kiện thật, 2 phút/lần khi tab mở; xe offline/đang giữ/chạy không bị đụng tới); màn Đội xe gom xe theo bãi đang đậu, hiện khoảng cách ước tính tới điểm lấy; `cd backend && .venv/bin/python -m app.sandbox.run --n 100 --seed 42 --out ../docs/SANDBOX_REPORT.md` chạy **100 ca mô phỏng** so xe điểm cao nhất với cách chọn khác (cùng đường code ghép thật, không ghi DB; xem thẻ "Mô phỏng 100 ca" ở màn Lợi ích).
 
+**Slot ICD mô phỏng tự duy trì**: ICD đăng nhập / mở tab / lúc ghép → lịch slot `mock` được kéo dài tới ~10 giờ phía trước (không đụng slot đã có, không nới hard gate, slot thật không bao giờ bị sinh) — hết cảnh "không có phương án khả thi" chỉ vì slot mẫu đã qua giờ.
+
 **ETA Sandbox** (công cụ nội bộ để thử/tinh chỉnh ETA trước khi chốt demo, không cần bật server/DB): `cd backend && .venv/bin/python -m app.eta_sandbox_cli [--only drift|scenarios|signals] [--fresh]` in 3 bảng (quét độ trôi ML · lưới kịch bản theo khung giờ · sức khoẻ OSRM/Open-Meteo/Mapbox). Tương đương qua API (vai Điều phối viên, cần mã quản trị nếu có): `GET /v1/eta/sandbox/drift-sweep`, `/scenarios`, `/signals-health?fresh=true`.
 
 ## Màn hình (menu hiện theo vai trò)

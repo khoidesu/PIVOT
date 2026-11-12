@@ -12,7 +12,7 @@ from ..access import (
     CAN_CREATE_SHIPMENT, get_visible_shipment, price_visible_ids, visible_shipments_stmt,
     visible_vehicles_stmt,
 )
-from .. import fleet, shipment_ops
+from .. import fleet, nodes, shipment_ops
 from ..admin import require_admin
 from ..assumptions import get_active
 from ..booking.service import BookingError
@@ -180,6 +180,16 @@ def list_vehicles(to_location_id: uuid.UUID | None = None, actor: Actor = Depend
             raise HTTPException(status_code=422, detail="Unknown to_location_id")
     vehicles = session.execute(visible_vehicles_stmt(actor).order_by(m.Vehicle.plate)).scalars().all()
     return fleet.vehicle_views(session, list(vehicles), datetime.now(timezone.utc), target)
+
+
+@router.post("/slots/refresh")
+def refresh_slots(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    """ICD kéo dài lịch slot MÔ PHỎNG của chính mình tới `slot_horizon_hours` (idempotent). Slot thật không bao giờ bị sinh; không nới hard gate."""
+    if actor.role != "node_operator":
+        raise HTTPException(status_code=403, detail="Terminal operator only")
+    out = nodes.refresh_slots(session, actor.org_id, datetime.now(timezone.utc))
+    session.commit()
+    return {**out, "is_simulated": True}
 
 
 @router.post("/vehicles/refresh-fleet")

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, type Proposal } from '../api'
 import { Chip, ErrorNote, Loading, More, Note } from '../components/ui'
-import { fmtTime, nowMs } from '../fmt'
+import { ageMinutes, fmtTime, nowMs } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
@@ -101,7 +101,7 @@ export function Confirm() {
           <div className="card-h"><h2>{t('cf.slotsTitle')}</h2></div>
           <div className="table-wrap"><table>
             <thead><tr><th>{t('col.time')}</th><th>{t('col.left')}</th></tr></thead>
-            <tbody>{(slots.data ?? []).filter((s) => s.node_org_id === me.org_id).map((s) => (
+            <tbody>{(slots.data ?? []).filter((s) => s.node_org_id === me.org_id && (ageMinutes(s.end_at) ?? 0) <= 60).map((s) => (
               <tr key={s.id}><td className="nw">{fmtTime(s.start_at)}–{fmtTime(s.end_at).slice(-5)}</td>
                 <td><Chip kind={s.remaining === 0 ? 'FAIL' : 'PASS'}>{s.remaining}/{s.capacity}</Chip></td></tr>))}</tbody>
           </table></div>

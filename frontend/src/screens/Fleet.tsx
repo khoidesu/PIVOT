@@ -57,7 +57,7 @@ export function Fleet({ go }: { go: (to: string) => void }) {
   const [target, setTarget] = useState('')
   const targetId = target || zones[0]?.id || ''
   const vehicles = useData(() => api.vehicles(targetId || undefined), 5000, targetId)
-  const slots = useData(() => api.slots())
+  const slots = useData(() => api.slots(), 15000)
   const [tab, setTab] = useState<Tab>(firstTab(me?.role))
   const [askCancel, setAskCancel] = useState<string | null>(null)
   const [showCancelled, setShowCancelled] = useState(false)
@@ -150,7 +150,7 @@ export function Fleet({ go }: { go: (to: string) => void }) {
         (slots.data ?? []).length === 0 ? <div className="empty">{t('fleet.empty')}</div> : (
           <div className="table-wrap"><table>
             <thead><tr><th>{t('col.time')}</th><th>{t('col.left')}</th></tr></thead>
-            <tbody>{slots.data?.map((s) => (
+            <tbody>{slots.data?.filter((s) => (ageMinutes(s.end_at) ?? 0) <= 60).map((s) => ( // chỉ slot hiện tại/sắp tới (đã qua > 1 giờ thì ẩn)
               <tr key={s.id}>
                 <td className="nw">{fmtTime(s.start_at)}–{fmtTime(s.end_at).slice(-5)}</td>
                 <td><Chip kind={s.remaining === 0 ? 'FAIL' : 'PASS'} title={t('cf.srcTip', { src: s.source })}>{s.remaining}/{s.capacity}</Chip></td>

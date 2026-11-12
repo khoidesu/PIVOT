@@ -67,12 +67,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { void load() }, [load, epoch, session])
 
   // Nhà vận tải: tự làm tươi vị trí + khung rảnh của xe rảnh khi vào và định kỳ (< ngưỡng quá hạn 5 phút) — bỏ qua khi tab đang ẩn.
+  // ICD: tự kéo dài lịch slot mô phỏng (để dữ liệu mẫu không tự hết hạn theo thời gian).
   const role = me?.role
   useEffect(() => {
-    if (role !== 'carrier') { setFleetSync(null); return }
+    if (role !== 'carrier') setFleetSync(null)
+    if (role !== 'carrier' && role !== 'node_operator') return
     let stop = false
     const run = () => {
       if (document.visibilityState === 'hidden') return
+      if (role === 'node_operator') { api.refreshSlots().catch(() => { /* không chặn giao diện */ }); return }
       api.refreshFleet().then((r: FleetRefresh) => { if (!stop) setFleetSync({ n: r.updated + r.already_fresh, at: r.at }) }).catch(() => { /* không chặn giao diện */ })
     }
     run()

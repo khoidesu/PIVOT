@@ -233,6 +233,7 @@ export const api = {
   vehicles: (toLocationId?: string) => request<Vehicle[]>(`/v1/vehicles${toLocationId ? `?to_location_id=${toLocationId}` : ''}`),
   sandboxLatest: () => request<SandboxResult>('/v1/benefits/sandbox/latest'),
   sandboxRun: (n: number, seed: number) => post<SandboxResult>('/v1/benefits/sandbox/run', { n, seed }),
+  refreshSlots: () => post<{ created: number; reason: string; is_simulated: boolean }>('/v1/slots/refresh', {}),
   refreshFleet: () => post<FleetRefresh>('/v1/vehicles/refresh-fleet', {}),
   slots: () => request<Slot[]>('/v1/slots'),
   createShipment: (b: ShipmentCreate) => post<Shipment>('/v1/shipments', b),
