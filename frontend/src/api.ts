@@ -7,7 +7,7 @@ export interface Session { token: string; name: string; role: Role }
 export interface LoginResult { token: string; is_new: boolean; me: Me }
 
 export interface Me { user_id: string; user_name: string; org_id: string; org_name: string; org_type: string; role: string }
-export interface Meta { data_mode: 'mock' | 'live'; is_simulated: boolean; server_time: string; stale_position_minutes: number; admin_key_required: boolean; image_intake_enabled?: boolean }
+export interface Meta { data_mode: 'mock' | 'live'; is_simulated: boolean; server_time: string; stale_position_minutes: number; admin_key_required: boolean; image_intake_enabled?: boolean; pdf_intake_enabled?: boolean }
 export interface Location { id: string; name: string; kind: string; lat: number; lng: number }
 export interface Shipment {
   id: string; tenant_id: string; code: string; cargo_type: string; weight_kg: number | null; volume_m3: number | null
@@ -54,7 +54,7 @@ export interface ShipmentCreate {
 export type ShipmentUpdate = Partial<Omit<ShipmentCreate, 'code' | 'draft_id'>> & { version: number }
 export interface IntakeField { value: unknown; display: string | null; source: { quote: string; start: number; end: number } | null; status: 'ok' | 'needs_review'; notes: string[] }
 export interface IntakeDraft {
-  draft_id: string; extractor: { name: string; kind: string; note?: string }; source: { length: number; sha256: string }; reference_time: string
+  draft_id: string; extractor: { name: string; kind: string; note?: string }; source: { length: number; sha256: string; kind?: 'image' | 'pdf_text' | 'pdf_scan'; pages?: number }; reference_time: string
   fields: Record<string, IntakeField>; needs_review: string[]; complete: boolean; suspicious_instructions: boolean; multiple_shipments?: boolean; looks_like_request?: boolean; is_draft_only: boolean
   transcript?: string | null; image_quota_remaining?: number | null
 }
@@ -217,7 +217,7 @@ export const api = {
   refreshShipment: (id: string) => post<Shipment>(`/v1/shipments/${id}/refresh`, {}),
   cancelShipment: (id: string) => request<Shipment>(`/v1/shipments/${id}`, { method: 'DELETE' }),
   intakeDraft: (text: string) => post<IntakeDraft>('/v1/intake/drafts', { text }),
-  intakeImage: (image_base64: string) => post<IntakeDraft>('/v1/intake/drafts/image', { image_base64 }),
+  intakeFile: (file_base64: string) => post<IntakeDraft>('/v1/intake/drafts/file', { file_base64 }), // PDF hoặc ảnh
   sendVehicleEvent: (vehicleId: string, event_type: 'VEHICLE_POSITION', payload: Record<string, unknown> = {}) =>
     post<{ event_id: string; duplicate: boolean }>('/v1/events', {
       entity_type: 'vehicle', entity_id: vehicleId, event_type, payload, occurred_at: new Date().toISOString(),

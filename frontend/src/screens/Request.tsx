@@ -3,7 +3,7 @@ import { api, ApiError, type IntakeDraft, type Shipment } from '../api'
 import { Chip, ErrorNote, Hint, Note } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { IntakeTile } from '../components/IntakeTile'
-import { ACCEPT, prepareImage } from '../image'
+import { acceptFor, isPdf, prepareImage, readPdf } from '../image'
 import { isoToLocalInput, localInputDefault, localInputToIso } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
@@ -41,6 +41,7 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
   const [reviewed, setReviewed] = useState(false)
   const [draftUsed, setDraftUsed] = useState(false)
   const [imgUrl, setImgUrl] = useState<string | null>(null) // ảnh xem trước (nếu bản nháp đến từ ảnh)
+  const [fileName, setFileName] = useState<string | null>(null) // tên tệp đã tải (ảnh hoặc PDF)
   const fileRef = useRef<HTMLInputElement>(null)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }))
 
@@ -70,19 +71,25 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
     e.target.value = '' // cho phép chọn lại cùng một tệp
     if (!file) return
     setDrafting(true); setReading(true); setError(null); setDraft(null); setDraftUsed(false); setReviewed(false)
+    if (imgUrl) URL.revokeObjectURL(imgUrl)
+    setImgUrl(null); setFileName(file.name)
     try {
-      const img = await prepareImage(file)
-      if (imgUrl) URL.revokeObjectURL(imgUrl)
-      setImgUrl(img.previewUrl)
-      const d = await api.intakeImage(img.base64)
-      setDraft(d); applyDraft(d) // tải ảnh xong là điền thẳng vào form (người dùng chỉ còn xem lại + xác nhận), không cần bấm thêm
+      let b64: string
+      if (isPdf(file)) b64 = (await readPdf(file)).base64 // PDF gửi nguyên tệp: máy chủ tự lấy lớp chữ, hoặc vẽ trang nếu là bản scan
+      else {
+        const img = await prepareImage(file)
+        setImgUrl(img.previewUrl); b64 = img.base64
+      }
+      const d = await api.intakeFile(b64)
+      setDraft(d); applyDraft(d) // tải tệp xong là điền thẳng vào form (người dùng chỉ còn xem lại + xác nhận), không cần bấm thêm
     } catch (err) {
-      setImgUrl(null)
-      setError(err instanceof ApiError ? err : new ApiError(0, 'IMAGE_LOCAL', t((err as Error).message === 'TOO_LARGE' ? 'err.IMAGE_TOO_LARGE' : 'err.UNSUPPORTED_IMAGE')))
+      setImgUrl(null); setFileName(null)
+      const m = (err as Error).message
+      setError(err instanceof ApiError ? err : new ApiError(0, 'FILE_LOCAL', t(m === 'TOO_LARGE' ? 'err.IMAGE_TOO_LARGE' : m === 'PDF_TOO_LARGE' ? 'err.PDF_TOO_LARGE' : 'err.UNSUPPORTED_FILE')))
     } finally { setDrafting(false); setReading(false) }
   }
   async function extract() {
-    setDrafting(true); setError(null); setDraft(null); setDraftUsed(false); setReviewed(false); setImgUrl(null)
+    setDrafting(true); setError(null); setDraft(null); setDraftUsed(false); setReviewed(false); setImgUrl(null); setFileName(null)
     try { setDraft(await api.intakeDraft(text)) }
     catch (e) { setError(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) }
     finally { setDrafting(false) }
@@ -142,9 +149,9 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
         {!editing && allowed && (
           <div className="tiles">
             <IntakeTile icon="message" title={t('req.paste')} sub={t('req.paste.sub')} active={showImport} onClick={() => setShowImport((v) => !v)} />
-            {meta?.image_intake_enabled && (
+            {(meta?.image_intake_enabled || meta?.pdf_intake_enabled) && (
               <IntakeTile icon="image" index={1} title={reading ? t('in.img.reading') : t('req.photo')} sub={t('req.photo.sub')} busy={reading} disabled={drafting} onClick={() => fileRef.current?.click()} />)}
-            <input ref={fileRef} type="file" accept={ACCEPT} className="sr" tabIndex={-1} aria-hidden onChange={onFile} />
+            <input ref={fileRef} type="file" accept={acceptFor(!!meta?.image_intake_enabled, !!meta?.pdf_intake_enabled)} className="sr" tabIndex={-1} aria-hidden onChange={onFile} />
           </div>)}
         {me && !allowed && <Note kind="warn">{t('req.cannot')}</Note>}
         {notFound && <Note kind="err">{t('req.notFound')}</Note>}
@@ -155,7 +162,7 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
             <textarea id="intake-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('in.placeholder')} maxLength={8000} rows={3} />
             <div className="row">
               <button type="button" className="btn sm" onClick={extract} disabled={drafting || !text.trim()}>{drafting ? t('in.running') : t('in.run')}</button>
-              {(draft || text) && <button type="button" className="btn sm" onClick={() => { setText(''); setDraft(null); setDraftUsed(false); setImgUrl(null) }}>{t('in.clear')}</button>}
+              {(draft || text) && <button type="button" className="btn sm" onClick={() => { setText(''); setDraft(null); setDraftUsed(false); setImgUrl(null); setFileName(null) }}>{t('in.clear')}</button>}
             </div>
             {draft && (
               <div className="stack">
@@ -198,17 +205,20 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
           </div>)}
 
         {reading && <Note kind="info">{t('in.img.reading')}</Note>}
-        {draftUsed && imgUrl && draft?.transcript && (
+        {draftUsed && fileName && draft?.transcript && (
           <div className="stack import">
             <div className="row">
               <Chip kind="teal">{t('in.img.filled')}</Chip>
+              {draft.source.kind?.startsWith('pdf') && <span className="footnote" title={fileName}>{t('in.img.pdf', { n: draft.source.pages ?? 1 })}</span>}
               {draft.image_quota_remaining != null && <span className="footnote">{t('in.img.left', { n: draft.image_quota_remaining })}</span>}
               {draft.suspicious_instructions && <Chip kind="bad">{t('in.suspicious')}</Chip>}
             </div>
-            <div className="img-pair">
-              <img src={imgUrl} alt={t('in.img.alt')} />
-              <pre className="transcript" aria-label={t('in.img.text')}>{draft.transcript}</pre>
-            </div>
+            {imgUrl
+              ? <div className="img-pair">
+                <img src={imgUrl} alt={t('in.img.alt')} />
+                <pre className="transcript" aria-label={t('in.img.text')}>{draft.transcript}</pre>
+              </div>
+              : <pre className="transcript" aria-label={t('in.img.text')}>{draft.transcript}</pre>}
           </div>)}
 
         <form className="form" onSubmit={submit} aria-label={t('req.new')}>

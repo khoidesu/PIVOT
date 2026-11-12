@@ -1,0 +1,34 @@
+{
+  "file": "02_pdf_email_dat_xe.pdf",
+  "group": "pdf_text",
+  "group_note": "PDF có lớp chữ: chữ lấy trong máy chủ, đi cùng đường với tin nhắn dán (luật; có khoá Gemini + chế độ hybrid thì Gemini bổ sung phần thiếu). Không tốn lượt ảnh.",
+  "scenario": "Email đặt xe in ra PDF: văn xuôi, không có nhãn cố định ('9 tấn rưỡi', 'chậm nhất 10h30', '5 triệu 200 nghìn').",
+  "demo": "So sánh bộ luật và Gemini: luật bỏ sót vài trường, chế độ lai (hybrid) gọi Gemini bổ sung — giá/tên khách được che trước khi gửi.",
+  "needs_gemini": false,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "pdf_text",
+    "pages": 1,
+    "all_need_review": false
+  },
+  "expected_fields": {
+    "cargo_type": "dry",
+    "weight_kg": 9500,
+    "volume_m3": 24,
+    "origin": "KCN VSIP I (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-23T07:00:00+07:00",
+    "pickup_deadline": "2026-11-23T10:30:00+07:00",
+    "cutoff_at": "2026-11-23T16:00:00+07:00",
+    "price_vnd": 5200000,
+    "customer_name": [
+      "Công ty CP Nội Thất Gỗ Đông Á",
+      "Lê Thị Mai",
+      null
+    ]
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "Từ: dieuphoi@noithat-donga.invalid\nĐến: booking@logection-demo.invalid\nNgày gửi: 12/11/2026 09:15\nTiêu đề: Đặt xe thứ Hai 23/11 - hàng gỗ đi ICD\nChào anh/chị bên điều phối,\nBên em cần một xe chở 9 tấn rưỡi ván gỗ ép đóng kiện (hàng khô, khoảng 24 khối)\ntừ KCN VSIP I ra ICD Cảng C.\nHàng sẵn sàng từ 7 giờ sáng thứ Hai 23/11/2026, xe vui lòng vào lấy chậm nhất 10h30\nngày 23/11/2026; cut-off tại ICD là 16h ngày 23/11/2026.\nCước như lần trước là 5 triệu 200 nghìn, bên em thanh toán sau khi giao.\nTrân trọng,\nLê Thị Mai - Công ty CP Nội Thất Gỗ Đông Á (hư cấu)\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

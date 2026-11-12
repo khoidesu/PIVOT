@@ -1,0 +1,29 @@
+{
+  "file": "13_anh_scan_nghieng.png",
+  "group": "image",
+  "group_note": "Ảnh: Gemini đọc. Cần khoá Gemini, tốn 1 lượt ảnh. Mọi trường có giá trị đều 'cần xem lại'.",
+  "scenario": "Ảnh scan bị nghiêng khoảng 4°, đen trắng.",
+  "demo": "Ảnh nghiêng không cần chỉnh tay trước khi tải lên.",
+  "needs_gemini": true,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "image",
+    "all_need_review": true
+  },
+  "expected_fields": {
+    "cargo_type": "dry",
+    "weight_kg": 9000,
+    "volume_m3": 25,
+    "origin": "KCN Sóng Thần (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-23T09:00:00+07:00",
+    "pickup_deadline": "2026-11-23T11:30:00+07:00",
+    "cutoff_at": "2026-11-23T19:00:00+07:00",
+    "price_vnd": 3600000,
+    "customer_name": "Công ty TNHH Nhựa Bình Minh Xanh"
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "PHIẾU ĐẶT XE VẬN CHUYỂN\nSố phiếu: PDX-2611-0463          Ngày lập: 12/11/2026\nThông tin khách hàng\nKhách hàng: Công ty TNHH Nhựa Bình Minh Xanh\nNgười liên hệ: anh Lý Thành Đạt - 0900 565 656 (giả)\nThông tin lô hàng\nLoại hàng: Hàng khô (hạt nhựa bao 25kg)\nKhối lượng: 9.000 kg\nThể tích: 25 m3\nĐiểm lấy hàng: KCN Sóng Thần\nĐiểm giao: ICD Cảng C\nThời gian\nHàng sẵn sàng: 09:00 ngày 23/11/2026\nHạn lấy hàng: 11:30 ngày 23/11/2026\nCut-off: 19:00 ngày 23/11/2026\nChi phí\nCước vận chuyển: 3.600.000 đồng\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

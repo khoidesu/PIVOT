@@ -1,0 +1,17 @@
+{
+  "file": "16_pdf_qua_nhieu_trang.pdf",
+  "group": "rejected",
+  "group_note": "Bị từ chối trước khi đọc: không gọi mô hình, không tốn lượt.",
+  "scenario": "PDF 5 trang (giới hạn 3 trang).",
+  "demo": "Bị từ chối (413) trước khi đọc — giữ chi phí và thời gian xử lý trong tầm kiểm soát.",
+  "needs_gemini": false,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 413,
+    "error_code": "PDF_TOO_MANY_PAGES"
+  },
+  "expected_fields": null,
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": null,
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

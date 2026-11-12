@@ -1,0 +1,17 @@
+{
+  "file": "17_pdf_co_mat_khau.pdf",
+  "group": "rejected",
+  "group_note": "Bị từ chối trước khi đọc: không gọi mô hình, không tốn lượt.",
+  "scenario": "PDF có mật khẩu mở tệp (mật khẩu: demo123).",
+  "demo": "Bị từ chối (422 'PDF có mật khẩu'): hệ thống không thử đoán mật khẩu.",
+  "needs_gemini": false,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 422,
+    "error_code": "PDF_ENCRYPTED"
+  },
+  "expected_fields": null,
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": null,
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

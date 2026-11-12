@@ -25,6 +25,8 @@ MULTI_RE = re.compile(r"\b(?:lô|đơn)\s*(?:1|một)\b.*?\b(?:lô|đơn)\s*(?:2
 REQUEST_RE = re.compile(r"chở|vận chuyển|lô hàng|container|\bxe\b|\d\s*(?:tấn|kg|khối|m3|m³)|\b(?:ship|transport|cargo)\b", re.I)
 _PL = r"(?:(?:kho|KCN|kcn|xưởng|cảng|ICD|icd|depot|chợ đầu mối|chợ|showroom|nhà máy|bãi|cụm công nghiệp)\s+)?[A-ZÀ-Ỹ][\wÀ-ỹ]*(?:\s+[A-ZÀ-Ỹ][\wÀ-ỹ]*){0,3}(?:\s+(?:\d{1,2}\b|cảng\b))?"
 PLACE_PAIR_RE = re.compile(rf"\btừ\s+(?P<o>{_PL})\s*(?:đến|tới|ra|về|đi|->|→|-)\s*(?P<d>{_PL})")
+PLACE_LABEL_RE = {"origin": re.compile(rf"(?i:điểm lấy(?: hàng)?|nơi lấy(?: hàng)?|địa điểm lấy(?: hàng)?)\s*:\s*(?P<p>{_PL})"),  # phiếu có nhãn: "Điểm lấy hàng: Kho Tân Bình"
+                  "dest": re.compile(rf"(?i:điểm giao(?: hàng)?|nơi giao(?: hàng)?|điểm đến|nơi nhận)\s*:\s*(?P<p>{_PL})")}
 PLACE_ONE_RE = {"origin": re.compile(rf"\b(?:từ|lấy (?:hàng )?tại|tại)\s+(?P<p>{_PL})"), "dest": re.compile(rf"\b(?:đến|tới|ra|giao (?:tại|cho|ở)?)\s+(?P<p>{_PL})")}
 HOUR_RE = re.compile(r"\d\s*(?:h|giờ|g\b|:|am\b|pm\b|a\.m|p\.m|o.?clock|hrs?\b)", re.I)
 
@@ -176,9 +178,10 @@ def build_draft(text: str, now: datetime, locations: list[dict], extractor: Extr
         f = fields[k]
         if f["value"] is not None or f["notes"] not in (["MISSING"], ["QUOTE_NOT_FOUND_IN_SOURCE"], []):
             continue
+        lab = PLACE_LABEL_RE[k].search(text)
         pm = PLACE_PAIR_RE.search(text)
         mm = (pm if pm and pm.group("o" if k == "origin" else "d") else None)
-        span = mm.span("o" if k == "origin" else "d") if mm else None
+        span = lab.span("p") if lab else mm.span("o" if k == "origin" else "d") if mm else None
         if not span:
             one = PLACE_ONE_RE[k].search(text)
             span = one.span("p") if one else None
@@ -194,7 +197,8 @@ def build_draft(text: str, now: datetime, locations: list[dict], extractor: Extr
             if f["value"] is not None:
                 f["status"] = "needs_review"
                 f["notes"].append("MULTIPLE_SHIPMENTS")
-    looks = any(fields[k]["value"] is not None for k in FIELDS) or bool(REQUEST_RE.search(text))
+    # chỉ xét trường của LÔ HÀNG: thư cảm ơn có tên công ty/giá trị khác vẫn không phải yêu cầu vận chuyển
+    looks = any(fields[k]["value"] is not None for k in REQUIRED) or bool(REQUEST_RE.search(text))
     needs_review = [k for k in FIELDS if fields[k]["status"] == "needs_review" and (k in REQUIRED or fields[k]["value"] is not None or fields[k]["notes"] not in ([], ["MISSING"]))]
     return {
         "draft_id": str(uuid.uuid4()),

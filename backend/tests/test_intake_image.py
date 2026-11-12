@@ -41,6 +41,10 @@ class FakeGemini:
         self.seen = (data, mime)
         return None if self.result is None else (FIELDS, TRANSCRIPT)
 
+    def extract_images(self, images, now, locations):  # nhiều trang (PDF scan) → ghi lại rồi đọc như một ảnh
+        self.pages = images
+        return self.extract_image(images[0][0], images[0][1], now, locations)
+
 
 @pytest.fixture()
 def fake(client):

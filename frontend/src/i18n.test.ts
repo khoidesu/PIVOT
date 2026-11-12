@@ -63,8 +63,8 @@ const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).fl
 const wordsOf = (lang: 'vi' | 'en') => Object.values(dictionaries[lang]).reduce((n, v) => n + v.split(/\s+/).filter(Boolean).length, 0)
 
 describe('giao diện gọn chữ', () => {
-  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ; nới 2.000 → 2.200 khi thêm ETA tín hiệu thật, nhiều cửa sổ, màn Xác nhận mới; 2.300 khi thêm đọc ảnh; 2.330 khi thêm cảnh báo bản nháp: thiếu/nhiều lô/sai thứ/giờ đã qua; 2.345 khi thêm hero màn bắt đầu; 2.430 khi thêm trang mở đầu + hướng dẫn 4 bước)', () => {
-    expect(wordsOf('vi')).toBeLessThanOrEqual(2430)
+  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ; nới 2.000 → 2.200 khi thêm ETA tín hiệu thật, nhiều cửa sổ, màn Xác nhận mới; 2.300 khi thêm đọc ảnh; 2.330 khi thêm cảnh báo bản nháp: thiếu/nhiều lô/sai thứ/giờ đã qua; 2.345 khi thêm hero màn bắt đầu; 2.430 khi thêm trang mở đầu + hướng dẫn 4 bước; 2.465 khi thêm đọc PDF + lỗi tệp PDF; 2.500 khi thêm thông báo giới hạn lượt theo IP/toàn hệ thống mỗi phút)', () => {
+    expect(wordsOf('vi')).toBeLessThanOrEqual(2500)
   })
   it('mọi khoá i18n đều được mã nguồn dùng (không để chuỗi chết)', () => {
     const code = walk(SRC).filter((f) => /\.(tsx?)$/.test(f) && !/i18n(\.test)?\.ts$/.test(f)).map((f) => readFileSync(f, 'utf8')).join('\n')

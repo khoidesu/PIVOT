@@ -1,0 +1,33 @@
+{
+  "file": "12_anh_phieu_viet_tay.jpg",
+  "group": "image",
+  "group_note": "Ảnh: Gemini đọc. Cần khoá Gemini, tốn 1 lượt ảnh. Mọi trường có giá trị đều 'cần xem lại'.",
+  "scenario": "Phiếu viết tay trên giấy kẻ dòng (giả lập bằng phông chữ tay).",
+  "demo": "Chữ viết tay: thế mạnh của mô hình đọc ảnh so với OCR truyền thống; vẫn bắt buộc người dùng xem lại.",
+  "needs_gemini": true,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "image",
+    "all_need_review": true
+  },
+  "expected_fields": {
+    "cargo_type": "dry",
+    "weight_kg": 7000,
+    "volume_m3": 20,
+    "origin": "KCN Sóng Thần (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-22T14:00:00+07:00",
+    "pickup_deadline": "2026-11-22T16:00:00+07:00",
+    "cutoff_at": "2026-11-22T23:00:00+07:00",
+    "price_vnd": 2900000,
+    "customer_name": [
+      "anh Phúc",
+      "Phúc",
+      null
+    ]
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "Phiếu gửi hàng\nHàng khô 7 tấn, 20 khối\nTừ KCN Sóng Thần đến ICD Cảng C\nSẵn sàng 14h 22/11/2026\nHạn lấy hàng 16h 22/11/2026\nCut-off 23h 22/11/2026\nGiá 2.900.000 đồng - anh Phúc\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

@@ -1,0 +1,17 @@
+{
+  "file": "15_tep_gia_anh.jpg",
+  "group": "rejected",
+  "group_note": "Bị từ chối trước khi đọc: không gọi mô hình, không tốn lượt.",
+  "scenario": "Tệp có đuôi .jpg nhưng nội dung là tệp thực thi Windows (chỉ phần đầu tệp, không chạy được).",
+  "demo": "Kiểm tra theo NỘI DUNG, không tin đuôi tệp → 415 'Chỉ nhận PDF hoặc ảnh'.",
+  "needs_gemini": false,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 415,
+    "error_code": "UNSUPPORTED_FILE"
+  },
+  "expected_fields": null,
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": null,
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

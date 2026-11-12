@@ -1,0 +1,29 @@
+{
+  "file": "10_anh_chup_dien_thoai.jpg",
+  "group": "image",
+  "group_note": "Ảnh: Gemini đọc. Cần khoá Gemini, tốn 1 lượt ảnh. Mọi trường có giá trị đều 'cần xem lại'.",
+  "scenario": "Ảnh chụp phiếu bằng điện thoại: đặt chéo trên bàn, méo phối cảnh, có bóng, hơi nhoè.",
+  "demo": "Ảnh thật ngoài hiện trường: Gemini vẫn đọc được; ảnh hiện cạnh chữ đọc được để người dùng so.",
+  "needs_gemini": true,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "image",
+    "all_need_review": true
+  },
+  "expected_fields": {
+    "cargo_type": "cold",
+    "weight_kg": 8000,
+    "volume_m3": 22,
+    "origin": "KCN VSIP I (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-21T06:00:00+07:00",
+    "pickup_deadline": "2026-11-21T08:30:00+07:00",
+    "cutoff_at": "2026-11-21T14:00:00+07:00",
+    "price_vnd": 6500000,
+    "customer_name": "Công ty TNHH Thực Phẩm Bình An"
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "PHIẾU ĐẶT XE\nSố phiếu: PDX-2611-0458          Ngày lập: 12/11/2026\nThông tin khách hàng\nKhách hàng: Công ty TNHH Thực Phẩm Bình An\nNgười liên hệ: chị Trương Mỹ Linh - 0900 343 434 (giả)\nThông tin lô hàng\nLoại hàng: Hàng lạnh (thuỷ sản đông lạnh)\nKhối lượng: 8.000 kg\nThể tích: 22 m3\nĐiểm lấy hàng: KCN VSIP I\nĐiểm giao: ICD Cảng C\nThời gian\nHàng sẵn sàng: 06:00 ngày 21/11/2026\nHạn lấy hàng: 08:30 ngày 21/11/2026\nCut-off: 14:00 ngày 21/11/2026\nChi phí\nCước vận chuyển: 6.500.000 đồng\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

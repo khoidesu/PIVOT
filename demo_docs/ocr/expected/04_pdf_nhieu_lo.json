@@ -1,0 +1,36 @@
+{
+  "file": "04_pdf_nhieu_lo.pdf",
+  "group": "pdf_text",
+  "group_note": "PDF có lớp chữ: chữ lấy trong máy chủ, đi cùng đường với tin nhắn dán (luật; có khoá Gemini + chế độ hybrid thì Gemini bổ sung phần thiếu). Không tốn lượt ảnh.",
+  "scenario": "Một phiếu có HAI lô hàng.",
+  "demo": "Hệ thống chỉ lấy lô đầu và báo 'Tin có nhiều lô' — người dùng tách thành hai yêu cầu.",
+  "needs_gemini": false,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "pdf_text",
+    "pages": 1,
+    "all_need_review": false,
+    "flags": {
+      "multiple_shipments": true
+    }
+  },
+  "expected_fields": {
+    "cargo_type": "dry",
+    "weight_kg": 8000,
+    "volume_m3": 20,
+    "origin": "KCN Sóng Thần (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-24T08:00:00+07:00",
+    "pickup_deadline": "2026-11-24T10:00:00+07:00",
+    "cutoff_at": "2026-11-24T15:00:00+07:00",
+    "price_vnd": [
+      7300000,
+      null
+    ],
+    "customer_name": "Công ty TNHH Thương Mại Hoà Phong"
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "PHIẾU ĐẶT XE (2 LÔ)\nSố phiếu: PDX-2611-0430          Ngày lập: 12/11/2026\nKhách hàng: Công ty TNHH Thương Mại Hoà Phong\nLô 1\nLoại hàng: Hàng khô (linh kiện điện tử)\nKhối lượng: 8.000 kg     Thể tích: 20 m3\nTừ KCN Sóng Thần đến ICD Cảng C\nHàng sẵn sàng: 08:00 ngày 24/11/2026\nHạn lấy hàng: 10:00 ngày 24/11/2026\nCut-off: 15:00 ngày 24/11/2026\nLô 2\nLoại hàng: Hàng lạnh (trái cây đông lạnh)\nKhối lượng: 5.000 kg     Thể tích: 14 m3\nTừ KCN VSIP I đến ICD Cảng C\nHàng sẵn sàng: 13:00 ngày 24/11/2026\nHạn lấy hàng: 14:30 ngày 24/11/2026\nCut-off: 20:00 ngày 24/11/2026\nChi phí\nTổng cước 2 lô: 7.300.000 đồng\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

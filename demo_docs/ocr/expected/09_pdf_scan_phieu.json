@@ -1,0 +1,30 @@
+{
+  "file": "09_pdf_scan_phieu.pdf",
+  "group": "pdf_scan",
+  "group_note": "PDF scan: không có lớp chữ → vẽ trang thành ảnh → Gemini đọc. Cần khoá Gemini, tốn 1 lượt ảnh.",
+  "scenario": "PDF từ máy scan: chỉ có ẢNH, không có lớp chữ (hơi nghiêng, có bụi).",
+  "demo": "Hệ thống tự nhận ra PDF scan → vẽ trang thành ảnh → Gemini đọc; mọi trường tô vàng 'cần xem lại', hiện chữ đọc được để đối chiếu.",
+  "needs_gemini": true,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "pdf_scan",
+    "pages": 1,
+    "all_need_review": true
+  },
+  "expected_fields": {
+    "cargo_type": "dry",
+    "weight_kg": 15000,
+    "volume_m3": 35,
+    "origin": "KCN VSIP I (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-25T06:00:00+07:00",
+    "pickup_deadline": "2026-11-25T08:00:00+07:00",
+    "cutoff_at": "2026-11-25T14:00:00+07:00",
+    "price_vnd": 5600000,
+    "customer_name": "Công ty TNHH Linh Kiện Việt Nhật"
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "PHIẾU ĐẶT XE VẬN CHUYỂN\nSố phiếu: PDX-2611-0452          Ngày lập: 12/11/2026\nThông tin khách hàng\nKhách hàng: Công ty TNHH Linh Kiện Việt Nhật\nNgười liên hệ: anh Hoàng Đức Long - 0900 121 212 (giả)\nThông tin lô hàng\nLoại hàng: Hàng khô (linh kiện ô tô)\nKhối lượng: 15.000 kg\nThể tích: 35 m3\nĐiểm lấy hàng: KCN VSIP I\nĐiểm giao: ICD Cảng C\nThời gian\nHàng sẵn sàng: 06:00 ngày 25/11/2026\nHạn lấy hàng: 08:00 ngày 25/11/2026\nCut-off: 14:00 ngày 25/11/2026\nChi phí\nCước vận chuyển: 5.600.000 đồng\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

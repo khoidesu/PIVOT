@@ -1,0 +1,30 @@
+{
+  "file": "06_pdf_hang_lanh_2_trang.pdf",
+  "group": "pdf_text",
+  "group_note": "PDF có lớp chữ: chữ lấy trong máy chủ, đi cùng đường với tin nhắn dán (luật; có khoá Gemini + chế độ hybrid thì Gemini bổ sung phần thiếu). Không tốn lượt ảnh.",
+  "scenario": "PDF 2 trang, hàng lạnh: thông tin lô ở trang 1, thời gian và cước ở trang 2.",
+  "demo": "Đọc được cả hai trang (chữ hiện kèm '2 trang PDF'); loại hàng nhận đúng 'cold'.",
+  "needs_gemini": false,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "pdf_text",
+    "pages": 2,
+    "all_need_review": false
+  },
+  "expected_fields": {
+    "cargo_type": "cold",
+    "weight_kg": 7200,
+    "volume_m3": 18,
+    "origin": "KCN VSIP I (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-26T05:30:00+07:00",
+    "pickup_deadline": "2026-11-26T07:00:00+07:00",
+    "cutoff_at": "2026-11-26T12:00:00+07:00",
+    "price_vnd": 6500000,
+    "customer_name": "Công ty CP Thuỷ Sản Biển Xanh"
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "PHIẾU ĐẶT XE LẠNH\nSố phiếu: PDX-2611-0441          Ngày lập: 12/11/2026\nThông tin khách hàng\nKhách hàng: Công ty CP Thuỷ Sản Biển Xanh\nNgười liên hệ: anh Võ Minh Tâm - 0900 777 888 (giả)\nThông tin lô hàng\nLoại hàng: Hàng lạnh (thuỷ sản đông lạnh, giữ -18°C)\nKhối lượng: 7.200 kg\nThể tích: 18 m3\nĐiểm lấy hàng: KCN VSIP I\nĐiểm giao: ICD Cảng C\n(xem tiếp trang 2)\nThời gian (tiếp theo trang 1)\nHàng sẵn sàng: 05:30 ngày 26/11/2026\nHạn lấy hàng: 07:00 ngày 26/11/2026\nCut-off: 12:00 ngày 26/11/2026\nChi phí\nCước vận chuyển: 6.500.000 đồng\nGhi chú: xe lạnh phải chạy máy trước 30 phút.\nNgười lập phiếu: Võ Minh Tâm\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

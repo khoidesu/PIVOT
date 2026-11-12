@@ -41,7 +41,13 @@ def _is_cap(w: str) -> bool:
 
 
 def _known_given(w: str) -> bool:
-    return _strip(w) in _GIV or _strip(w) in _MID or _strip(w) in _SUR
+    """Viết hoa: so không dấu (chấp nhận gõ thiếu dấu "Hung"). Viết thường: phải trùng CẢ DẤU — tránh "em nhận" (≈ Nhân), "anh lấy"…"""
+    if _is_cap(w):
+        return _strip(w) in _GIV or _strip(w) in _MID or _strip(w) in _SUR
+    return w.lower() in _EXACT
+
+
+_EXACT = {x.lower() for x in (*SURNAMES, *MIDDLES, *GIVEN)}
 
 
 def find_person(text: str, exclude: list[tuple[int, int]] | None = None) -> tuple[str, str] | None:
@@ -51,22 +57,23 @@ def find_person(text: str, exclude: list[tuple[int, int]] | None = None) -> tupl
     def bad(s: int, e: int) -> bool:
         return any(s < b and a < e for a, b in ex) or bool(PLACE_PREFIX.search(text[max(0, s - 14):s])) or text[s:e].lower() in PLACE_PHRASES
 
-    m = re.search(rf"\b((?i:cty|c\.ty|công ty)\s+(?:(?i:tnhh|cổ phần|cp)\s+)?{_WORD}(?:\s+{_CAP}){{0,3}})", text)
+    # tên công ty phải bắt đầu bằng chữ VIẾT HOA ("Công ty chúng tôi" không phải tên); tối đa 6 từ ("Công ty CP Nội Thất Gỗ Đông Á")
+    m = re.search(rf"\b((?i:cty|c\.ty|công ty)\s+(?:(?i:tnhh|cổ phần|cp)\s+)?{_CAP}(?:[ \t]+{_CAP}){{0,5}})", text)
     if m and not bad(m.start(), m.end()):
         return m.group(1).strip(), m.group(1).strip()
-    for m in re.finditer(rf"(?<!\w)({'|'.join(SURNAMES)})((?:\s+{_CAP}){{1,3}})(?!\w)", text):  # "Nguyễn Văn An": họ + 1–3 từ viết hoa
+    for m in re.finditer(rf"(?<!\w)({'|'.join(SURNAMES)})((?:[ \t]+{_CAP}){{1,3}})(?!\w)", text):  # "Nguyễn Văn An": họ + 1–3 từ viết hoa
         if bad(m.start(), m.end()):
             continue
         rest = m.group(2).split()
         if rest and not any(w.lower() in NOT_NAME_WORDS for w in rest):
             return m.group(0).strip(), m.group(0).strip()
-    for m in re.finditer(rf"(?<!\w)({'|'.join(HONORIFICS)})\s+({_WORD})((?:\s+{_CAP}){{0,2}})", text, re.I):
+    for m in re.finditer(rf"(?<!\w)({'|'.join(HONORIFICS)})[ \t]+({_WORD})((?:[ \t]+{_CAP}){{0,2}})", text, re.I):
         hon, w1, more = m.group(1), m.group(2), m.group(3)
         if hon.lower() in ("a", "c", "em") and not (_is_cap(w1) or _known_given(w1)):
             continue
         if w1.lower() in NOT_NAME_WORDS or bad(m.start(), m.end()):
             continue
-        if _is_cap(w1) or (_strip(w1) in (_GIV | _MID | _SUR) and w1.lower() not in AMBIGUOUS_LOWER):
+        if _is_cap(w1) or (_known_given(w1) and w1.lower() not in AMBIGUOUS_LOWER):
             name = (w1 + more).strip()
             if any(t.lower() in NOT_NAME_WORDS for t in name.split()):
                 name = name.split()[0]

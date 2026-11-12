@@ -19,14 +19,27 @@ class Settings(BaseSettings):
     gemini_timeout_s: float = 25.0  # tổng thời gian chờ Gemini (kể cả mô hình dự phòng); quá hạn → quay về kết quả của luật
     gemini_fallback_models: str = "gemini-3.5-flash-lite"  # gọi song song khi mô hình chính chưa trả sau gemini_hedge_after_s (rỗng = tắt)
     gemini_hedge_after_s: float = 5.0
+    gemini_vision_hedge_after_s: float = 15.0  # đọc ảnh chậm hơn văn bản: chờ lâu hơn trước khi gọi song song mô hình dự phòng (lỗi thì gọi ngay)
+    gemini_vision_model: str | None = None  # mô hình đọc ẢNH / PDF scan (vd một bản Pro, đọc chữ viết tay tốt hơn); trống = dùng gemini_model
     llm_per_user_day: int = 50  # giới hạn lượt gọi mô hình: mỗi người/ngày, mỗi người/phút, toàn hệ thống/ngày (vượt → dùng bộ luật)
     llm_per_user_minute: int = 5
     llm_global_day: int = 500
+    llm_per_ip_day: int = 150  # theo IP: chặn đổi tên đăng nhập để lấy thêm lượt (nhóm cùng mạng văn phòng dùng chung mức này)
+    llm_per_ip_minute: int = 15
+    llm_global_minute: int = 30  # toàn hệ thống mỗi phút: nhiều người thử cùng lúc không vượt giới hạn tốc độ của khoá
     intake_image_enabled: bool = True  # cho phép nhập liệu từ ảnh (cần khoá Gemini). Ảnh gửi NGUYÊN VẸN ra ngoài → tắt ở bản công khai
     llm_image_per_user_day: int = 3  # ảnh tốn lượt hơn văn bản: giới hạn riêng, không có bộ luật để quay về nên hết lượt là báo lỗi rõ
     llm_image_per_user_minute: int = 2
     llm_image_global_day: int = 100
+    llm_image_per_ip_day: int = 20
+    llm_image_per_ip_minute: int = 6
+    llm_image_global_minute: int = 10
+    trust_proxy: bool = False  # true khi chạy sau proxy (Render): IP người dùng = phần tử CUỐI của X-Forwarded-For (do proxy thêm, không giả được)
     intake_image_max_bytes: int = 4_000_000
+    intake_pdf_enabled: bool = True  # PDF có lớp chữ đọc ngay trong máy chủ (không cần khoá); PDF scan cần đọc ảnh (Gemini) và tính vào lượt ảnh
+    intake_pdf_max_bytes: int = 5_000_000
+    intake_pdf_max_pages: int = 3
+    intake_pdf_min_letters: int = 40  # ít chữ cái hơn ngưỡng này (vd chỉ có chân trang) → coi là PDF scan
     anthropic_api_key: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường
     anthropic_model: str = "claude-haiku-5-5"
     allow_embed: bool = False  # true → bỏ X-Frame-Options (cần khi chạy trong khung nhúng của Hugging Face Spaces)

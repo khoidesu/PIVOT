@@ -1,0 +1,35 @@
+{
+  "file": "03_pdf_thieu_truong.pdf",
+  "group": "pdf_text",
+  "group_note": "PDF có lớp chữ: chữ lấy trong máy chủ, đi cùng đường với tin nhắn dán (luật; có khoá Gemini + chế độ hybrid thì Gemini bổ sung phần thiếu). Không tốn lượt ảnh.",
+  "scenario": "Phiếu thiếu thể tích ('chưa đo') và cut-off ('chờ ICD báo lại'); giá không ghi số.",
+  "demo": "Hệ thống KHÔNG đoán: hai trường để trống + tô vàng 'cần xem lại'; người dùng phải tự điền mới tạo được lô.",
+  "needs_gemini": false,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "pdf_text",
+    "pages": 1,
+    "all_need_review": false,
+    "must_be_null": [
+      "volume_m3",
+      "cutoff_at",
+      "price_vnd"
+    ]
+  },
+  "expected_fields": {
+    "cargo_type": "dry",
+    "weight_kg": 6000,
+    "volume_m3": null,
+    "origin": "Depot Thủ Đức (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-21T13:00:00+07:00",
+    "pickup_deadline": "2026-11-21T15:00:00+07:00",
+    "cutoff_at": null,
+    "price_vnd": null,
+    "customer_name": "Công ty TNHH Bao Bì Tân Phát"
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "PHIẾU ĐẶT XE\nSố phiếu: PDX-2611-0422          Ngày lập: 12/11/2026\nThông tin khách hàng\nKhách hàng: Công ty TNHH Bao Bì Tân Phát\nNgười liên hệ: chị Đỗ Ngọc Lan - 0900 333 444 (giả)\nThông tin lô hàng\nLoại hàng: Hàng khô (thùng carton)\nKhối lượng: 6.000 kg\nThể tích: chưa đo\nĐiểm lấy hàng: Depot Thủ Đức\nĐiểm giao: ICD Cảng C\nThời gian\nHàng sẵn sàng: 13:00 ngày 21/11/2026\nHạn lấy hàng: 15:00 ngày 21/11/2026\nCut-off: chờ ICD báo lại\nChi phí\nCước vận chuyển: theo bảng giá tháng 11\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

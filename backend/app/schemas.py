@@ -27,6 +27,7 @@ class MetaOut(BaseModel):
     stale_position_minutes: int
     admin_key_required: bool = False
     image_intake_enabled: bool = False
+    pdf_intake_enabled: bool = False
 
 
 class ShipmentCreate(BaseModel):
@@ -342,6 +343,10 @@ class IntakeImageIn(BaseModel):
     image_base64: str = Field(min_length=100, max_length=6_000_000)  # ảnh đã được trình duyệt thu nhỏ; máy chủ vẫn kiểm tra loại + kích thước thật
 
 
+class IntakeFileIn(BaseModel):
+    file_base64: str = Field(min_length=100, max_length=7_000_000)  # ảnh (đã thu nhỏ) hoặc PDF ≤ 5 MB; máy chủ kiểm tra loại theo nội dung + kích thước thật
+
+
 class IntakeDraftOut(BaseModel):
     draft_id: str
     extractor: dict[str, str]
@@ -352,5 +357,5 @@ class IntakeDraftOut(BaseModel):
     complete: bool
     suspicious_instructions: bool
     is_draft_only: bool
-    transcript: str | None = None  # chỉ với bản nháp từ ảnh: chữ mô hình đọc được (để người dùng đối chiếu)
+    transcript: str | None = None  # bản nháp từ ảnh/PDF: chữ đọc được (để người dùng đối chiếu)
     image_quota_remaining: int | None = None

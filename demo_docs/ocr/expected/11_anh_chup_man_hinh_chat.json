@@ -1,0 +1,38 @@
+{
+  "file": "11_anh_chup_man_hinh_chat.png",
+  "group": "image",
+  "group_note": "Ảnh: Gemini đọc. Cần khoá Gemini, tốn 1 lượt ảnh. Mọi trường có giá trị đều 'cần xem lại'.",
+  "scenario": "Ảnh chụp màn hình đoạn chat (giao diện chat chung chung, không phải ứng dụng thật): thông tin rải ở nhiều tin.",
+  "demo": "Gom thông tin từ nhiều bong bóng chat: '6 tấn rưỡi' → 6.500 kg, '2tr8' → 2.800.000.",
+  "needs_gemini": true,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "image",
+    "all_need_review": true
+  },
+  "expected_fields": {
+    "cargo_type": "dry",
+    "weight_kg": 6500,
+    "volume_m3": 18,
+    "origin": "Depot Thủ Đức (mô phỏng)",
+    "dest": "ICD Cảng C (mô phỏng)",
+    "ready_at": "2026-11-24T13:00:00+07:00",
+    "pickup_deadline": "2026-11-24T15:00:00+07:00",
+    "cutoff_at": "2026-11-24T21:00:00+07:00",
+    "price_vnd": [
+      2800000,
+      null
+    ],
+    "customer_name": [
+      "chị Mai",
+      "Mai",
+      "Chị Mai",
+      "Nội Thất Đông Á",
+      null
+    ]
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "them: Chào em, chị cần xe chở 6 tấn rưỡi hàng khô, khoảng 18 khối (08:02)\nthem: Lấy ở Depot Thủ Đức, giao ICD Cảng C (08:02)\nthem: Hàng sẵn sàng 13h ngày 24/11, xe lấy chậm nhất 15h ngày 24/11 (08:03)\nthem: Cut-off ICD 21h ngày 24/11 nha em (08:03)\nme: Dạ em nhận ạ, cước 2tr8 nha chị (08:05)\nthem: Ok em, chị Mai bên Nội Thất Đông Á nhé (08:06)\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

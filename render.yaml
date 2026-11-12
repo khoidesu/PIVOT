@@ -16,3 +16,14 @@ services:
         generateValue: true       # Render sinh mã ngẫu nhiên; xem trong Dashboard → Environment
       - key: PIVOT_DATA_MODE
         value: mock
+      # --- Nhập liệu tin nhắn / ảnh / PDF scan bằng Gemini (khoá dùng chung cho cả web, chỉ nằm ở máy chủ) ---
+      - key: PIVOT_GEMINI_API_KEY
+        sync: false       # dán khoá trong Dashboard → Environment (KHÔNG ghi vào repo); trình duyệt không bao giờ nhận được khoá
+      - key: PIVOT_INTAKE_EXTRACTOR
+        value: hybrid
+      - key: PIVOT_GEMINI_VISION_MODEL
+        value: gemini-3.5-flash
+      - key: PIVOT_GEMINI_FALLBACK_MODELS
+        value: gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.1-flash-lite
+      - key: PIVOT_TRUST_PROXY
+        value: "true"     # IP thật = phần tử cuối của X-Forwarded-For do proxy Render thêm → giới hạn lượt theo IP đúng người

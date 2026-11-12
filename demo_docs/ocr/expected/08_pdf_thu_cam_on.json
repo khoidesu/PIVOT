@@ -1,0 +1,47 @@
+{
+  "file": "08_pdf_thu_cam_on.pdf",
+  "group": "pdf_text",
+  "group_note": "PDF có lớp chữ: chữ lấy trong máy chủ, đi cùng đường với tin nhắn dán (luật; có khoá Gemini + chế độ hybrid thì Gemini bổ sung phần thiếu). Không tốn lượt ảnh.",
+  "scenario": "Thư cảm ơn — không phải yêu cầu vận chuyển.",
+  "demo": "Cảnh báo 'không giống yêu cầu vận chuyển'; không trường nào được điền bừa.",
+  "needs_gemini": false,
+  "reference_time": "2026-11-12T10:00:00+07:00",
+  "expect": {
+    "http": 200,
+    "source_kind": "pdf_text",
+    "pages": 1,
+    "all_need_review": false,
+    "flags": {
+      "looks_like_request": false
+    },
+    "must_be_null": [
+      "cargo_type",
+      "weight_kg",
+      "volume_m3",
+      "origin",
+      "dest",
+      "ready_at",
+      "pickup_deadline",
+      "cutoff_at",
+      "price_vnd"
+    ]
+  },
+  "expected_fields": {
+    "cargo_type": null,
+    "weight_kg": null,
+    "volume_m3": null,
+    "origin": null,
+    "dest": null,
+    "ready_at": null,
+    "pickup_deadline": null,
+    "cutoff_at": null,
+    "price_vnd": null,
+    "customer_name": [
+      null,
+      "Công ty TNHH Thương Mại Hoà Phong"
+    ]
+  },
+  "field_rule": "Giá trị là đáp án đúng; danh sách = chấp nhận một trong các giá trị; null = tài liệu không có/không được điền.",
+  "ground_truth_text": "Kính gửi Quý đối tác,\nCông ty chúng tôi chân thành cảm ơn sự hợp tác của Quý đối tác trong năm 2026.\nKính chúc Quý đối tác một mùa cuối năm thuận lợi và nhiều thành công.\nTrân trọng,\nBan Giám đốc - Công ty TNHH Thương Mại Hoà Phong (hư cấu)\nTÀI LIỆU MÔ PHỎNG - LOGECTION DEMO - không phải chứng từ thật",
+  "note": "Tài liệu MÔ PHỎNG do nhóm tạo bằng make_demo_files.py; mọi tên công ty/người/số điện thoại/email là hư cấu."
+}

@@ -10,6 +10,12 @@ os.environ["PIVOT_INTAKE_EXTRACTOR"] = "rule"  # test KHÔNG được gọi mô 
 os.environ["PIVOT_ETA_MODEL_DIR"] = ""  # test ETA mô phỏng cũ không bị model ONNX trong backend/model chen vào; test ONNX tự trỏ thư mục
 os.environ["PIVOT_GEMINI_API_KEY"] = ""
 os.environ["PIVOT_ANTHROPIC_API_KEY"] = ""
+for _k, _v in {"LLM_IMAGE_PER_USER_DAY": "3", "LLM_IMAGE_PER_USER_MINUTE": "2", "LLM_IMAGE_GLOBAL_DAY": "100",  # giới hạn lượt cố định:
+               "LLM_PER_USER_DAY": "50", "LLM_PER_USER_MINUTE": "5", "LLM_GLOBAL_DAY": "500",
+               "LLM_PER_IP_DAY": "150", "LLM_PER_IP_MINUTE": "15", "LLM_GLOBAL_MINUTE": "30",
+               "LLM_IMAGE_PER_IP_DAY": "20", "LLM_IMAGE_PER_IP_MINUTE": "6", "LLM_IMAGE_GLOBAL_MINUTE": "10", "TRUST_PROXY": "false"}.items():  # backend/.env (demo) không làm lệch test
+    os.environ[f"PIVOT_{_k}"] = _v
+os.environ.pop("PIVOT_GEMINI_VISION_MODEL", None)
 os.environ["PIVOT_SIGNALS_ENABLED"] = "false"  # test không gọi OSRM/Open-Meteo thật (xác định, chạy offline); test tín hiệu bật lại bằng monkeypatch
 
 
