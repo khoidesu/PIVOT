@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 import os
@@ -11,6 +12,7 @@ from .config import settings
 from .routers import auth, benefits, core, demo, docks, eta, events, incidents, intake, matching, tracking
 from .worker import process_pending
 
+log = logging.getLogger("pivot.main")
 
 
 def _warm_eta() -> None:
@@ -31,20 +33,29 @@ def sim_tick_once() -> None:
         pass
 
 
+async def background_loop(interval: float = 1.0) -> None:
+    """Vòng worker nền. Một lần lỗi (vd Neon ngắt kết nối) chỉ ghi log rồi chạy tiếp — nếu để lỗi thoát ra ngoài thì task
+    asyncio chết lặng lẽ và outbox/mô phỏng dừng hẳn cho tới khi khởi động lại."""
+    while True:
+        try:
+            await asyncio.to_thread(process_pending)
+            await asyncio.to_thread(sim_tick_once)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("background worker iteration failed")
+        await asyncio.sleep(interval)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Chốt chặn: token dev chỉ được bật cùng dữ liệu mô phỏng
     if settings.allow_dev_tokens and settings.data_mode != "mock":
         raise RuntimeError("Refusing to start: dev tokens enabled while PIVOT_DATA_MODE != 'mock'")
     task = None
-    asyncio.get_event_loop().run_in_executor(None, _warm_eta)  # huấn luyện ETA mô phỏng nền (không chặn khởi động)
+    asyncio.get_running_loop().run_in_executor(None, _warm_eta)  # huấn luyện ETA mô phỏng nền (không chặn khởi động)
     if settings.worker_inline:  # worker nền đọc outbox mỗi giây (chạy cùng tiến trình cho demo local)
-        async def loop():
-            while True:
-                await asyncio.to_thread(process_pending)
-                await asyncio.to_thread(sim_tick_once)
-                await asyncio.sleep(1)
-        task = asyncio.create_task(loop())
+        task = asyncio.create_task(background_loop())
     yield
     if task:
         task.cancel()

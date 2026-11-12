@@ -122,7 +122,7 @@ def build_draft(text: str, now: datetime, locations: list[dict], extractor: Extr
     needs_review = [k for k in FIELDS if fields[k]["status"] == "needs_review" and (k in REQUIRED or fields[k]["value"] is not None or fields[k]["notes"] not in ([], ["MISSING"]))]
     return {
         "draft_id": str(uuid.uuid4()),
-        "extractor": {"name": extractor.name, "kind": extractor.kind},
+        "extractor": {"name": extractor.name, "kind": extractor.kind, **({"note": extractor.note} if getattr(extractor, "note", None) else {})},
         "source": {"length": len(text), "sha256": hashlib.sha256(text.encode()).hexdigest()},
         "reference_time": now.astimezone(VN).isoformat(),
         "fields": fields,
@@ -131,3 +131,17 @@ def build_draft(text: str, now: datetime, locations: list[dict], extractor: Extr
         "suspicious_instructions": bool(INJECTION_RE.search(text)),
         "is_draft_only": True,
     }
+
+
+def mark_image_draft(draft: dict, mime: str, transcript: str) -> dict:
+    """Bản nháp từ ẢNH: trích đoạn kiểm theo bản phiên âm (không phải ảnh), nên mọi trường có giá trị đều phải được người dùng xem lại
+    (cho tới khi đo được độ chính xác trên ảnh thật — DRAFT 6.1)."""
+    for name, f in draft["fields"].items():
+        if f["value"] is not None:
+            f["status"] = "needs_review"
+            if "FROM_IMAGE" not in f["notes"]:
+                f["notes"].append("FROM_IMAGE")
+    draft["needs_review"] = [k for k in FIELDS if draft["fields"][k]["value"] is not None or k in REQUIRED]
+    draft["source"] = {**draft["source"], "kind": "image", "mime": mime}
+    draft["transcript"] = transcript
+    return draft

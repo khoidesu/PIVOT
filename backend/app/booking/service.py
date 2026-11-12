@@ -120,14 +120,15 @@ def release_holds(session: Session, proposal_id: uuid.UUID, to_status: str) -> N
 
 def expire_stale(session: Session, now: datetime) -> list[uuid.UUID]:
     """Đánh dấu hold/đề xuất quá hạn là expired (trong transaction hiện tại) và trả slot về."""
+    # ORDER BY id: nhiều giao dịch cùng dọn một lúc khoá các dòng theo CÙNG thứ tự → giảm nguy cơ bế tắc (deadlock)
     stale = session.execute(select(m.Reservation).where(
-        m.Reservation.status == "held", m.Reservation.expires_at < now).with_for_update()).scalars().all()
+        m.Reservation.status == "held", m.Reservation.expires_at < now).order_by(m.Reservation.id).with_for_update()).scalars().all()
     for r in stale:
         r.status = "expired"
         if r.resource_type == "slot":
             _restore_slot(session, r.resource_id)
     props = session.execute(select(m.Proposal).where(
-        m.Proposal.status.in_(OPEN_STATES), m.Proposal.expires_at < now).with_for_update()).scalars().all()
+        m.Proposal.status.in_(OPEN_STATES), m.Proposal.expires_at < now).order_by(m.Proposal.id).with_for_update()).scalars().all()
     for p in props:
         p.status = "expired"
         p.version += 1

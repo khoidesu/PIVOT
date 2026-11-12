@@ -80,7 +80,7 @@ def provision_org(session: Session, org: m.Organization, role: str, now: datetim
     if role == "carrier" and not session.execute(select(m.Vehicle.id).where(m.Vehicle.tenant_id == org.id)).first():
         home = L["depot"] or L["zones"][0]
         for i, (kg, m3) in enumerate([(24000, 60), (18000, 45), (18000, 45), (8000, 25)], 1):
-            plate = f"61{org.id.hex[0].upper()}-{org.id.hex[1:4]}.{i:02d}"
+            plate = f"61{org.id.hex[0].upper()}-{org.id.hex[1:7]}.{i:02d}"  # 7 ký tự hex (≈268 triệu khả năng): không va chạm khi có hàng trăm nhà vận tải
             veh = m.Vehicle(tenant_id=org.id, plate=plate, cargo_types=["dry"], capacity_kg=kg, capacity_m3=m3,
                             status="available", position_updated_at=now - timedelta(minutes=1))
             session.add(veh)
@@ -134,6 +134,10 @@ def login_or_register(session: Session, name: str, role: str) -> tuple[str, bool
             session.add(m.Membership(user_id=user.id, org_id=org.id, role=role))
             session.flush()
             provision_org(session, org, role)
-    except IntegrityError:  # hai tab đăng nhập cùng một tên mới cùng lúc: người đến sau dùng tài khoản vừa tạo
+    except IntegrityError:
+        # Hai tab đăng nhập cùng một tên mới cùng lúc: người đến sau dùng tài khoản vừa được tạo. Nếu người dùng KHÔNG tồn tại thì
+        # lỗi ràng buộc là do việc khác (vd trùng biển số) → ném lại, không trả khoá của một tài khoản không có thật.
+        if session.execute(select(m.User.id).where(m.User.email == email)).first() is None:
+            raise
         return key, False
     return key, True

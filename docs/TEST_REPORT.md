@@ -6,8 +6,8 @@ Dữ liệu: **mô phỏng** (3 tổ chức, 5 thành viên, 10 xe, 20 lô, 20 s
 ## Kết quả tổng
 | Bộ test | Số test | Kết quả |
 |---|---|---|
-| Backend (pytest) | 201 | **201 đạt** |
-| Frontend (vitest) + `tsc` + `vite build` | 15 | **15 đạt**, kiểu và build sạch |
+| Backend (pytest) | 255 | **255 đạt** (cập nhật 12/11/2026) |
+| Frontend (vitest) + `tsc` + `vite build` | 31 | **31 đạt**, kiểu và build sạch (cập nhật 12/11/2026) |
 | Kịch bản demo (CLI trên API thật) | 10 | **10/10 đạt** (0,1–0,8 giây mỗi kịch bản), chạy lặp lại nhiều lần đều đạt |
 
 Theo file (backend): access 9 · benefits_audit 12 · booking 14 · events 10 · gates 11 · intake 14 · integrity 17 · match 16 · perf 1 · scenarios 12 · shipment_edit 8 · vehicle_events 6 · login 13 · login_scenarios 11 · deploy 9 · **tracking 6 · incidents 12 · docks 10 · eta 10** (mở rộng Control Tower).
@@ -91,6 +91,12 @@ Test đáng chú ý: `test_no_future_leakage…` (trôi chỉ xuất hiện ở 
 | Chạy tab Demo | Reset bằng `TRUNCATE` bế tắc với worker nền | `DELETE` theo thứ tự khoá ngoại + test hồi quy (bản cũ làm test treo) |
 | Chạy tab Demo | Endpoint chạy kịch bản tự chờ chính giao dịch của mình | Nhả giao dịch trước khi chạy |
 | Review lần 1 | Hold hết hạn chiếm tài nguyên (index không dùng được `now()`) | Hết hạn trong transaction + worker |
+| Rà soát 12/11 | Xe `offline` (sau hỏng + ghép lại) không bao giờ trở lại `available` dù đã báo `VEHICLE_AVAILABLE` | `VEHICLE_AVAILABLE` đưa xe `offline` về `available` (xe `committed` giữ nguyên) |
+| Rà soát 12/11 | `customer_name` > 200 ký tự / `price_vnd` vượt BIGINT → HTTP 500 | Ràng buộc schema → 422 |
+| Rà soát 12/11 | Một lỗi trong vòng worker nền làm task asyncio chết lặng lẽ; lỗi `sweep` chặn cả xử lý outbox | `background_loop` bắt lỗi + log; mỗi việc dọn một transaction riêng |
+| Rà soát 12/11 | Đăng nhập tên mới gặp lỗi ràng buộc khác race vẫn trả khoá của người dùng không tồn tại; biển số sinh chỉ 16^4 khả năng | Ném lại lỗi thật; biển số 7 ký tự hex |
+| Rà soát 12/11 | `/v1/tracking` LIMIT 100 trước khi lọc quyền → chuyến cũ của người dùng biến mất; `/v1/benefits` nạp cả sổ rồi lọc | Lọc quyền trong SQL |
+| Rà soát 12/11 | Giao diện: `useData` để phản hồi chậm của token/chuyến cũ ghi đè dữ liệu mới; đổi chuyến phải đợi nhịp polling | Chỉ áp dụng lần gọi mới nhất; tải ngay khi đổi `key` |
 
 ## Giới hạn đã biết (không che giấu)
 - Mọi số liệu là **mô phỏng**; "verified" chỉ chứng minh quy trình ghi sổ/xác minh độc lập, **không** chứng minh tiết kiệm thật. Lợi ích mới có một hạng mục (km chạy rỗng × đơn giá phẳng, baseline hằng số 38 km); chưa có chi phí chờ/bốc dỡ/đi vòng, chưa có Bảng A/B/C của DRAFT 11.3.

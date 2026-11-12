@@ -36,17 +36,25 @@ def _handle(session: Session, job: m.OutboxJob, now: datetime) -> None:
         raise ValueError(f"unknown topic {job.topic}")
 
 
+def maintenance(factory: sessionmaker = SessionLocal, now: datetime | None = None) -> None:
+    """Các việc dọn nền: hold/đề xuất quá hạn (trả slot — GET không ghi DB), NO_SHOW + hàng đợi dock, leo thang quá SLA + dữ liệu
+    vị trí quá cũ. Mỗi việc một transaction riêng và lỗi của việc này KHÔNG làm hỏng việc khác hay cả vòng xử lý job outbox."""
+    from .docks.service import sweep as dock_sweep
+    from .incidents.service import sweep
+    for name, step in (("expire_stale", expire_stale), ("dock_sweep", dock_sweep), ("sweep", sweep)):
+        try:
+            with factory() as s:
+                step(s, now or datetime.now(timezone.utc))
+                s.commit()
+        except Exception:  # noqa: BLE001 — việc dọn lỗi (DB chập chờn, dữ liệu bất thường) chỉ được ghi log, không dừng worker
+            log.exception("worker maintenance step failed: %s", name)
+
+
 def process_pending(factory: sessionmaker = SessionLocal, limit: int = 50, now: datetime | None = None,
                     fail_hook=None) -> dict:
     """Xử lý tối đa `limit` job đến hạn. fail_hook(job) chỉ dùng để test sự cố worker chết giữa chừng."""
     stats = {"done": 0, "retry": 0, "failed": 0}
-    with factory() as s:  # dọn hold/đề xuất quá hạn (trả slot) — GET không còn ghi DB
-        expire_stale(s, now or datetime.now(timezone.utc))
-        from .incidents.service import sweep
-        from .docks.service import sweep as dock_sweep
-        dock_sweep(s, now or datetime.now(timezone.utc))  # NO_SHOW + hàng đợi dock
-        sweep(s, now or datetime.now(timezone.utc))  # leo thang quá SLA + phát hiện dữ liệu vị trí quá cũ
-        s.commit()
+    maintenance(factory, now)
     for _ in range(limit):
         now_ = now or datetime.now(timezone.utc)
         with factory() as s:  # tx1: claim
@@ -95,7 +103,10 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     log.info("worker started")
     while True:
-        process_pending()
+        try:
+            process_pending()
+        except Exception:  # noqa: BLE001 — mất kết nối DB tạm thời không được làm worker chết hẳn
+            log.exception("worker iteration failed")
         time.sleep(1)
 
 

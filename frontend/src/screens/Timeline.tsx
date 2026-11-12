@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, type ExceptionItem, type Replay } from '../api'
 import { Chip, ErrorNote, Loading, More, Note, Stepper } from '../components/ui'
+import { Icon, type IconName } from '../components/Icon'
 import { fmtClock } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
-const KIND_ICON: Record<string, string> = { match: '◎', decision: '✔', event: '⇄', exception: '⚠', benefit: '₫' }
+const KIND_ICON: Record<string, IconName> = { match: 'target', decision: 'check', event: 'arrows', exception: 'alert', benefit: 'coins' }
 const KIND_COLOR: Record<string, string> = { match: 'teal', decision: 'good', event: '', exception: 'warn', benefit: 'good' }
 const ABNORMAL = new Set(['late', 'invalid', 'unsupported'])
 const PARTY_ROLES = new Set(['shipper', 'carrier'])
@@ -24,7 +25,7 @@ export function Timeline({ query }: { query: URLSearchParams }) {
     }
   }, [list.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tl = useData(() => (pid ? api.timeline(pid) : Promise.resolve(null)), 2000)
+  const tl = useData(() => (pid ? api.timeline(pid) : Promise.resolve(null)), 2000, pid) // key=pid: đổi chuyến là tải ngay
   const exs = useData(() => api.exceptions(), 2000)
   const cur = list.find((p) => p.id === pid)
   const myExs = (exs.data ?? []).filter((e) => e.proposal_id === pid)
@@ -82,7 +83,7 @@ export function Timeline({ query }: { query: URLSearchParams }) {
                   const party = typeof i.detail.party === 'string' ? ` (${t(`party.${i.detail.party}`)})` : ''
                   return (
                     <li key={k} className={`tl-item ${i.kind}`}>
-                      <span className={`tl-dot ${KIND_COLOR[i.kind]}`} aria-hidden>{KIND_ICON[i.kind]}</span>
+                      <span className={`tl-dot ${KIND_COLOR[i.kind]}`} aria-hidden><Icon name={KIND_ICON[i.kind] ?? 'arrows'} size={14} /></span>
                       <div>
                         <div className="row"><b>{title}{party}</b>
                           {i.quality && ABNORMAL.has(i.quality) && <Chip kind="warn">{t(`tl.q.${i.quality}`)}</Chip>}</div>

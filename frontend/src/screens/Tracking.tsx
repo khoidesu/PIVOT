@@ -121,11 +121,12 @@ export function Tracking({ query }: { query: URLSearchParams }) {
   const list = useData(() => api.tracking(), 2500)
   const [pid, setPid] = useState(query.get('p') ?? '')
   const trips = list.data ?? []
-  useEffect(() => {
+  const tripIds = trips.map((x) => x.proposal_id).join(',')
+  useEffect(() => { // chuyến đang chọn biến mất (hoàn tất/huỷ) dù số chuyến không đổi → chọn lại, không để màn hình trống
     if (!trips.length) return
     if (!pid || !trips.some((x) => x.proposal_id === pid)) setPid((trips.find((x) => x.status === 'executing') ?? trips[0]).proposal_id)
-  }, [trips.length, pid]) // eslint-disable-line react-hooks/exhaustive-deps
-  const detail = useData(() => (pid ? api.trip(pid) : Promise.resolve(null)), 2000)
+  }, [tripIds, pid]) // eslint-disable-line react-hooks/exhaustive-deps
+  const detail = useData(() => (pid ? api.trip(pid) : Promise.resolve(null)), 2000, pid) // key=pid: đổi chuyến là tải ngay, không đợi nhịp polling
   const trip = detail.data && detail.data.proposal_id === pid ? detail.data : null
   const roadTried = useRef<Set<string>>(new Set())
   useEffect(() => { // chuyến đã cam kết nhưng chưa chạy: lấy & lưu đường bộ thật một lần (idempotent; lỗi mạng → giữ tuyến mô phỏng)

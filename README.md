@@ -50,9 +50,10 @@ cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 
 ## Kiểm thử
 ```bash
-cd backend && .venv/bin/python -m pytest      # 240 test (DB test riêng: pivot_test)
+cd backend && .venv/bin/python -m pytest      # 299 test (DB test riêng: pivot_test)
 cd frontend && npm test && npx tsc --noEmit
 ```
+**ETA Sandbox** (công cụ nội bộ để thử/tinh chỉnh ETA trước khi chốt demo, không cần bật server/DB): `cd backend && .venv/bin/python -m app.eta_sandbox_cli [--only drift|scenarios|signals] [--fresh]` in 3 bảng (quét độ trôi ML · lưới kịch bản theo khung giờ · sức khoẻ OSRM/Open-Meteo/Mapbox). Tương đương qua API (vai Điều phối viên, cần mã quản trị nếu có): `GET /v1/eta/sandbox/drift-sweep`, `/scenarios`, `/signals-health?fresh=true`.
 
 ## Màn hình (menu hiện theo vai trò)
 **Yêu cầu** (gõ tay hoặc nút *Dán tin nhắn* → bản nháp có dẫn nguồn) · **Lô / Xe / Slot** (sửa, huỷ lô) · **Ghép** (khuyến nghị + lý do; chi tiết kỹ thuật ở mục *Chi tiết*) · **Xác nhận** · **Theo dõi** (bản đồ OSM, mốc geofence, ETA P50–P90) · **Lịch dock** (Gantt, check-in/bốc dỡ, dwell) · **Ngoại lệ** (mức độ, playbook, SLA, ghép lại) · **Hành trình** (timeline, tái lập) · **Lợi ích**; chuông thông báo ở thanh đầu. Chủ hàng thấy cả 6; nhà vận tải không có *Yêu cầu* ở menu (vẫn vào được bằng nút *+ Yêu cầu*); ICD thấy *Slot · Xác nhận · Lịch dock · Theo dõi · Ngoại lệ · Hành trình*; điều phối viên thấy phần còn lại và mở *Kịch bản demo* từ menu avatar.
@@ -69,4 +70,11 @@ cd frontend && npm test && npx tsc --noEmit
 - **Lợi ích**: baseline chốt trước, estimated → measured → verified, xác minh phải do bên độc lập.
 
 ## AI nhập liệu — đọc kỹ
-Mặc định dùng **bộ phân tích theo luật (không phải AI)**. Để dùng mô hình ngôn ngữ: `PIVOT_INTAKE_EXTRACTOR=llm` và `PIVOT_ANTHROPIC_API_KEY=<khoá của bạn>` (không đưa khoá vào mã/commit). Bộ LLM **chưa được chạy thử với API thật**. Dù dùng bộ nào, kết quả vẫn qua kiểm tra bằng luật và chỉ là bản nháp.
+Mặc định dùng **bộ phân tích theo luật (không phải AI)**. Có hai cách bật mô hình ngôn ngữ (đặt trong `backend/.env`, đã `.gitignore`, **không commit khoá**):
+
+- **Gemini kết hợp luật (khuyến nghị):** `PIVOT_INTAKE_EXTRACTOR=hybrid` + `PIVOT_GEMINI_API_KEY=<khoá>`. Luật chạy trước; **chỉ khi còn thiếu/mơ hồ trường bắt buộc** mới hỏi Gemini phần còn thiếu (luật đã đủ thì không tốn lượt). Giá và tên khách do luật trích và **bị che** trước khi gửi. Mô hình mặc định `gemini-3.1-flash-lite` (đổi bằng `PIVOT_GEMINI_MODEL`; model `gemini-2.5-flash` đã ngừng cấp cho khoá mới). Giới hạn lượt gọi (vượt → tự dùng bộ luật, giao diện báo rõ): `PIVOT_LLM_PER_USER_DAY=50`, `PIVOT_LLM_PER_USER_MINUTE=5`, `PIVOT_LLM_GLOBAL_DAY=500` (đếm trong bộ nhớ tiến trình).
+- **Claude:** `PIVOT_INTAKE_EXTRACTOR=llm` + `PIVOT_ANTHROPIC_API_KEY=<khoá>` (bộ này **chưa chạy thử với API thật**).
+
+- **Đọc ảnh (nút *Tải ảnh* ở màn Yêu cầu):** dùng chung khoá Gemini, bật tự động khi có `PIVOT_GEMINI_API_KEY` (tắt bằng `PIVOT_INTAKE_IMAGE_ENABLED=false`). Trình duyệt thu nhỏ ảnh (≤1600px, JPEG) và loại EXIF; máy chủ kiểm tra loại tệp theo nội dung (JPEG/PNG/WebP), kích thước ≤4 MB, gỡ EXIF lần nữa. Gemini trả các trường + **bản phiên âm**; trích đoạn kiểm theo bản phiên âm; trường Gemini bỏ sót được bộ luật điền từ bản phiên âm. **Mọi trường từ ảnh đều ở trạng thái "cần xem lại"** cho tới khi đo được độ chính xác trên ảnh thật. Giới hạn riêng: `PIVOT_LLM_IMAGE_PER_USER_DAY=3`, `..._PER_USER_MINUTE=2`, `PIVOT_LLM_IMAGE_GLOBAL_DAY=100` — hết lượt là báo lỗi rõ (không có bộ luật để quay về); lỗi phía Gemini không tính lượt. Ảnh được gửi **nguyên vẹn** (không che được giá/tên khách), không lưu ảnh gốc.
+
+Dù dùng bộ nào, kết quả vẫn qua kiểm tra bằng luật (trích đoạn nguồn phải có thật, địa điểm phải khớp danh sách, thứ tự giờ, ngày tương đối luôn hỏi lại) và chỉ là bản nháp để người dùng duyệt. **Bản triển khai công khai: không đặt khoá** (endpoint mở, tốn tiền).

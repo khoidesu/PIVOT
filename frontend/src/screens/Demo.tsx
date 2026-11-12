@@ -34,7 +34,7 @@ export function Demo() {
           {Object.keys(res).length > 0 && <Chip kind={passed === SCENARIO_IDS.length ? 'good' : 'warn'}>{t('demo.all', { n: passed })}</Chip>}
         </div>
         {needKey && (
-          <More label={`${t('demo.adminTitle')} ${hasKey ? '✓' : '⚠'}`} open={!hasKey}>
+          <More label={`${t('demo.adminTitle')} ${hasKey ? '✓' : '!'}`} open={!hasKey}>
             <div className="row">
               <label className="sr" htmlFor="admin-key">{t('demo.adminTitle')}</label>
               <input id="admin-key" type="password" autoComplete="off" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} style={{ maxWidth: 260 }} />

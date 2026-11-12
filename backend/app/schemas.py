@@ -4,6 +4,9 @@ from datetime import datetime
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 
+MAX_PRICE_VND = 10 ** 15  # trần hợp lý (1 triệu tỷ ₫) và nằm xa giới hạn BIGINT của DB
+
+
 class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -23,6 +26,7 @@ class MetaOut(BaseModel):
     server_time: datetime
     stale_position_minutes: int
     admin_key_required: bool = False
+    image_intake_enabled: bool = False
 
 
 class ShipmentCreate(BaseModel):
@@ -36,8 +40,8 @@ class ShipmentCreate(BaseModel):
     ready_at: AwareDatetime  # bắt buộc có múi giờ (lưu UTC, DRAFT mục 4.1)
     pickup_deadline: AwareDatetime
     cutoff_at: AwareDatetime
-    price_vnd: int | None = Field(default=None, ge=0)
-    customer_name: str | None = None
+    price_vnd: int | None = Field(default=None, ge=0, le=MAX_PRICE_VND)
+    customer_name: str | None = Field(default=None, max_length=200)  # khớp cột String(200): quá dài → 422 thay vì lỗi DB (500)
     draft_id: uuid.UUID | None = None  # nếu tạo từ bản nháp nhập liệu đã được người dùng duyệt
 
     @model_validator(mode="after")
@@ -318,7 +322,7 @@ class ShipmentUpdate(BaseModel):
     ready_at: AwareDatetime | None = None
     pickup_deadline: AwareDatetime | None = None
     cutoff_at: AwareDatetime | None = None
-    price_vnd: int | None = Field(default=None, ge=0)
+    price_vnd: int | None = Field(default=None, ge=0, le=MAX_PRICE_VND)
     customer_name: str | None = Field(default=None, max_length=200)
 
 
@@ -334,6 +338,10 @@ class IntakeFieldOut(BaseModel):
     notes: list[str] = []
 
 
+class IntakeImageIn(BaseModel):
+    image_base64: str = Field(min_length=100, max_length=6_000_000)  # ảnh đã được trình duyệt thu nhỏ; máy chủ vẫn kiểm tra loại + kích thước thật
+
+
 class IntakeDraftOut(BaseModel):
     draft_id: str
     extractor: dict[str, str]
@@ -344,3 +352,5 @@ class IntakeDraftOut(BaseModel):
     complete: bool
     suspicious_instructions: bool
     is_draft_only: bool
+    transcript: str | None = None  # chỉ với bản nháp từ ảnh: chữ mô hình đọc được (để người dùng đối chiếu)
+    image_quota_remaining: int | None = None

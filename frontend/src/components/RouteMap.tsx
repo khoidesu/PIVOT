@@ -3,6 +3,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef, useState } from 'react'
 import type { TripTrack } from '../api'
 import { useI18n } from '../i18n'
+import { iconSvg } from './Icon'
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty' // bản đồ vector miễn phí, không cần khoá, có sẵn toà nhà 3D
 const BLANK: maplibregl.StyleSpecification = { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#e8eef0' } }] }
@@ -93,9 +94,9 @@ export function RouteMap({ trip, late }: { trip: TripTrack; late?: boolean }) {
     src('fences').setData(fc(trip.geofences.map((f) => ring(f.lng, f.lat, f.radius_m))))
     m.setPaintProperty('route', 'line-dasharray', trip.route_source === 'osrm' ? [1, 0] : [1.2, 1.6]) // đường bộ thật: nét liền; mô phỏng: nét đứt
     markers.current.forEach((k) => k.remove())
-    markers.current = trip.geofences.map((f) => new maplibregl.Marker({ element: mk('mk-pin', f.code === 'AT_ICD_GATE' ? '⚑' : '▣') }).setLngLat([f.lng, f.lat]).addTo(m))
+    markers.current = trip.geofences.map((f) => new maplibregl.Marker({ element: mk('mk-pin', iconSvg(f.code === 'AT_ICD_GATE' ? 'flag' : 'box', 14)) }).setLngLat([f.lng, f.lat]).addTo(m))
     if (trip.position) {
-      markers.current.push(new maplibregl.Marker({ element: mk(late ? 'mk-veh late' : 'mk-veh', '🚚', trip.plate) }).setLngLat([trip.position.lng, trip.position.lat]).addTo(m))
+      markers.current.push(new maplibregl.Marker({ element: mk(late ? 'mk-veh late' : 'mk-veh', iconSvg('truck', 16), trip.plate) }).setLngLat([trip.position.lng, trip.position.lat]).addTo(m))
       if (follow) m.easeTo({ center: [trip.position.lng, trip.position.lat], duration: 600 })
     }
     const key = `${trip.proposal_id}:${trip.route_source}`

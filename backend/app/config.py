@@ -12,7 +12,19 @@ class Settings(BaseSettings):
     hold_seconds: int = 120  # DRAFT 5.4: hold có hạn, demo 120 giây
     data_mode: str = "mock"  # mock | live — hiển thị trên UI (DRAFT mục 7)
     worker_inline: bool = True  # worker outbox chạy nền cùng API (tắt khi chạy `python -m app.worker` riêng)
-    intake_extractor: str = "rule"  # rule | llm  (llm chỉ dùng được khi có PIVOT_ANTHROPIC_API_KEY)
+    intake_extractor: str = "rule"  # rule | llm | hybrid  (llm cần PIVOT_ANTHROPIC_API_KEY; hybrid = luật trước + Gemini bổ sung, cần PIVOT_GEMINI_API_KEY)
+    gemini_api_key: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường hoặc backend/.env (đã .gitignore)
+    gemini_model: str = "gemini-3.1-flash-lite"  # nhanh, rẻ, đủ cho trích xuất có schema (gemini-2.5-flash đã ngừng cấp cho khoá mới)
+    gemini_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_timeout_s: float = 15.0
+    llm_per_user_day: int = 50  # giới hạn lượt gọi mô hình: mỗi người/ngày, mỗi người/phút, toàn hệ thống/ngày (vượt → dùng bộ luật)
+    llm_per_user_minute: int = 5
+    llm_global_day: int = 500
+    intake_image_enabled: bool = True  # cho phép nhập liệu từ ảnh (cần khoá Gemini). Ảnh gửi NGUYÊN VẸN ra ngoài → tắt ở bản công khai
+    llm_image_per_user_day: int = 3  # ảnh tốn lượt hơn văn bản: giới hạn riêng, không có bộ luật để quay về nên hết lượt là báo lỗi rõ
+    llm_image_per_user_minute: int = 2
+    llm_image_global_day: int = 100
+    intake_image_max_bytes: int = 4_000_000
     anthropic_api_key: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường
     anthropic_model: str = "claude-haiku-5-5"
     allow_embed: bool = False  # true → bỏ X-Frame-Options (cần khi chạy trong khung nhúng của Hugging Face Spaces)

@@ -51,7 +51,8 @@ def meta(actor: Actor = Depends(current_actor), session: Session = Depends(get_s
     return s.MetaOut(data_mode=settings.data_mode, is_simulated=True,
                      server_time=datetime.now(timezone.utc),
                      stale_position_minutes=params["stale_position_minutes"],
-                     admin_key_required=bool(settings.admin_key))
+                     admin_key_required=bool(settings.admin_key),
+                     image_intake_enabled=bool(settings.gemini_api_key and settings.intake_image_enabled))
 
 
 @router.post("/demo/retime", dependencies=[Depends(require_admin)])

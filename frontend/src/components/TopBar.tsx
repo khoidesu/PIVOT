@@ -5,6 +5,7 @@ import { ageMinutes } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
 import { Chip, Hint } from './ui'
+import { Icon } from './Icon'
 
 export function Brand() {
   return <div className="brand"><div className="logo" aria-hidden>L</div><b>LOGECTION</b></div>
@@ -25,7 +26,7 @@ function Bell() {
   const unread = list.data?.unread ?? 0
   return (
     <div className="menu-wrap" ref={wrap}>
-      <button className="bell" aria-label={t('bell.title')} aria-expanded={open} onClick={() => setOpen((v) => !v)}>🔔{unread > 0 && <span className="dot">{unread > 9 ? '9+' : unread}</span>}</button>
+      <button className="bell" aria-label={unread > 0 ? `${t('bell.title')}: ${unread}` : t('bell.title')} aria-expanded={open} onClick={() => setOpen((v) => !v)}><Icon name="bell" size={18} />{unread > 0 && <span className="dot" aria-hidden>{unread > 9 ? '9+' : unread}</span>}</button>
       {open && (
         <div className="menu bell-list" role="menu">
           {!items.length && <div className="muted small" style={{ padding: 10 }}>{t('bell.empty')}</div>}
@@ -52,6 +53,7 @@ function StaleFleet() {
   async function fix() {
     setBusy(true)
     try { for (const v of stale) await api.sendVehicleEvent(v.id, 'VEHICLE_POSITION'); await new Promise((r) => setTimeout(r, 1600)); await vehicles.reload(true) }
+    catch { /* lỗi mạng/quyền: nút bật lại để thử tiếp, không để lỗi thoát ra thành "unhandled rejection" */ }
     finally { setBusy(false) }
   }
   return (

@@ -5,7 +5,7 @@ Toàn bộ toạ độ/đường đi ở prototype là MÔ PHỎNG (đường n�
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -110,10 +110,9 @@ def _visible_proposals(session: Session, actor, only_active: bool):
             .join(m.Vehicle, m.Vehicle.id == m.Proposal.vehicle_id)
             .outerjoin(m.Slot, m.Slot.id == m.Proposal.slot_id)
             .where(m.Proposal.status.in_(("executing",) if only_active else ("confirmed", "executing", "completed"))))
-    rows = session.execute(stmt.order_by(m.Proposal.created_at.desc()).limit(100)).all()
-    if actor.role == "dispatcher":
-        return rows
-    return [r for r in rows if actor.org_id in (r[1].tenant_id, r[2].tenant_id, r[3].node_org_id if r[3] else None)]
+    if actor.role != "dispatcher":  # lọc quyền NGAY trong SQL: nếu LIMIT trước rồi mới lọc thì chuyến cũ của người dùng bị chuyến mới của người khác đẩy khỏi danh sách
+        stmt = stmt.where(or_(m.Shipment.tenant_id == actor.org_id, m.Vehicle.tenant_id == actor.org_id, m.Slot.node_org_id == actor.org_id))
+    return session.execute(stmt.order_by(m.Proposal.created_at.desc()).limit(100)).all()
 
 
 def trip_view(session: Session, prop: m.Proposal, ship: m.Shipment, veh: m.Vehicle, now: datetime) -> dict:

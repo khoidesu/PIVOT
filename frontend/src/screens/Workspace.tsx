@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, getSession, setSession, type Role } from '../api'
-import { Brand } from '../components/TopBar'
-import { Chip, ErrorNote } from '../components/ui'
+import { ErrorNote } from '../components/ui'
+import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n'
 import {
   addWin, CHAIN, closeWin, EMPTY, focusWin, MAX_WINS, minimizeWin, moveWin, parse, placement, serialize, setLayout, TEAM, updateToken,
   winId, WsLimitError, type LayoutMode, type Win, type WsState,
 } from '../workspace'
+import { applyTheme, currentTheme, type Theme } from '../theme'
 import { LoginForm } from './Login'
 
 const KEY = 'pivot.workspace'
 const LAYOUTS: LayoutMode[] = ['grid', 'cols', 'focus']
+/** Chữ viết tắt trong avatar: 2 chữ cái đầu của hai từ cuối ("Nguyễn Văn An" → VA), một từ → chữ đầu + chữ thứ hai. */
+const initials = (name: string) => {
+  const w = name.trim().split(/\s+/)
+  return (w.length > 1 ? w[w.length - 2][0] + w[w.length - 1][0] : name.trim().slice(0, 2)).toUpperCase()
+}
 
 function initial(): WsState {
   let s = EMPTY
@@ -31,6 +37,8 @@ export function Workspace() {
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [width, setWidth] = useState(1200)
+  const [theme, setThemeState] = useState<Theme>(currentTheme)
+  const [slim, setSlim] = useState(() => { try { return localStorage.getItem('pivot.railSlim') === '1' } catch { return false } }) // thanh người: rộng (có tên) hoặc thu gọn (chỉ avatar)
   const frames = useRef(new Map<string, HTMLIFrameElement>())
   const gridEl = useRef<HTMLDivElement | null>(null)
   const popEl = useRef<HTMLDivElement | null>(null)
@@ -60,16 +68,21 @@ export function Workspace() {
       const hit = [...frames.current].find(([, f]) => f.contentWindow === e.source)
       if (!hit) return
       const id = hit[0]
-      if (d.type === 'logection:ready') { sendSession(id); hit[1].contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin) }
+      if (d.type === 'logection:ready') { sendSession(id); hit[1].contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin) }
       else if (d.type === 'logection:badge') setBadges((b) => (b[id] === d.n ? b : { ...b, [id]: d.n ?? 0 }))
       else if (d.type === 'logection:logout') commit(closeWin(stRef.current, id))
       else if (d.type === 'logection:expired') { const w = stRef.current.wins.find((x) => x.id === id); if (w) void relogin(w) }
     }
     window.addEventListener('message', on)
     return () => window.removeEventListener('message', on)
-  }, [commit, relogin, sendSession, lang])
+  }, [commit, relogin, sendSession, lang, theme])
 
   useEffect(() => { for (const f of frames.current.values()) f.contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin) }, [lang])
+  useEffect(() => { // chế độ sáng/tối: áp dụng cho trang bao ngoài và phát tới mọi cửa sổ nhúng
+    applyTheme(theme)
+    for (const f of frames.current.values()) f.contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin)
+  }, [theme])
+  const setTheme = (th: Theme) => { applyTheme(th, true); setThemeState(th) }
 
   useEffect(() => { // bấm vào bên trong một cửa sổ (khung nhúng) → cửa sổ đó thành tiêu điểm
     const on = () => setTimeout(() => {
@@ -118,64 +131,62 @@ export function Workspace() {
   const stable = [...wins].sort((a, b) => (a.id < b.id ? -1 : 1)) // thứ tự DOM cố định (đổi thứ tự DOM sẽ làm khung nhúng tải lại); thứ tự hiển thị dùng CSS `order`
   const focusId = st.focus ?? open[0]?.id
 
-  if (!wins.length) {
-    return (
-      <main className="login">
-        <div className="login-top">
-          <Brand />
-          <div className="row">
-            <Chip kind="sim">● {t('badge.mock')}</Chip>
-            <div className="seg" role="group" aria-label="Language">
-              {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
-            </div>
-          </div>
-        </div>
-        <LoginForm onLogin={enter} />
-      </main>
-    )
-  }
+  const addMenu = pop === 'form' ? (
+    <LoginForm compact onLogin={async (n, r) => { await enter(n, r); setPop('closed') }} />
+  ) : (
+    <>
+      <div className="ws-pop-h">{t('ws.add')}</div>
+      {TEAM.map((p) => {
+        const ex = wins.find((w) => w.id === winId(p.name, p.role))
+        return (
+          <button key={p.name} role="menuitem" className="ws-pi" disabled={!!ex?.open} onClick={() => quick(p.name, p.role)}>
+            <span className={`ws-av role-${p.role}`}>{p.name.charAt(0)}</span>
+            <span className="grow">{p.name} <span className="muted">· {t(`role.${p.role}`)}</span></span>
+            {ex && <span className="muted small">{ex.open ? t('ws.open') : t('ws.bg')}</span>}
+          </button>)
+      })}
+      <div className="ws-sep" />
+      <button role="menuitem" className="ws-pi" onClick={chain}>{t('ws.chain')}</button>
+      <button role="menuitem" className="ws-pi" onClick={() => setPop('form')}>{t('ws.other')}</button>
+      {err && <ErrorNote error={err} />}
+    </>
+  )
 
   return (
     <div className="ws">
-      <nav className="ws-rail" aria-label={t('ws.rail')}>
+      <nav className={`ws-rail${slim ? ' slim' : ''}`} aria-label={t('ws.rail')}>
+        <div className="ws-rail-h">
+          {!slim && <span className="ws-rail-t">{t('ws.people')}</span>}
+          <button className="ws-collapse" aria-label={t(slim ? 'ws.expand' : 'ws.collapse')} title={t(slim ? 'ws.expand' : 'ws.collapse')} aria-expanded={!slim}
+            onClick={() => { setSlim(!slim); try { localStorage.setItem('pivot.railSlim', slim ? '0' : '1') } catch { /* bỏ qua */ } }}><Icon name={slim ? 'chevronsRight' : 'chevronsLeft'} size={16} /></button>
+        </div>
         <div className="ws-nodes">
           {wins.map((w) => {
             const b = badges[w.id] ?? 0
             const isOpen = w.open
+            const label = `${w.name} · ${t(`role.${w.role}`)}`
             return (
               <button key={w.id} className={`ws-node role-${w.role}${isOpen ? '' : ' bg'}${isOpen && w.id === focusId ? ' foc' : ''}`}
-                title={`${w.name} · ${t(`role.${w.role}`)} — ${isOpen ? t('ws.open') : t('ws.bgTip')}`}
+                title={`${label} — ${isOpen ? t('ws.open') : t('ws.bgTip')}`}
                 aria-label={`${w.name}, ${t(`role.${w.role}`)}, ${isOpen ? t('ws.open') : t('ws.bg')}${b ? `, ${t('ws.pending', { n: b })}` : ''}`}
                 onClick={() => commit(focusWin(stRef.current, w.id))}>
-                {w.name.trim().charAt(0).toUpperCase()}
-                {b > 0 && <span className="ws-bd">{b > 9 ? '9+' : b}</span>}
+                <span className="ws-ava" aria-hidden>{initials(w.name)}{b > 0 && slim && <span className="ws-bd">{b > 9 ? '9+' : b}</span>}</span>
+                {!slim && (
+                  <span className="ws-meta">
+                    <b>{w.name}</b>
+                    <small><i className={isOpen ? 'on' : ''} aria-hidden />{t(`role.${w.role}`)}</small>
+                  </span>)}
+                {!slim && b > 0 && <span className="ws-pill">{b > 9 ? '9+' : b}</span>}
               </button>)
           })}
         </div>
         <div className="ws-tools" ref={popEl}>
-          <button className="ws-add" aria-label={t('ws.add')} aria-expanded={pop !== 'closed'} aria-haspopup="menu" onClick={() => { setErr(null); setPop(pop === 'closed' ? 'list' : 'closed') }}>+</button>
+          <button className="ws-add" aria-label={t('ws.add')} title={t('ws.add')} aria-expanded={pop !== 'closed'} aria-haspopup="menu" onClick={() => { setErr(null); setPop(pop === 'closed' ? 'list' : 'closed') }}>
+            <span aria-hidden>+</span>{!slim && <span>{t('ws.add')}</span>}
+          </button>
           {pop !== 'closed' && (
             <div className="ws-pop" role="menu">
-              {pop === 'list' ? (
-                <>
-                  <div className="ws-pop-h">{t('ws.add')}</div>
-                  {TEAM.map((p) => {
-                    const ex = wins.find((w) => w.id === winId(p.name, p.role))
-                    return (
-                      <button key={p.name} role="menuitem" className="ws-pi" disabled={!!ex?.open} onClick={() => quick(p.name, p.role)}>
-                        <span className={`ws-av role-${p.role}`}>{p.name.charAt(0)}</span>
-                        <span className="grow">{p.name} <span className="muted">· {t(`role.${p.role}`)}</span></span>
-                        {ex && <span className="muted small">{ex.open ? t('ws.open') : t('ws.bg')}</span>}
-                      </button>)
-                  })}
-                  <div className="ws-sep" />
-                  <button role="menuitem" className="ws-pi" onClick={chain}>{t('ws.chain')}</button>
-                  <button role="menuitem" className="ws-pi" onClick={() => setPop('form')}>{t('ws.other')}</button>
-                  {err && <ErrorNote error={err} />}
-                </>
-              ) : (
-                <LoginForm compact onLogin={async (n, r) => { await enter(n, r); setPop('closed') }} />
-              )}
+              {addMenu}
             </div>)}
         </div>
       </nav>
@@ -187,12 +198,17 @@ export function Workspace() {
           <div className="seg" role="group" aria-label={t('ws.layout')}>
             {LAYOUTS.map((l) => <button key={l} aria-pressed={st.layout === l} onClick={() => commit(setLayout(stRef.current, l))}>{t(`ws.layout.${l}`)}</button>)}
           </div>
+          <div className="seg" role="group" aria-label={t('theme.label')}>
+            {(['light', 'dark'] as const).map((m) => <button key={m} className="theme-btn" aria-pressed={theme === m} title={t(`theme.${m}`)} aria-label={t(`theme.${m}`)} onClick={() => setTheme(m)}><Icon name={m === 'light' ? 'sun' : 'moon'} size={15} /></button>)}
+          </div>
           <div className="seg" role="group" aria-label="Language">
             {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
           </div>
         </div>
         <div ref={gridEl} className={`ws-grid${dragId ? ' dragging' : ''}`} style={narrow ? { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)' } : { gridTemplateColumns: place.columns, gridTemplateRows: place.rows }}>
-          {!open.length && <div className="ws-none">{t('ws.empty')}</div>}
+          {!wins.length
+            ? <div className="ws-start"><div className="ws-start-card" role="menu">{addMenu}</div></div>
+            : !open.length && <div className="ws-none">{t('ws.empty')}</div>}
           {stable.map((w) => {
             const p = place.items[w.id]
             const shown = w.open && (!narrow || w.id === focusId)
@@ -206,7 +222,7 @@ export function Workspace() {
                 <div className="ws-wh" draggable title={t('ws.drag')} onClick={() => commit(focusWin(stRef.current, w.id))}
                   onDragStart={(e) => { setDragId(w.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', w.id) } catch { /* bỏ qua */ } }}
                   onDragEnd={() => { setDragId(null); setOverId(null) }}>
-                  <span className="ws-grip" aria-hidden>⠿</span>
+                  <span className="ws-grip" aria-hidden><Icon name="grip" size={14} /></span>
                   <span className="ws-title"><b>{w.name}</b> <span className="muted">· {t(`role.${w.role}`)}</span>{b > 0 && <span className="ws-pend">{t('ws.pending', { n: b })}</span>}</span>
                   <button className="ws-ib" aria-label={`${t('ws.min')} — ${w.name}`} title={t('ws.min')} onClick={(e) => { e.stopPropagation(); commit(minimizeWin(stRef.current, w.id)) }}>–</button>
                   <button className="ws-ib" aria-label={`${t('ws.close')} — ${w.name}`} title={t('ws.close')} onClick={(e) => { e.stopPropagation(); commit(closeWin(stRef.current, w.id)) }}>×</button>

@@ -137,7 +137,7 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
           <div className="row">
             <label className="inline">{t('rec.pick')}
               <select value={lotId} onChange={(e) => setLotId(e.target.value)} disabled={!allowed}>
-                {open.map((s) => <option key={s.id} value={s.id}>{s.code} · {t(`cargo.${s.cargo_type}`)} · {s.weight_kg == null ? '?' : `${fmtNum(s.weight_kg)} kg`}{s.missing_fields.length ? ' ⚠' : ''}</option>)}
+                {open.map((s) => <option key={s.id} value={s.id}>{s.code} · {t(`cargo.${s.cargo_type}`)} · {s.weight_kg == null ? '?' : `${fmtNum(s.weight_kg)} kg`}{s.missing_fields.length ? ' (!)' : ''}</option>)}
               </select>
             </label>
             <label className="inline">{t('rec.icd')}

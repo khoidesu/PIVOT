@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from .. import models as m
@@ -17,8 +17,12 @@ router = APIRouter(prefix="/v1")
 
 @router.get("/benefits", response_model=s.BenefitListOut)
 def list_benefits(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
-    rows = session.execute(select(m.BenefitLedger).order_by(m.BenefitLedger.verified_at.desc().nullslast())).scalars().all()
-    items = [v for r in rows if (v := bf.view(session, actor, r))]
+    stmt = (select(m.BenefitLedger).join(m.Proposal, m.Proposal.id == m.BenefitLedger.proposal_id)
+            .join(m.Shipment, m.Shipment.id == m.Proposal.shipment_id).join(m.Vehicle, m.Vehicle.id == m.Proposal.vehicle_id))
+    if actor.role != "dispatcher":  # cùng quy tắc với bf.visible(): chủ lô hoặc nhà vận tải của chuyến — lọc trong SQL, không nạp sổ của người khác
+        stmt = stmt.where(or_(m.Shipment.tenant_id == actor.org_id, m.Vehicle.tenant_id == actor.org_id))
+    rows = session.execute(stmt.order_by(m.BenefitLedger.verified_at.desc().nullslast())).scalars().all()
+    items = [v for r in rows if (v := bf.view(session, actor, r))]  # view() vẫn kiểm tra quyền lần nữa (lớp bảo vệ thứ hai)
     return {"items": items, "totals": bf.totals(items)}
 
 

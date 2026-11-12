@@ -7,8 +7,8 @@ Mục tiêu: một **link duy nhất** để mọi người cùng dùng (giao di
 
 ## Những gì được triển khai
 - 1 web service Docker (`Dockerfile`): React build + FastAPI + worker nền chạy cùng tiến trình.
-- 1 PostgreSQL do Render quản lý. Khi khởi động: `alembic upgrade head` → seed **chỉ khi DB trống** (các lần sau không đụng dữ liệu người dùng).
-- Biến môi trường (đặt sẵn trong `render.yaml`): `PIVOT_DATABASE_URL` (tự lấy từ DB), `PIVOT_ADMIN_KEY` (Render tự sinh), `PIVOT_DATA_MODE=mock`.
+- Cơ sở dữ liệu là **Postgres ngoài (Neon)**, không phải DB do Render quản lý. Khi khởi động: `alembic upgrade head` → seed **chỉ khi DB trống** (các lần sau không đụng dữ liệu người dùng).
+- Biến môi trường (trong `render.yaml`): `PIVOT_DATABASE_URL` (dán chuỗi Neon trong Dashboard, `sync: false`), `PIVOT_ADMIN_KEY` (Render tự sinh), `PIVOT_DATA_MODE=mock`. Các bước chi tiết: `DEPLOY_RENDER_NEON.md`.
 
 ## Các bước (bạn làm — cần đăng nhập, tôi không làm thay được)
 1. **Đẩy mã lên GitHub** `khoidesu/PIVOT` (nhánh `main`) — Render lấy mã từ đây.
@@ -16,7 +16,7 @@ Mục tiêu: một **link duy nhất** để mọi người cùng dùng (giao di
 3. Cho Render quyền đọc repo `khoidesu/PIVOT` → chọn repo → Render đọc `render.yaml` → **Apply**.
 4. Chờ build 5–10 phút. Xong có địa chỉ dạng `https://pivot-xxxx.onrender.com`.
 5. Lấy mã quản trị: service **pivot → Environment → `PIVOT_ADMIN_KEY`** (bấm hiện giá trị). **Chỉ giữ cho bạn** hoặc người phụ trách demo.
-6. Mở địa chỉ → đăng nhập bằng tên + vai trò. Muốn Reset/Chạy kịch bản: chọn **Phú — Điều phối viên** → tab **7 · Kịch bản demo** → nhập mã quản trị.
+6. Mở địa chỉ → đăng nhập bằng tên + vai trò. Muốn Reset/Chạy kịch bản: chọn **Phú — Điều phối viên** → menu avatar → **Kịch bản demo** → nhập mã quản trị.
 
 ### Kiểm tra sau khi deploy
 ```bash

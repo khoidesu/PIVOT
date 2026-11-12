@@ -117,6 +117,9 @@ def _apply_vehicle_event(session: Session, ev: m.Event) -> str:
         session.add(m.AvailabilityWindow(vehicle_id=veh.id, location_id=loc, free_from=a, free_to=b))
     else:
         win.location_id, win.free_from, win.free_to = loc, a, b
+    if veh.status == "offline":  # nhà vận tải báo khả dụng → xe hỏng/ngoại tuyến được đưa lại vào ghép (xe `committed` thì giữ nguyên)
+        veh.status = "available"
+        veh.version += 1
     return "applied"
 
 

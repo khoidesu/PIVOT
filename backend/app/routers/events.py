@@ -2,14 +2,13 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models as m
 from .. import schemas as s
 from ..admin import require_admin
 from ..auth import Actor, current_actor
-from ..booking import audit
 from ..booking import service as bk
 from ..db import SessionLocal, get_session
 from ..events import service as events

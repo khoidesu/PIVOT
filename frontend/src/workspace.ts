@@ -110,7 +110,9 @@ export function parse(raw: string | null): WsState {
 }
 
 /** Bốn người cố định của nhóm: bấm một lần để vào (không cần gõ). */
+// Phước là chủ hàng thứ hai CÙNG tổ chức với Nguyên: dùng để thử "hai người cùng bên" (vd cùng giữ một tài nguyên → chỉ một thành công).
 export const TEAM: { name: string; role: Role }[] = [
-  { name: 'Nguyên', role: 'shipper' }, { name: 'Minh', role: 'carrier' }, { name: 'Khôi', role: 'node_operator' }, { name: 'Phú', role: 'dispatcher' },
+  { name: 'Nguyên', role: 'shipper' }, { name: 'Phước', role: 'shipper' }, { name: 'Minh', role: 'carrier' },
+  { name: 'Khôi', role: 'node_operator' }, { name: 'Phú', role: 'dispatcher' },
 ]
-export const CHAIN = TEAM.slice(0, 3) // chuỗi ba bên: chủ hàng → vận tải → ICD
+export const CHAIN = [TEAM[0], TEAM[2], TEAM[3]] // chuỗi ba bên: chủ hàng → vận tải → ICD

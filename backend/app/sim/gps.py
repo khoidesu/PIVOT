@@ -1,7 +1,7 @@
 """Bộ giả lập GPS (MÔ PHỎNG). `tick` đẩy từng chuyến đang chạy dọc tuyến và phát VEHICLE_POSITION qua đường nhận sự kiện thật
 (danh nghĩa nhà vận tải sở hữu xe) → vẫn qua phân quyền, idempotency, outbox, worker như tin từ thiết bị thật."""
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

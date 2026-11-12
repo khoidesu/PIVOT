@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, ApiError, type Shipment } from '../api'
 import { Chip, ErrorNote, Loading, Note } from '../components/ui'
+import { Icon } from '../components/Icon'
 import { ageMinutes, fmtNum, fmtTime, fmtVnd } from '../fmt'
 import { useI18n } from '../i18n'
 import { useApp } from '../store'
@@ -79,14 +80,14 @@ export function Fleet({ go }: { go: (to: string) => void }) {
                   </td>
                   <td className="nw">
                     {s.status === 'open' && me && CAN_MATCH.has(me.role) && (
-                      <button className="btn sm icon" aria-label={t('fleet.match')} title={t('fleet.match')} onClick={() => go(`/recommend?lot=${s.id}`)}>▶</button>)}
+                      <button className="btn sm icon" aria-label={t('fleet.match')} title={t('fleet.match')} onClick={() => go(`/recommend?lot=${s.id}`)}><Icon name="play" size={14} /></button>)}
                     {s.status === 'open' && ownerOf(s) && (askCancel === s.id ? (
                       <span className="stack"><span className="small">{t('fleet.cancelAsk', { code: s.code })}</span>
                         <span className="row"><button className="btn sm danger" onClick={() => cancel(s)}>{t('fleet.cancelYes')}</button>
                           <button className="btn sm" onClick={() => setAskCancel(null)}>{t('fleet.cancelNo')}</button></span></span>
                     ) : (
-                      <> <button className="btn sm icon" aria-label={t('fleet.edit')} title={t('fleet.edit')} onClick={() => go(`/request?edit=${s.id}`)}>✎</button>
-                        <button className="btn sm icon danger" aria-label={t('fleet.cancel')} title={t('fleet.cancel')} onClick={() => setAskCancel(s.id)}>✕</button></>))}
+                      <> <button className="btn sm icon" aria-label={t('fleet.edit')} title={t('fleet.edit')} onClick={() => go(`/request?edit=${s.id}`)}><Icon name="pencil" size={14} /></button>
+                        <button className="btn sm icon danger" aria-label={t('fleet.cancel')} title={t('fleet.cancel')} onClick={() => setAskCancel(s.id)}><Icon name="x" size={14} /></button></>))}
                   </td>
                 </tr>))}</tbody>
             </table></div>)}
