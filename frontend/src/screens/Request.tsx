@@ -58,8 +58,8 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
   }, [editId, lots.data])
 
   const allowed = me ? CAN_CREATE.has(me.role) : false
-  const origin = f.origin || origins[0]?.id || ''
-  const dest = f.dest || dests[0]?.id || ''
+  const origin = f.origin || (draftUsed ? '' : origins[0]?.id || '') // bản nháp thiếu điểm → để trống, không tự chọn hộ
+  const dest = f.dest || (draftUsed ? '' : dests[0]?.id || '')
   const reviewFields = new Set(draftUsed && draft ? draft.needs_review.map((k) => FORM_FIELD[k]).filter(Boolean) : [])
   const mustConfirm = draftUsed && !!draft && draft.needs_review.length > 0 && !reviewed
   const cls = (name: string) => (reviewFields.has(name) ? 'review' : undefined)
@@ -90,12 +90,12 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
     const v = (k: string) => d.fields[k]?.value
     setF((x) => ({
       ...x,
-      cargo_type: (v('cargo_type') as string) ?? x.cargo_type,
+      cargo_type: (v('cargo_type') as string) ?? '',
       weight_kg: v('weight_kg') != null ? String(v('weight_kg')) : '', volume_m3: v('volume_m3') != null ? String(v('volume_m3')) : '',
       origin: (v('origin') as string) ?? '', dest: (v('dest') as string) ?? '',
-      ready: v('ready_at') ? isoToLocalInput(v('ready_at') as string) : x.ready,
-      deadline: v('pickup_deadline') ? isoToLocalInput(v('pickup_deadline') as string) : x.deadline,
-      cutoff: v('cutoff_at') ? isoToLocalInput(v('cutoff_at') as string) : x.cutoff,
+      ready: v('ready_at') ? isoToLocalInput(v('ready_at') as string) : '',
+      deadline: v('pickup_deadline') ? isoToLocalInput(v('pickup_deadline') as string) : '',
+      cutoff: v('cutoff_at') ? isoToLocalInput(v('cutoff_at') as string) : '',
       price: v('price_vnd') != null ? String(v('price_vnd')) : '', customer: (v('customer_name') as string) ?? '',
     }))
     setDraftUsed(true); setReviewed(false); setDone(null); setShowImport(false)
@@ -160,18 +160,25 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
                 <div className="row"><Chip kind={draft.extractor.kind === 'llm' ? 'teal' : 'warn'}>{t('in.draft', { by: draft.extractor.kind === 'llm' ? t('in.byLlm', { name: draft.extractor.name }) : t('in.byRule') })}</Chip></div>
                 {draft.image_quota_remaining != null && <span className="footnote">{t('in.img.left', { n: draft.image_quota_remaining })}</span>}
                 {draft.suspicious_instructions && <Note kind="err">{t('in.suspicious')}</Note>}
+                {draft.looks_like_request === false && <Note kind="warn">{t('in.notRequest')}</Note>}
+                {draft.multiple_shipments && <Note kind="warn">{t('in.multi')}</Note>}
                 {draft.extractor.note && <Note kind="warn">{t(`in.llm.${draft.extractor.note}`)}</Note>}
                 {imgUrl && draft.transcript && (
                   <div className="img-pair">
                     <img src={imgUrl} alt={t('in.img.alt')} />
                     <pre className="transcript" aria-label={t('in.img.text')}>{draft.transcript}</pre>
                   </div>)}
+                {(() => {
+                  const gaps = DRAFT_ORDER.filter((k) => k !== 'price_vnd' && k !== 'customer_name' && draft.fields[k]?.value == null)
+                  return gaps.length > 0 && <Note kind="warn">{t('in.gaps', { list: gaps.map((k) => t(`in.f.${k}`)).join(', ') })}</Note>
+                })()}
                 <div className="table-wrap"><table>
                   <thead><tr><th>{t('in.col.field')}</th><th>{t('in.col.value')}</th><th>{t('in.col.source')}</th><th /></tr></thead>
                   <tbody>{DRAFT_ORDER.map((k) => {
                     const x = draft.fields[k]
-                    if (!x || (x.value == null && (k === 'price_vnd' || k === 'customer_name'))) return null // trường tuỳ chọn không có thì không hiện
-                    const warn = x.status !== 'ok'
+                    if (!x) return null
+                    const optionalGap = x.value == null && (k === 'price_vnd' || k === 'customer_name') // tuỳ chọn: vẫn hiện dòng để người dùng thấy tin không nêu, nhưng không báo động
+                    const warn = x.status !== 'ok' && !optionalGap
                     return (
                       <tr key={k}>
                         <td><b>{t(`in.f.${k}`)}</b></td>
@@ -179,7 +186,7 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
                         <td>{x.source ? <q className="small">{x.source.quote}</q> : <span className="muted small">{t('in.missing')}</span>}</td>
                         <td>{warn
                           ? <Chip kind="UNKNOWN" title={x.notes.filter((n) => !n.startsWith('candidates')).map((n) => (t(`in.note.${n}`) === `in.note.${n}` ? n : t(`in.note.${n}`))).join(' ')}><Icon name="alert" size={13} /></Chip>
-                          : <Chip kind="PASS">✓</Chip>}
+                          : optionalGap ? <span className="muted small">—</span> : <Chip kind="PASS">✓</Chip>}
                           {warn && x.notes.filter((n) => !n.startsWith('candidates')).map((n) => <div key={n} className="footnote">{t(`in.note.${n}`) === `in.note.${n}` ? n : t(`in.note.${n}`)}</div>)}</td>
                       </tr>)
                   })}</tbody>
@@ -205,17 +212,18 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
         <form className="form" onSubmit={submit} aria-label={t('req.new')}>
           <label>{t('req.code')}<input value={f.code} onChange={set('code')} disabled={!allowed || !!editing} required maxLength={40} title={editing ? t('req.codeLocked') : undefined} /></label>
           <label className={cls('cargo_type')}>{t('req.cargo')}
-            <select value={f.cargo_type} onChange={set('cargo_type')} disabled={!allowed}>
+            <select value={f.cargo_type} onChange={set('cargo_type')} disabled={!allowed} required>
+              {!f.cargo_type && <option value="">{t('req.pick')}</option>}
               <option value="dry">{t('cargo.dry')}</option><option value="cold">{t('cargo.cold')}</option>
             </select>
           </label>
           <label className={cls('weight_kg')}>{t('req.weight')}<input type="number" min="1" step="any" inputMode="decimal" value={f.weight_kg} onChange={set('weight_kg')} disabled={!allowed} required /></label>
           <label className={cls('volume_m3')}>{t('req.volume')}<input type="number" min="1" step="any" inputMode="decimal" value={f.volume_m3} onChange={set('volume_m3')} disabled={!allowed} required /></label>
           <label className={cls('origin')}>{t('req.origin')}
-            <select value={origin} onChange={set('origin')} disabled={!allowed}>{origins.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+            <select value={origin} onChange={set('origin')} disabled={!allowed} required>{!origin && <option value="">{t('req.pick')}</option>}{origins.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
           </label>
           <label className={cls('dest')}>{t('req.dest')}
-            <select value={dest} onChange={set('dest')} disabled={!allowed}>{dests.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
+            <select value={dest} onChange={set('dest')} disabled={!allowed} required>{!dest && <option value="">{t('req.pick')}</option>}{dests.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
           </label>
           <label className={cls('ready')}>{t('req.ready')}<input type="datetime-local" value={f.ready} onChange={set('ready')} disabled={!allowed} required /></label>
           <label className={cls('deadline')}>{t('req.deadline')}<input type="datetime-local" value={f.deadline} onChange={set('deadline')} disabled={!allowed} required /></label>

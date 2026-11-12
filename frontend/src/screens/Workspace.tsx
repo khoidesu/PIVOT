@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, getSession, setSession, type Role } from '../api'
-import { ErrorNote } from '../components/ui'
+import { Chip, ErrorNote } from '../components/ui'
 import { Icon } from '../components/Icon'
+import { HeroArt } from '../components/HeroArt'
+import { Brand } from '../components/TopBar'
+import { gsap, reducedMotion, useAutoEnter, useGSAP } from '../motion'
 import { useI18n } from '../i18n'
 import {
   addWin, CHAIN, closeWin, EMPTY, focusWin, MAX_WINS, minimizeWin, moveWin, parse, placement, serialize, setLayout, TEAM, updateToken,
@@ -26,7 +29,7 @@ function initial(): WsState {
   return s
 }
 
-export function Workspace() {
+export function Workspace({ onHome }: { onHome?: () => void }) {
   const { t, lang, setLang } = useI18n()
   const [st, setSt] = useState<WsState>(initial)
   const stRef = useRef(st)
@@ -38,6 +41,16 @@ export function Workspace() {
   const [overId, setOverId] = useState<string | null>(null)
   const [width, setWidth] = useState(1200)
   const [theme, setThemeState] = useState<Theme>(currentTheme)
+  const root = useRef<HTMLDivElement>(null)
+  useAutoEnter(root)                                                   // cửa sổ mới / ngăn thêm người hiện lên mượt (GSAP)
+  const started = st.wins.length > 0
+  useGSAP(() => {                                                      // màn bắt đầu: chữ và bảng chọn vai vào lần lượt
+    if (started || reducedMotion()) return
+    gsap.timeline({ defaults: { duration: 0.7 } })
+      .from('.ws-hero-copy > *', { opacity: 0, y: 28, stagger: 0.09 }, 0.15)
+      .from('.ws-start-card', { opacity: 0, y: 24, scale: 0.98 }, 0.35)
+      .from('.ws-rail, .ws-bar', { opacity: 0, duration: 0.5 }, 0)
+  }, { scope: root, dependencies: [started] })
   const [slim, setSlim] = useState(() => { try { return localStorage.getItem('pivot.railSlim') === '1' } catch { return false } }) // thanh người: rộng (có tên) hoặc thu gọn (chỉ avatar)
   const frames = useRef(new Map<string, HTMLIFrameElement>())
   const gridEl = useRef<HTMLDivElement | null>(null)
@@ -153,13 +166,14 @@ export function Workspace() {
   )
 
   return (
-    <div className="ws">
+    <div className="ws" ref={root}>
       <nav className={`ws-rail${slim ? ' slim' : ''}`} aria-label={t('ws.rail')}>
         <div className="ws-rail-h">
-          {!slim && <span className="ws-rail-t">{t('ws.people')}</span>}
+          <button className="brand-btn" aria-label="LOGECTION" onClick={onHome}><Brand /></button>
           <button className="ws-collapse" aria-label={t(slim ? 'ws.expand' : 'ws.collapse')} title={t(slim ? 'ws.expand' : 'ws.collapse')} aria-expanded={!slim}
             onClick={() => { setSlim(!slim); try { localStorage.setItem('pivot.railSlim', slim ? '0' : '1') } catch { /* bỏ qua */ } }}><Icon name={slim ? 'chevronsRight' : 'chevronsLeft'} size={16} /></button>
         </div>
+        {!slim && <span className="ws-rail-t">{t('ws.people')}</span>}
         <div className="ws-nodes">
           {wins.map((w) => {
             const b = badges[w.id] ?? 0
@@ -182,8 +196,11 @@ export function Workspace() {
         </div>
         <div className="ws-tools" ref={popEl}>
           <button className="ws-add" aria-label={t('ws.add')} title={t('ws.add')} aria-expanded={pop !== 'closed'} aria-haspopup="menu" onClick={() => { setErr(null); setPop(pop === 'closed' ? 'list' : 'closed') }}>
-            <span aria-hidden>+</span>{!slim && <span>{t('ws.add')}</span>}
+            <Icon name="plus" size={16} />{!slim && <span>{t('ws.add')}</span>}
           </button>
+          <div className="seg ws-theme" role="group" aria-label={t('theme.label')}>
+            {(['light', 'dark'] as const).map((m) => <button key={m} className="theme-btn" aria-pressed={theme === m} title={t(`theme.${m}`)} aria-label={t(`theme.${m}`)} onClick={() => setTheme(m)}><Icon name={m === 'light' ? 'sun' : 'moon'} size={15} /><span>{t(`theme.${m}`)}</span></button>)}
+          </div>
           {pop !== 'closed' && (
             <div className="ws-pop" role="menu">
               {addMenu}
@@ -198,16 +215,22 @@ export function Workspace() {
           <div className="seg" role="group" aria-label={t('ws.layout')}>
             {LAYOUTS.map((l) => <button key={l} aria-pressed={st.layout === l} onClick={() => commit(setLayout(stRef.current, l))}>{t(`ws.layout.${l}`)}</button>)}
           </div>
-          <div className="seg" role="group" aria-label={t('theme.label')}>
-            {(['light', 'dark'] as const).map((m) => <button key={m} className="theme-btn" aria-pressed={theme === m} title={t(`theme.${m}`)} aria-label={t(`theme.${m}`)} onClick={() => setTheme(m)}><Icon name={m === 'light' ? 'sun' : 'moon'} size={15} /></button>)}
-          </div>
           <div className="seg" role="group" aria-label="Language">
             {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
           </div>
         </div>
         <div ref={gridEl} className={`ws-grid${dragId ? ' dragging' : ''}`} style={narrow ? { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)' } : { gridTemplateColumns: place.columns, gridTemplateRows: place.rows }}>
           {!wins.length
-            ? <div className="ws-start"><div className="ws-start-card" role="menu">{addMenu}</div></div>
+            ? (
+              <div className="ws-start">
+                <HeroArt variant="full" />
+                <div className="ws-hero-copy">
+                  <Chip kind="sim">{t('badge.mock')}</Chip>
+                  <h1 className="ws-hero-title">{t('ws.hero.title')}</h1>
+                  <p className="ws-hero-sub">{t('ws.hero.sub')}</p>
+                </div>
+                <div className="ws-start-card" role="menu">{addMenu}</div>
+              </div>)
             : !open.length && <div className="ws-none">{t('ws.empty')}</div>}
           {stable.map((w) => {
             const p = place.items[w.id]
@@ -224,8 +247,8 @@ export function Workspace() {
                   onDragEnd={() => { setDragId(null); setOverId(null) }}>
                   <span className="ws-grip" aria-hidden><Icon name="grip" size={14} /></span>
                   <span className="ws-title"><b>{w.name}</b> <span className="muted">· {t(`role.${w.role}`)}</span>{b > 0 && <span className="ws-pend">{t('ws.pending', { n: b })}</span>}</span>
-                  <button className="ws-ib" aria-label={`${t('ws.min')} — ${w.name}`} title={t('ws.min')} onClick={(e) => { e.stopPropagation(); commit(minimizeWin(stRef.current, w.id)) }}>–</button>
-                  <button className="ws-ib" aria-label={`${t('ws.close')} — ${w.name}`} title={t('ws.close')} onClick={(e) => { e.stopPropagation(); commit(closeWin(stRef.current, w.id)) }}>×</button>
+                  <button className="ws-ib" aria-label={`${t('ws.min')} — ${w.name}`} title={t('ws.min')} onClick={(e) => { e.stopPropagation(); commit(minimizeWin(stRef.current, w.id)) }}><Icon name="minus" size={15} /></button>
+                  <button className="ws-ib" aria-label={`${t('ws.close')} — ${w.name}`} title={t('ws.close')} onClick={(e) => { e.stopPropagation(); commit(closeWin(stRef.current, w.id)) }}><Icon name="x" size={15} /></button>
                 </div>
                 <div className="ws-frame">
                   <iframe title={t('ws.win', { name: w.name })} src={`${location.pathname}?embed=1`} ref={(el) => { if (el) frames.current.set(w.id, el); else frames.current.delete(w.id) }} />

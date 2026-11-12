@@ -67,7 +67,7 @@ function StaleFleet() {
 }
 
 export function TopBar() {
-  const { t, lang, setLang } = useI18n()
+  const { t } = useI18n()
   const { me, meta, logout, bump } = useApp()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -89,17 +89,11 @@ export function TopBar() {
     finally { setBusy(false); setTimeout(() => setMsg(null), 3500) }
   }
 
-  const sim = meta ? meta.data_mode === 'mock' || meta.is_simulated : true
   const dispatcher = me?.role === 'dispatcher'
   const needKey = !!meta?.admin_key_required && !getAdminKey()
   return (
-    <header className="topbar">
+    <>
       <div className="topbar-in">
-        <Brand />
-        <div className="ctrl">
-          <Chip kind={sim ? 'sim' : 'good'}>● {sim ? t('badge.mock') : t('badge.live')}</Chip>
-          {sim && <Hint text={t('badge.mockTip')} />}
-        </div>
         {me?.role === 'carrier' && <StaleFleet />}
         {me && <Bell />}
         {me && (
@@ -110,18 +104,21 @@ export function TopBar() {
             </button>
             {open && (
               <div className="menu" role="menu">
-                <div className="menu-row"><span className="muted small">{t('menu.lang')}</span>
-                  <div className="seg" role="group" aria-label={t('menu.lang')}>
-                    {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
-                  </div>
-                </div>
                 {dispatcher && <button role="menuitem" onClick={retime} disabled={busy || needKey} title={needKey ? t('menu.needKey') : undefined}>{t('menu.retime')}</button>}
                 {dispatcher && <button role="menuitem" onClick={() => { setOpen(false); window.location.hash = '#/demo' }}>{t('menu.demo')}</button>}
                 <button role="menuitem" onClick={logout}>{t('menu.logout')}</button>
               </div>)}
           </div>)}
       </div>
-      {msg && <div className="topbar-in"><span className="small muted" role="status">{msg}</span></div>}
-    </header>
+      {msg && <div className="topbar-msg"><span className="small muted" role="status">{msg}</span></div>}
+    </>
   )
+}
+
+/** Nhãn nguồn dữ liệu (MÔ PHỎNG / LIVE) — luôn hiện ở hero của mỗi cửa sổ. */
+export function SimBadge() {
+  const { t } = useI18n()
+  const { meta } = useApp()
+  const sim = meta ? meta.data_mode === 'mock' || meta.is_simulated : true
+  return <span className="ctrl"><Chip kind={sim ? 'sim' : 'good'}>{sim ? t('badge.mock') : t('badge.live')}</Chip>{sim && <Hint text={t('badge.mockTip')} />}</span>
 }

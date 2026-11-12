@@ -13,7 +13,8 @@ export function storedTheme(): Theme | null {
   try { const v = localStorage.getItem(KEY); return isTheme(v) ? v : null } catch { return null }
 }
 
-export const currentTheme = (): Theme => storedTheme() ?? systemTheme()
+/** Chưa chọn → TỐI (hệ thiết kế v3 lấy nền tối làm chính); người dùng đổi bằng nút Sáng/Tối và lựa chọn được nhớ. */
+export const currentTheme = (): Theme => storedTheme() ?? 'dark'
 
 export function applyTheme(t: Theme, persist = false) {
   document.documentElement.dataset.theme = t

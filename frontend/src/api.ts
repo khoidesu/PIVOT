@@ -55,7 +55,7 @@ export type ShipmentUpdate = Partial<Omit<ShipmentCreate, 'code' | 'draft_id'>> 
 export interface IntakeField { value: unknown; display: string | null; source: { quote: string; start: number; end: number } | null; status: 'ok' | 'needs_review'; notes: string[] }
 export interface IntakeDraft {
   draft_id: string; extractor: { name: string; kind: string; note?: string }; source: { length: number; sha256: string }; reference_time: string
-  fields: Record<string, IntakeField>; needs_review: string[]; complete: boolean; suspicious_instructions: boolean; is_draft_only: boolean
+  fields: Record<string, IntakeField>; needs_review: string[]; complete: boolean; suspicious_instructions: boolean; multiple_shipments?: boolean; looks_like_request?: boolean; is_draft_only: boolean
   transcript?: string | null; image_quota_remaining?: number | null
 }
 
