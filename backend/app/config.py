@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường hoặc backend/.env (đã .gitignore)
     gemini_model: str = "gemini-3.1-flash-lite"  # nhanh, rẻ, đủ cho trích xuất có schema (gemini-2.5-flash đã ngừng cấp cho khoá mới)
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta"
-    gemini_timeout_s: float = 15.0
+    gemini_timeout_s: float = 25.0  # tổng thời gian chờ Gemini (kể cả mô hình dự phòng); quá hạn → quay về kết quả của luật
+    gemini_fallback_models: str = "gemini-3.5-flash-lite"  # gọi song song khi mô hình chính chưa trả sau gemini_hedge_after_s (rỗng = tắt)
+    gemini_hedge_after_s: float = 5.0
     llm_per_user_day: int = 50  # giới hạn lượt gọi mô hình: mỗi người/ngày, mỗi người/phút, toàn hệ thống/ngày (vượt → dùng bộ luật)
     llm_per_user_minute: int = 5
     llm_global_day: int = 500
@@ -34,6 +36,8 @@ class Settings(BaseSettings):
     signals_timeout_s: float = 2.5
     mapbox_token: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường PIVOT_MAPBOX_TOKEN. Có → kẹt xe thật (Mapbox Directions driving-traffic)
     mapbox_url: str = "https://api.mapbox.com"
+    eta_model_dir: str | None = None  # thư mục model ONNX (mặc định backend/model); đặt RỖNG để tắt
+    eta_model_force: bool = False  # true: dùng model dù cổng promote KHÔNG đạt — CHỈ để thử/demo, luôn gắn nhãn bật thủ công
     allow_dev_tokens: bool = True  # chỉ cho prototype local; tắt khi có OIDC thật
 
 

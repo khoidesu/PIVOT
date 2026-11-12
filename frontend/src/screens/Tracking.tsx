@@ -71,18 +71,18 @@ function EtaModelCard() {
   return (
     <More label={t('eta.model')}>
       <div className="stack">
-        <div className="row"><Chip kind={m.status === 'promoted' ? 'good' : 'warn'}>{t(`eta.status.${m.status}`)}</Chip><Chip kind="sim">{t('badge.mock')}</Chip><Hint text={m.note} /></div>
+        <div className="row"><Chip kind={m.status === 'promoted' ? 'good' : 'warn'}>{t(`eta.status.${m.status}`)}</Chip>{m.source === 'onnx' && <Chip title={m.sha256 ?? ''}>{m.label}</Chip>}<Chip kind="sim">{t('badge.mock')}</Chip><Hint text={m.note} /></div>
         {x && (
           <table className="mini"><thead><tr><th /><th>{t('eta.rule')}</th><th>ML</th></tr></thead><tbody>
             <tr><td>MAE</td><td>{x.mae_rule}′</td><td>{x.mae_ml}′</td></tr>
             <tr><td>±15′</td><td>{Math.round(x.within15_rule * 100)}%</td><td>{Math.round(x.within15_ml * 100)}%</td></tr>
             <tr><td>P90</td><td>{Math.round(x.p90_coverage_rule * 100)}%</td><td>{Math.round(x.p90_coverage_ml * 100)}%</td></tr>
           </tbody></table>)}
-        {x && <span className="footnote">{t('eta.gate', { n: x.improvement_pct, min: x.min_improvement_pct })}</span>}
+        {x && <span className="footnote">{t('eta.gate', { n: x.improvement_pct, min: x.min_improvement_pct })}{m.baseline ? ` ${t('eta.baseline', { name: m.baseline })}` : ''}</span>}
         {err && <ErrorNote error={err} />}
-        {m.reason !== 'ok' && m.status === 'rule_fallback' && <span className="footnote">{t(`eta.reason.${m.reason}`)}</span>}
-        <div className="row"><button className="btn sm" disabled={busy} onClick={() => train(0)}>{t('eta.train')}</button>
-          <button className="btn sm" disabled={busy} onClick={() => train(0.15)}>{t('eta.trainDrift')}</button></div>
+        {m.reason !== 'ok' && m.status !== 'promoted' && <span className="footnote">{t(t(`eta.reason.${m.reason}`) === `eta.reason.${m.reason}` ? 'eta.reason.model_error' : `eta.reason.${m.reason}`)}</span>}
+        {m.source !== 'onnx' && <div className="row"><button className="btn sm" disabled={busy} onClick={() => train(0)}>{t('eta.train')}</button>
+          <button className="btn sm" disabled={busy} onClick={() => train(0.15)}>{t('eta.trainDrift')}</button></div>}
       </div>
     </More>
   )

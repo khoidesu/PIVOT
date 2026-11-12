@@ -1,14 +1,14 @@
 {
   "model_version": "eta-onnx-sim-v1",
   "model_file": "eta_model.onnx",
-  "sha256": "96ee69955a422e84debefdad6a6f453fc4230190af78a4ce5c9e7f1116ba888a",
+  "sha256": "f8574ee79c716dc5cf0e106de986ee34840ffe3eb5ceddd0100b97c89c3f1cd0",
   "trained_on": {
     "file": "eta_trips.csv",
-    "sha256": "29407d96b3337bcefc5911ba6bb20fde589c69f20cda9251216948b8e4bbf4e5",
+    "sha256": "22f979725389c619b4090522d8cef423a134455ce55987a47a7dc3162b6418ce",
     "rows": 19683,
     "is_simulated": true
   },
-  "framework": "pytorch 2.11.0+cpu -> onnx opset 17",
+  "framework": "pytorch 2.13.0 -> onnx opset 17",
   "architecture": "MLP 12-64-64-2 (chuẩn hoá + hiệu chỉnh P90 nhúng trong model)",
   "feature_order": [
     "distance_km",
@@ -29,7 +29,7 @@
     "p50_minutes",
     "p90_minutes"
   ],
-  "p90_offset_minutes": 2.3122732639312744,
+  "p90_offset_minutes": 2.017409563064575,
   "valid_ranges": {
     "distance_km": [
       8.0,
@@ -57,48 +57,48 @@
     ]
   },
   "metrics_test": {
-    "mae_p50": 17.5388,
-    "pinball_0.5": 8.7694,
-    "pinball_0.9": 5.2337,
-    "p90_coverage": 0.7653,
-    "within15": 0.5899,
-    "p90_abs_err": 39.8422,
+    "mae_p50": 14.3082,
+    "pinball_0.5": 7.1541,
+    "pinball_0.9": 3.9875,
+    "p90_coverage": 0.8783,
+    "within15": 0.6718,
+    "p90_abs_err": 31.9028,
     "improvement_vs_baseline_pct": {
-      "rule_const_min": 53.5,
-      "rule_dist_min": 51.9,
-      "baseline_median_min": 33.6
+      "rule_const_min": 56.8,
+      "rule_dist_min": 49.2,
+      "baseline_median_min": 36.1
     },
     "strongest_baseline": "baseline_median_min",
-    "improvement_vs_strongest_pct": 33.65
+    "improvement_vs_strongest_pct": 36.08
   },
   "baselines_test": {
     "rule_const_min": {
-      "mae_p50": 37.7285,
-      "pinball_0.5": 18.8643,
-      "pinball_0.9": 15.8855,
-      "p90_coverage": 0.639,
-      "within15": 0.3078,
-      "p90_abs_err": 89.4
+      "mae_p50": 33.1373,
+      "pinball_0.5": 16.5687,
+      "pinball_0.9": 12.5993,
+      "p90_coverage": 0.7113,
+      "within15": 0.3318,
+      "p90_abs_err": 75.1
     },
     "rule_dist_min": {
-      "mae_p50": 36.4903,
-      "pinball_0.5": 18.2451,
-      "pinball_0.9": 11.3365,
-      "p90_coverage": 0.4074,
-      "within15": 0.1888,
-      "p90_abs_err": 71.84
+      "mae_p50": 28.1682,
+      "pinball_0.5": 14.0841,
+      "pinball_0.9": 7.1452,
+      "p90_coverage": 0.5741,
+      "within15": 0.3251,
+      "p90_abs_err": 58.7
     },
     "baseline_median_min": {
-      "mae_p50": 26.432,
-      "pinball_0.5": 13.216,
-      "pinball_0.9": 7.6551,
-      "p90_coverage": 0.7587,
-      "within15": 0.4144,
-      "p90_abs_err": 58.47
+      "mae_p50": 22.3833,
+      "pinball_0.5": 11.1917,
+      "pinball_0.9": 5.9258,
+      "p90_coverage": 0.8473,
+      "within15": 0.4624,
+      "p90_abs_err": 48.44
     }
   },
   "promotion_gate": {
-    "passed": false,
+    "passed": true,
     "min_mae_improvement_pct": 15,
     "p90_coverage_range": [
       0.85,

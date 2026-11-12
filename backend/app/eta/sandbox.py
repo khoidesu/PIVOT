@@ -4,6 +4,7 @@ Lớp MỎNG: chỉ gọi lại đúng các hàm đã có (`ml.train`, `compare.
 và tổng hợp kết quả thành bảng. KHÔNG tính lại luật, không huấn luyện riêng, không tự gọi API theo cách khác.
 Không đổi hard gate; tín hiệu thật vẫn chỉ là tầng MỀM. Dữ liệu huấn luyện vẫn là lịch sử MÔ PHỎNG (chỉ chứng minh pipeline).
 
+Lưu ý: `sweep_drift` chạy trên pipeline scikit-learn MÔ PHỎNG (`ml.train`), không phải model ONNX; `scenario_matrix` đi qua `ml.predict` nên phản ánh model ONNX (kèm cổng promote) khi có.
 Lưu ý vận hành: `sweep_drift` huấn luyện lại mô hình DÙNG CHUNG của tiến trình rồi KHÔI PHỤC đúng trạng thái cũ khi xong; trong lúc chạy
 (vài giây) các dự báo ML khác trong cùng tiến trình có thể thấy trạng thái tạm. Vì vậy chỉ dùng trong lúc phát triển/chuẩn bị demo.
 """

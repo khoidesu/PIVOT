@@ -16,7 +16,8 @@ log = logging.getLogger("pivot.main")
 
 
 def _warm_eta() -> None:
-    from .eta import ml
+    from .eta import ml, onnx_model
+    onnx_model.state()  # nạp + kiểm tra model ONNX sớm (nếu có)
     ml.ensure_trained()
 
 

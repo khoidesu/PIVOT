@@ -99,8 +99,9 @@ export interface LiveEta {
   stalled?: boolean; cutoff_risk?: boolean; cutoff_risk_p90?: boolean; remaining_km?: number; speed_kmh?: number
 }
 export interface EtaModel {
-  label: string; trained: boolean; status: 'promoted' | 'rule_fallback' | 'untrained'; reason: string; note: string
-  metrics: { n_train: number; n_test: number; mae_rule: number; mae_ml: number; improvement_pct: number; within15_rule: number; within15_ml: number
+  label: string; trained: boolean; status: 'promoted' | 'forced' | 'rule_fallback' | 'untrained'; reason: string; note: string
+  source?: 'onnx' | 'sim'; forced?: boolean; baseline?: string | null; sha256?: string | null
+  metrics: { n_train: number | null; n_test: number | null; mae_rule: number; mae_ml: number; improvement_pct: number; within15_rule: number; within15_ml: number
     p90_coverage_rule: number; p90_coverage_ml: number; min_improvement_pct: number; coverage_target: number[]; drift: number } | null
 }
 export interface EtaSignals {

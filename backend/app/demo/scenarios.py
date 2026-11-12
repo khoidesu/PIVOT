@@ -291,16 +291,30 @@ def s9_dock(r: Run):
 
 def s10_eta_model(r: Run):
     r.reset()
-    r.req("phu", "POST", "/v1/eta/train", {"drift": 0})
+    m0 = r.req("phu", "GET", "/v1/eta/model").json()
+    onnx = m0.get("source") == "onnx"  # model ONNX huấn luyện ngoài (nguồn chính thức) hay mô hình scikit-learn mô phỏng (khi tắt/không có model)
+    if not onnx:
+        r.req("phu", "POST", "/v1/eta/train", {"drift": 0})
     m1 = r.req("phu", "GET", "/v1/eta/model").json()
-    r.step("ML trên lịch sử MÔ PHỎNG: giảm MAE ≥ 15% và độ phủ P90 đạt → được promote", m1["status"] == "promoted", str(m1["metrics"] and m1["metrics"]["improvement_pct"]))
+    r.step("ML trên lịch sử MÔ PHỎNG: giảm MAE ≥ 15% và độ phủ P90 đạt → được promote", m1["status"] == "promoted",
+           f'{m1["source"]} · giảm MAE {m1["metrics"] and m1["metrics"]["improvement_pct"]}%')
     when = datetime.now(timezone.utc).isoformat()
     w1 = r.req("minh", "POST", "/v1/eta/predict", {"depart_at": when}).json()
     r.step("Dự báo what-if dùng ML, luôn gắn nhãn mô phỏng", w1["used"] == "ml" and w1["is_simulated"] is True)
-    m2 = r.req("phu", "POST", "/v1/eta/train", {"drift": 0.15}).json()
-    w2 = r.req("minh", "POST", "/v1/eta/predict", {"depart_at": when}).json()
-    r.step("Dữ liệu trôi → độ phủ tụt → tự hạ về ETA luật", m2["status"] == "rule_fallback" and w2["used"] == "rule" and w2["ml"] is None, m2["reason"])
-    r.req("phu", "POST", "/v1/eta/train", {"drift": 0})
+    if onnx:
+        # model ONNX không huấn luyện lại trong app (409); độ trôi được thử bằng quét của ETA Sandbox trên pipeline mô phỏng, và KHÔNG đổi model đang dùng
+        rej = r.req("phu", "POST", "/v1/eta/train", {"drift": 0.15})
+        sweep = r.req("phu", "GET", "/v1/eta/sandbox/drift-sweep").json()
+        after = r.req("phu", "GET", "/v1/eta/model").json()
+        r.step("Huấn luyện lại trong app bị từ chối khi dùng model ONNX (409)", rej.status_code == 409)
+        r.step("Quét độ trôi: không trôi → dùng ML; trôi lớn → tự hạ về ETA luật", sweep[0]["promoted"] is True and sweep[-1]["promoted"] is False,
+               f'hạ về luật từ drift = {next((x["drift"] for x in sweep if not x["promoted"]), None)}')
+        r.step("Quét độ trôi không làm đổi model ONNX đang dùng", after["status"] == m1["status"] and after["sha256"] == m1["sha256"])
+    else:
+        m2 = r.req("phu", "POST", "/v1/eta/train", {"drift": 0.15}).json()
+        w2 = r.req("minh", "POST", "/v1/eta/predict", {"depart_at": when}).json()
+        r.step("Dữ liệu trôi → độ phủ tụt → tự hạ về ETA luật", m2["status"] == "rule_fallback" and w2["used"] == "rule" and w2["ml"] is None, m2["reason"])
+        r.req("phu", "POST", "/v1/eta/train", {"drift": 0})
     r.step("Khoảng P50 ≤ P90 ở cả hai nhánh", w1["rule"]["p50"] <= w1["rule"]["p90"] and w1["ml"]["p50_minutes"] <= w1["ml"]["p90_minutes"])
     return "#/tracking"
 

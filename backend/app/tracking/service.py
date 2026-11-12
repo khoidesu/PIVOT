@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import models as m
-from ..eta import signals
+from ..eta import onnx_model, signals
 from . import geo
 
 R_PICKUP_KM = 0.6
@@ -115,6 +115,18 @@ def _visible_proposals(session: Session, actor, only_active: bool):
     return session.execute(stmt.order_by(m.Proposal.created_at.desc()).limit(100)).all()
 
 
+def _ml_input(session: Session, ship: m.Shipment, veh: m.Vehicle, pts, pickup_idx: int, cum: list[float], now: datetime) -> tuple[float, dict]:
+    """Đầu vào của model ETA cho CHUYẾN THẬT: quãng điểm lấy → ICD (đúng đoạn model được huấn luyện), tuyến theo điểm lấy hàng, hạng xe theo tải trọng.
+    Không nhận ra tuyến/hạng xe → giá trị None (model trả None → ETA luật; không đoán). Thời tiết: lấy từ tín hiệu thật nếu có, không thì dùng 'khô' và
+    model ghi rõ là giả định."""
+    origin = session.get(m.Location, ship.origin_location_id)
+    ctx: dict = {"route_id": onnx_model.route_id_for(origin.name if origin else None), "vehicle_class": onnx_model.vehicle_class_for(veh.capacity_kg)}
+    wx = signals.fetch_weather(pts[pickup_idx][0], pts[pickup_idx][1])
+    if wx:
+        ctx["rain_mm_h"], ctx["wind_kmh"] = wx["precip_mm_h"], wx["wind_kmh"]
+    return max(cum[-1] - cum[pickup_idx], 0.0), ctx
+
+
 def trip_view(session: Session, prop: m.Proposal, ship: m.Shipment, veh: m.Vehicle, now: datetime) -> dict:
     from ..assumptions import get_active
     from ..eta import live as eta_live, ml
@@ -135,7 +147,7 @@ def trip_view(session: Session, prop: m.Proposal, ship: m.Shipment, veh: m.Vehic
         "is_simulated": True,
         "eta": eta_live.live(session, prop, ship, veh, now, get_active(session).params) or ((prop.input_snapshot or {}).get("eta")),
         "cutoff_at": ship.cutoff_at,
-        "eta_ml": ml.predict(now) if prop.status in ("confirmed", "executing") else None,  # chỉ khi mô hình được promote (dữ liệu mô phỏng)
+        "eta_ml": ml.predict(now, *_ml_input(session, ship, veh, pts, pickup_idx, cum, now)) if prop.status in ("confirmed", "executing") else None,  # chỉ khi mô hình được promote (dữ liệu mô phỏng)
         "route": [{"lat": a, "lng": b} for a, b in pts], "pickup_index": pickup_idx,
         "route_source": "osrm" if session.get(m.TripRoute, prop.id) else "simulated",  # đường bộ thật (OSRM) hay nội suy mô phỏng
         "geofences": [{"code": "AT_PICKUP", "lat": pts[pickup_idx][0], "lng": pts[pickup_idx][1], "radius_m": int(R_PICKUP_KM * 1000)},

@@ -12,3 +12,4 @@ pgdata
 docs
 *.md
 !backend/requirements.txt
+backend/model/*.ipynb

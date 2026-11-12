@@ -1,12 +1,13 @@
-SQLAlchemy==2.1.8
 alembic==1.20.1
 fastapi==0.162.2
 httpx==0.28.1
 numpy==2.5.4
+onnxruntime==1.31.1
 psycopg-binary==3.3.8
 psycopg==3.3.8
 pydantic-settings==2.16.2
 pydantic==2.14.3
 pytest==9.2.0
 scikit-learn==1.9.1
+SQLAlchemy==2.1.8
 uvicorn==0.54.0

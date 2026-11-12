@@ -7,6 +7,7 @@ import pytest
 TEST_DB = "pivot_test"
 os.environ["PIVOT_DATABASE_URL"] = f"postgresql+psycopg://pivot:pivot_dev@localhost:5433/{TEST_DB}"
 os.environ["PIVOT_INTAKE_EXTRACTOR"] = "rule"  # test KHÔNG được gọi mô hình thật dù backend/.env có khoá
+os.environ["PIVOT_ETA_MODEL_DIR"] = ""  # test ETA mô phỏng cũ không bị model ONNX trong backend/model chen vào; test ONNX tự trỏ thư mục
 os.environ["PIVOT_GEMINI_API_KEY"] = ""
 os.environ["PIVOT_ANTHROPIC_API_KEY"] = ""
 os.environ["PIVOT_SIGNALS_ENABLED"] = "false"  # test không gọi OSRM/Open-Meteo thật (xác định, chạy offline); test tín hiệu bật lại bằng monkeypatch

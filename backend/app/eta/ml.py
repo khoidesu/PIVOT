@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 
+from . import onnx_model
+
 DEFAULT_DRIFT = 0.0  # mặc định không trôi (mô hình được promote); chèn trôi (vd 0.15) để xem mô hình tự hạ về luật
 SEED = 20261111
 N_TRIPS = 3000
@@ -81,10 +83,12 @@ def train(transit_minutes: float = 90.0, drift: float = DEFAULT_DRIFT) -> dict:
             "status": "promoted" if promoted else "rule_fallback",
             "reason": "ok" if promoted else ("improvement_below_threshold" if improvement < MIN_IMPROVEMENT else "p90_coverage_out_of_range"),
         })
-        return model_info()
+        return sim_info()
 
 
 def ensure_trained(transit_minutes: float = 90.0) -> None:
+    if onnx_model.available():  # có model ONNX (nguồn chính thức) → không cần dựng mô hình mô phỏng cũ
+        return
     if not _state.get("trained"):
         try:
             train(transit_minutes)
@@ -93,13 +97,21 @@ def ensure_trained(transit_minutes: float = 90.0) -> None:
 
 
 def model_info() -> dict:
-    return {"label": LABEL, "is_simulated_history": True, "trained": bool(_state.get("trained")), "status": _state.get("status", "untrained"),
+    """Thông tin mô hình ML đang là nguồn chính thức: ONNX (huấn luyện ngoài) nếu có thư mục model, ngược lại mô hình scikit-learn mô phỏng."""
+    return onnx_model.model_info() if onnx_model.available() else sim_info()
+
+
+def sim_info() -> dict:
+    return {"label": LABEL, "source": "sim", "is_simulated_history": True, "trained": bool(_state.get("trained")), "status": _state.get("status", "untrained"),
             "reason": _state.get("reason", "not_trained"), "metrics": _state.get("metrics"),
             "note": "Dữ liệu lịch sử MÔ PHỎNG — chỉ chứng minh pipeline, chưa chứng minh độ chính xác thật."}
 
 
-def predict(depart_at: datetime, km: float = BASE_KM) -> dict | None:
-    """(P50, P90) phút trung chuyển nếu mô hình đã được promote; None → dùng ETA luật. Mọi lỗi → None (tự hạ về luật)."""
+def predict(depart_at: datetime, km: float = BASE_KM, ctx: dict | None = None) -> dict | None:
+    """(P50, P90) phút trung chuyển nếu mô hình đã được promote; None → dùng ETA luật. Mọi lỗi → None (tự hạ về luật).
+    `ctx` (route_id, vehicle_class, rain_mm_h, wind_kmh) chỉ dùng cho model ONNX."""
+    if onnx_model.available():
+        return onnx_model.predict(depart_at, km, ctx)
     if not _state.get("promoted"):
         return None
     try:

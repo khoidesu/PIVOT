@@ -143,3 +143,65 @@ def test_build_extractor_modes():
     assert isinstance(build_extractor(S(), "u"), RuleExtractor)                  # không có khoá → luôn là bộ luật
     S.intake_extractor, S.gemini_api_key = "rule", "k"
     assert isinstance(build_extractor(S(), "u"), RuleExtractor)
+
+
+# ---------------------------------------------------------------- hoàn thiện trường (12/11): luật giá/khách/thứ + gọi song song mô hình dự phòng
+def test_rule_price_variants_and_customer_without_colon():
+    r = RuleExtractor()
+    for text, want in [("giá 3 triệu rưỡi", 3_500_000), ("Giá 2tr5", 2_500_000), ("giá 3 triệu 500", 3_500_000), ("giá 3tr", 3_000_000),
+                       ("giá 800k", 800_000), ("Giá 3.500.000đ", 3_500_000), ("cước 3 triệu 12/11 giao", 3_000_000)]:
+        assert r.extract(text, NOW, LOCS)["price_vnd"]["value"] == want, text
+    assert r.extract("cước 3 triệu rưỡi, khách Chị Lan.", NOW, LOCS)["customer_name"]["value"] == "Chị Lan"
+    assert r.extract("KH: Cty ABC, giá 1tr", NOW, LOCS)["customer_name"]["value"] == "Cty ABC"
+    assert "customer_name" not in r.extract("khách hàng khô 5 tấn", NOW, LOCS)    # không bắt nhầm cụm chữ thường
+
+
+def test_rule_weekday_and_pickup_label():
+    out = RuleExtractor().extract("Sẵn sàng 8h thứ Sáu, xe lấy trước 11h thứ Sáu, cut-off 16h thứ Sáu", NOW, LOCS)   # 12/11/2026 là thứ Năm
+    assert out["ready_at"]["value"] == "2026-11-13T08:00:00+07:00"
+    assert out["pickup_deadline"]["value"] == "2026-11-13T11:00:00+07:00" and out["cutoff_at"]["value"].startswith("2026-11-13T16:00")
+
+
+def test_hybrid_asks_model_for_price_and_customer_only_when_rules_missed_them_and_text_hints_at_them():
+    llm = FakeLLM({"price_vnd": {"value": 4_200_000, "quote": "bốn triệu hai"}, "customer_name": {"value": "Anh Hùng", "quote": "anh Hùng"}})
+    text = FULL + ". cước bốn triệu hai, khách anh Hùng"
+    d = build_draft(text, NOW, LOCS, HybridExtractor(llm, guard(), "u1"))
+    assert len(llm.sent) == 1 and d["fields"]["price_vnd"]["value"] == 4_200_000 and d["fields"]["customer_name"]["value"] == "Anh Hùng"
+    llm2 = FakeLLM({})
+    build_draft(FULL, NOW, LOCS, HybridExtractor(llm2, guard(), "u1"))
+    assert llm2.sent == []                                                          # tin không nhắc giá/khách → không tốn lượt
+
+
+def test_gemini_prompt_carries_calendar_and_price_customer_fields():
+    seen = {}
+
+    def handler(req):
+        seen["body"] = json.loads(req.content)
+        return gemini_reply({})
+    GeminiExtractor("k", "m1", transport=httpx.MockTransport(handler)).extract("thứ Sáu", NOW, LOCS)
+    user = seen["body"]["contents"][0]["parts"][0]["text"]
+    assert "12/11/2026=Thứ Năm (hôm nay)" in user and "13/11/2026=Thứ Sáu" in user
+    assert {"price_vnd", "customer_name"} <= set(seen["body"]["generationConfig"]["responseSchema"]["properties"])
+
+
+def test_gemini_hedges_to_fallback_model_when_primary_is_slow():
+    import time
+
+    def handler(req):
+        if "slow" in str(req.url):
+            time.sleep(1.5)                                                         # mô hình chính chậm
+            return gemini_reply({"origin": {"value": "x", "quote": "x"}})
+        return gemini_reply({"origin": {"value": "KCN VSIP I (mô phỏng)", "quote": "vsip 1"}})
+    g = GeminiExtractor("k", "slow", transport=httpx.MockTransport(handler), timeout=5, fallbacks=("fast",), hedge_after=0.2)
+    t0 = time.monotonic()
+    out = g.extract("vsip 1", NOW, LOCS)
+    assert out["origin"]["value"] == "KCN VSIP I (mô phỏng)" and g.used_model == "fast" and time.monotonic() - t0 < 1.2
+
+
+def test_gemini_hedge_falls_back_when_primary_errors_and_gives_up_after_timeout():
+    def ok_second(req):
+        return httpx.Response(500) if "bad" in str(req.url) else gemini_reply({"dest": {"value": "ICD Cảng C (mô phỏng)", "quote": "cảng C"}})
+    g = GeminiExtractor("k", "bad", transport=httpx.MockTransport(ok_second), timeout=5, fallbacks=("good",), hedge_after=5)
+    assert g.extract("cảng C", NOW, LOCS)["dest"]["value"] == "ICD Cảng C (mô phỏng)"
+    dead = GeminiExtractor("k", "a", transport=httpx.MockTransport(lambda r: httpx.Response(503)), timeout=3, fallbacks=("b",), hedge_after=0.1)
+    assert dead.extract("x", NOW, LOCS) == {}                                       # cả hai đều lỗi → rỗng, không ném lỗi

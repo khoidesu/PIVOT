@@ -1,0 +1,109 @@
+{
+  "model_version": "eta-onnx-sim-v1",
+  "model_file": "eta_model.onnx",
+  "sha256": "96ee69955a422e84debefdad6a6f453fc4230190af78a4ce5c9e7f1116ba888a",
+  "trained_on": {
+    "file": "eta_trips.csv",
+    "sha256": "29407d96b3337bcefc5911ba6bb20fde589c69f20cda9251216948b8e4bbf4e5",
+    "rows": 19683,
+    "is_simulated": true
+  },
+  "framework": "pytorch 2.11.0+cpu -> onnx opset 17",
+  "architecture": "MLP 12-64-64-2 (chuẩn hoá + hiệu chỉnh P90 nhúng trong model)",
+  "feature_order": [
+    "distance_km",
+    "hour",
+    "weekday",
+    "is_weekend",
+    "month",
+    "rain_mm_h",
+    "wind_kmh",
+    "route_id=KCN_A_ICD",
+    "route_id=KCN_B_ICD",
+    "vehicle_class=heavy",
+    "vehicle_class=medium",
+    "vehicle_class=light"
+  ],
+  "input_dtype": "float32",
+  "output_columns": [
+    "p50_minutes",
+    "p90_minutes"
+  ],
+  "p90_offset_minutes": 2.3122732639312744,
+  "valid_ranges": {
+    "distance_km": [
+      8.0,
+      40.0
+    ],
+    "hour": [
+      0,
+      23
+    ],
+    "weekday": [
+      0,
+      6
+    ],
+    "month": [
+      1,
+      12
+    ],
+    "rain_mm_h": [
+      0,
+      30.0
+    ],
+    "wind_kmh": [
+      0,
+      60.0
+    ]
+  },
+  "metrics_test": {
+    "mae_p50": 17.5388,
+    "pinball_0.5": 8.7694,
+    "pinball_0.9": 5.2337,
+    "p90_coverage": 0.7653,
+    "within15": 0.5899,
+    "p90_abs_err": 39.8422,
+    "improvement_vs_baseline_pct": {
+      "rule_const_min": 53.5,
+      "rule_dist_min": 51.9,
+      "baseline_median_min": 33.6
+    },
+    "strongest_baseline": "baseline_median_min",
+    "improvement_vs_strongest_pct": 33.65
+  },
+  "baselines_test": {
+    "rule_const_min": {
+      "mae_p50": 37.7285,
+      "pinball_0.5": 18.8643,
+      "pinball_0.9": 15.8855,
+      "p90_coverage": 0.639,
+      "within15": 0.3078,
+      "p90_abs_err": 89.4
+    },
+    "rule_dist_min": {
+      "mae_p50": 36.4903,
+      "pinball_0.5": 18.2451,
+      "pinball_0.9": 11.3365,
+      "p90_coverage": 0.4074,
+      "within15": 0.1888,
+      "p90_abs_err": 71.84
+    },
+    "baseline_median_min": {
+      "mae_p50": 26.432,
+      "pinball_0.5": 13.216,
+      "pinball_0.9": 7.6551,
+      "p90_coverage": 0.7587,
+      "within15": 0.4144,
+      "p90_abs_err": 58.47
+    }
+  },
+  "promotion_gate": {
+    "passed": false,
+    "min_mae_improvement_pct": 15,
+    "p90_coverage_range": [
+      0.85,
+      0.97
+    ]
+  },
+  "notes": "Huấn luyện trên dữ liệu MÔ PHỎNG; chỉ chứng minh quy trình, không chứng minh độ chính xác ngoài đời."
+}

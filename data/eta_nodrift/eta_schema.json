@@ -1,0 +1,137 @@
+{
+  "model_version": "eta-onnx-sim-v1",
+  "is_simulated": true,
+  "target": "actual_transit_min",
+  "target_unit": "minutes",
+  "prediction_time": "lúc xe rời điểm lấy hàng (depart_at)",
+  "rows": 19683,
+  "csv_sha256": "22f979725389c619b4090522d8cef423a134455ce55987a47a7dc3162b6418ce",
+  "numeric_features": [
+    "distance_km",
+    "hour",
+    "weekday",
+    "is_weekend",
+    "month",
+    "rain_mm_h",
+    "wind_kmh"
+  ],
+  "categorical_features": {
+    "route_id": [
+      "KCN_A_ICD",
+      "KCN_B_ICD"
+    ],
+    "vehicle_class": [
+      "heavy",
+      "medium",
+      "light"
+    ]
+  },
+  "input_order": [
+    "distance_km",
+    "hour",
+    "weekday",
+    "is_weekend",
+    "month",
+    "rain_mm_h",
+    "wind_kmh",
+    "route_id=KCN_A_ICD",
+    "route_id=KCN_B_ICD",
+    "vehicle_class=heavy",
+    "vehicle_class=medium",
+    "vehicle_class=light"
+  ],
+  "input_dtype": "float32",
+  "input_shape": [
+    "N",
+    12
+  ],
+  "output": {
+    "shape": [
+      "N",
+      2
+    ],
+    "columns": [
+      "p50_minutes",
+      "p90_minutes"
+    ],
+    "constraint": "p90 >= p50"
+  },
+  "valid_ranges": {
+    "distance_km": [
+      8.0,
+      40.0
+    ],
+    "hour": [
+      0,
+      23
+    ],
+    "weekday": [
+      0,
+      6
+    ],
+    "month": [
+      1,
+      12
+    ],
+    "rain_mm_h": [
+      0,
+      30.0
+    ],
+    "wind_kmh": [
+      0,
+      60.0
+    ]
+  },
+  "forbidden_as_features": [
+    "trip_id",
+    "depart_at",
+    "split",
+    "band",
+    "actual_transit_min",
+    "rule_const_min",
+    "rule_dist_min",
+    "baseline_median_min",
+    "rule_dist_p90_min",
+    "gate_queue_min",
+    "had_incident",
+    "incident_delay_min",
+    "scenario_tag"
+  ],
+  "splits": {
+    "train": "< 2026-07-01",
+    "calib": "2026-07-01 .. 2026-08-31",
+    "test": ">= 2026-09-01 (có drift)"
+  },
+  "promotion_gate": {
+    "min_mae_improvement_pct": 15,
+    "p90_coverage_range": [
+      0.85,
+      0.97
+    ],
+    "compare_against": "baseline mạnh nhất trong rule_const_min / rule_dist_min / baseline_median_min"
+  },
+  "columns": [
+    "trip_id",
+    "depart_at",
+    "split",
+    "distance_km",
+    "hour",
+    "weekday",
+    "is_weekend",
+    "month",
+    "rain_mm_h",
+    "wind_kmh",
+    "route_id",
+    "vehicle_class",
+    "band",
+    "actual_transit_min",
+    "rule_const_min",
+    "rule_dist_min",
+    "baseline_median_min",
+    "rule_dist_p90_min",
+    "gate_queue_min",
+    "had_incident",
+    "incident_delay_min",
+    "scenario_tag"
+  ]
+}
