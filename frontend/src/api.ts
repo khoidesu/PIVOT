@@ -26,6 +26,18 @@ export interface Vehicle {
   distance_to_target_km: number | null; distance_method: 'estimate' | null // ƯỚC TÍNH (đường chim bay × hệ số đường bộ)
   deadhead_eta: { minutes: number; p50: string; p90: string; method: string } | null
 }
+export interface SandboxSaving { mean: number; median: number; p10: number; p90: number; ci95: [number, number]; win_rate: number; strict_win_rate: number }
+export interface SandboxResult {
+  meta: { n: number; seed: number; profile: string; assumption_version: string; rule_version: string; generated_at: string; is_simulated: boolean; label: string }
+  summary: {
+    n_cases: number; n_feasible: number; n_infeasible: number; top1_mean: Record<string, number>
+    vs: Record<'random' | 'nearest' | 'first', { mean: Record<string, number>; saving: Record<'km' | 'cost_vnd' | 'min_to_pickup' | 'min_to_icd', SandboxSaving>; rate_diff: Record<string, number> }>
+    vs_static_baseline: { km_saved_mean: number; cost_saved_vnd_mean: number; share_better_than_baseline: number }
+    invalid_without_gate: { first_in_list_rate: number; mean_share_of_fleet_failing_gate: number }
+    top1_is_nearest_share: number; pass_gate_mean: number
+  }
+  cases: { i: number; profile: string; feasible: boolean; top1?: Record<string, number>; random?: Record<string, number> }[]
+}
 export interface FleetRefresh { updated: number; window_extended: number; already_fresh: number; skipped: Record<string, number>; at: string; is_simulated: boolean }
 export interface Slot {
   id: string; node_org_id: string; node_org_name: string | null; location_id: string; start_at: string; end_at: string
@@ -219,6 +231,8 @@ export const api = {
   locations: () => request<Location[]>('/v1/locations'),
   shipments: () => request<Shipment[]>('/v1/shipments'),
   vehicles: (toLocationId?: string) => request<Vehicle[]>(`/v1/vehicles${toLocationId ? `?to_location_id=${toLocationId}` : ''}`),
+  sandboxLatest: () => request<SandboxResult>('/v1/benefits/sandbox/latest'),
+  sandboxRun: (n: number, seed: number) => post<SandboxResult>('/v1/benefits/sandbox/run', { n, seed }),
   refreshFleet: () => post<FleetRefresh>('/v1/vehicles/refresh-fleet', {}),
   slots: () => request<Slot[]>('/v1/slots'),
   createShipment: (b: ShipmentCreate) => post<Shipment>('/v1/shipments', b),

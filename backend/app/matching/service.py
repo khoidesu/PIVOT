@@ -60,6 +60,33 @@ def _spread_icds(top: list, slots: list, shipment: m.Shipment, now: datetime, pa
                 break
 
 
+def evaluate_candidates(shipment, vehicles: list, windows: dict, slots: list, reserved_vehicles: set, now: datetime, params: dict, locs: dict):
+    """Lõi THUẦN của bộ ghép (không DB, không ghi): hard gate cho từng xe (chọn slot tốt nhất) → chấm điểm ứng viên đạt → xếp hạng.
+    Trả (passed, rejected, needs_data, scored). Dùng chung cho `run_match` (thật) và sandbox mô phỏng lợi ích — không có công thức thứ hai."""
+    passed, rejected, needs_data = [], [], []
+    for veh in vehicles:
+        win = windows.get(veh.id)
+        best = None
+        for slot in (slots or [None]):
+            verdict = gates.evaluate(shipment, veh, win, slot, now, params, vehicle_reserved=veh.id in reserved_vehicles)
+            if verdict.status == "PASS":
+                best = (slot, verdict)
+                break
+            if best is None or len(verdict.rejections) < len(best[1].rejections):
+                best = (slot, verdict)
+        slot, verdict = best
+        entry = {"vehicle": veh, "slot": slot, "verdict": verdict, "window": win}
+        {"PASS": passed, "FAIL": rejected, "UNKNOWN": needs_data}[verdict.status].append(entry)
+    scored = []
+    for e in passed:
+        sc = score.score_candidate(shipment, e["vehicle"], _loc(locs, e["window"].location_id),
+                                   _loc(locs, shipment.origin_location_id),
+                                   gates.pickup_eta(e["window"], shipment, now, params), params)
+        scored.append({**e, "scored": sc})
+    scored.sort(key=score.rank_key)
+    return passed, rejected, needs_data, scored
+
+
 def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetime, node_org_id: uuid.UUID | None = None) -> dict:
     if actor.role not in RUN_ROLES:
         raise HTTPException(status_code=403, detail="Role cannot run matching")
@@ -86,20 +113,7 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
     reserved_vehicles = set(session.execute(select(m.Reservation.resource_id).where(
         m.Reservation.resource_type == "vehicle", m.Reservation.status.in_(("held", "committed")))).scalars())
 
-    passed, rejected, needs_data = [], [], []
-    for veh in vehicles:
-        win = windows.get(veh.id)
-        best = None
-        for slot in (slots or [None]):
-            verdict = gates.evaluate(shipment, veh, win, slot, now, params, vehicle_reserved=veh.id in reserved_vehicles)
-            if verdict.status == "PASS":
-                best = (slot, verdict)
-                break
-            if best is None or len(verdict.rejections) < len(best[1].rejections):
-                best = (slot, verdict)
-        slot, verdict = best
-        entry = {"vehicle": veh, "slot": slot, "verdict": verdict, "window": win}
-        {"PASS": passed, "FAIL": rejected, "UNKNOWN": needs_data}[verdict.status].append(entry)
+    passed, rejected, needs_data, scored = evaluate_candidates(shipment, vehicles, windows, slots, reserved_vehicles, now, params, locs)
 
     def reasons(entry):
         yard = _yard(locs, entry["window"])
@@ -110,13 +124,6 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
     rejections = [reasons(e) for e in rejected]
     unknowns = [reasons(e) for e in needs_data]
 
-    scored = []
-    for e in passed:
-        sc = score.score_candidate(shipment, e["vehicle"], _loc(locs, e["window"].location_id),
-                                   _loc(locs, shipment.origin_location_id),
-                                   gates.pickup_eta(e["window"], shipment, now, params), params)
-        scored.append({**e, "scored": sc})
-    scored.sort(key=score.rank_key)
     top = scored[: params.get("max_proposals", 3)]
     if node_org_id is None:
         _spread_icds(top, slots, shipment, now, params, reserved_vehicles)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, type Benefit } from '../api'
+import { SandboxCard } from '../components/SandboxCard'
 import { Chip, ErrorNote, Hint, Loading, More, Note } from '../components/ui'
 import { fmtClock, fmtNum, fmtTime, fmtVnd } from '../fmt'
 import { useI18n } from '../i18n'
@@ -47,6 +48,8 @@ export function Benefits({ query }: { query: URLSearchParams }) {
             </div>))}
         </div>
       </section>
+
+      <SandboxCard />
 
       {list.error && <ErrorNote error={list.error} />}
       {list.loading && !list.data ? <Loading /> : items.length === 0 ? <div className="card empty stack"><span>{t('bf.empty')}</span><span className="small muted">{t('bf.emptyHow')}</span><a className="btn sm" href="#/tracking">{t('nav.tracking')}</a></div> : (

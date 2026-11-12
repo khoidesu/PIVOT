@@ -56,7 +56,7 @@ export function Fleet({ go }: { go: (to: string) => void }) {
   const zones = locations.filter((l) => l.kind === 'industrial_zone') // điểm lấy hàng (địa điểm công khai) để tính khoảng cách từ bãi
   const [target, setTarget] = useState('')
   const targetId = target || zones[0]?.id || ''
-  const vehicles = useData(() => api.vehicles(targetId || undefined), 0, targetId)
+  const vehicles = useData(() => api.vehicles(targetId || undefined), 5000, targetId)
   const slots = useData(() => api.slots())
   const [tab, setTab] = useState<Tab>(firstTab(me?.role))
   const [askCancel, setAskCancel] = useState<string | null>(null)
