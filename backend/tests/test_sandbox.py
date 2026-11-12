@@ -102,12 +102,20 @@ def test_nearest_vehicle_can_beat_top1_on_km_and_the_report_says_so():
 def test_scenario_coordinates_match_the_seeded_locations(client):
     with SessionLocal() as s:
         by_name = {x.name: x for x in s.execute(select(m.Location)).scalars()}
-    want = {"Depot Thủ Đức (mô phỏng)": ("depot", "yard"), "KCN Sóng Thần (mô phỏng)": ("kcn1",), "KCN VSIP I (mô phỏng)": ("kcn2",), "ICD Cảng C (mô phỏng)": ("icd",)}
+    want = {"KCN Sóng Thần (mô phỏng)": "kcn1", "KCN VSIP I (mô phỏng)": "kcn2", "ICD Cảng C (mô phỏng)": "icd"}
     world = {x.name: x for x in scenarios.world()["locs"].values()}
-    for name, (key, *_k) in want.items():
+    for name, key in want.items():
         assert (by_name[name].lat, by_name[name].lng) == (world[key].lat, world[key].lng), name
-    for key, name, lat, lng in fleet.YARDS:
-        assert (by_name[name].lat, by_name[name].lng) == (lat, lng) == (world[key.removeprefix("yard-")].lat, world[key.removeprefix("yard-")].lng)
+
+
+def test_simulated_carrier_bases_obey_the_same_5km_model_as_the_real_system():
+    zones = [(a, b) for _k, a, b in scenarios.ZONES]
+    for i in range(40):
+        sc = scenarios.make_scenario(i, 9)
+        bases = {sc["windows"][v.id].location_id for v in sc["vehicles"]}
+        assert bases and all(sc["locs"][b].kind == "carrier_base" for b in bases)
+        for b in bases:
+            assert all(score.haversine_km(sc["locs"][b].lat, sc["locs"][b].lng, la, ln) <= fleet.PICKUP_RADIUS_KM for la, ln in zones)
 
 
 # ---------------------------------------------------------------- API + không ghi DB + phân quyền

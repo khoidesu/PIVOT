@@ -9,7 +9,7 @@ from app.auth import actor_for_key
 from app.db import SessionLocal, engine
 from app.matching import score
 from tests.conftest import auth
-from tests.helpers import act, match, run_worker
+from tests.helpers import act, confirm_all, match, post_event, run_worker
 
 UTC = timezone.utc
 
@@ -123,7 +123,7 @@ def test_refresh_does_not_loosen_the_stale_rule_for_vehicles_nobody_refreshed(cl
 def test_vehicle_list_shows_yard_window_age_and_state(client):
     v = vehicles(client, "carrier_b")
     one = v["51C-100.01"]
-    assert one["yard"]["name"].startswith("Depot") and one["availability"]["state"] in ("empty", "free_later", "window_expired")
+    assert one["yard"]["name"].startswith("Nhà xe") and one["yard"]["kind"] == "carrier_base" and one["availability"]["state"] in ("empty", "free_later", "window_expired")
     assert v["51C-100.10"]["availability"] == {"state": "offline", "reason": "VEHICLE_OFFLINE"}
     assert one["position_age_seconds"] is not None and one["free_from"] and one["free_to"]
 
@@ -145,12 +145,76 @@ def test_distance_to_target_matches_the_match_score_formula_and_is_labelled_an_e
     assert client.get("/v1/vehicles", params={"to_location_id": "00000000-0000-0000-0000-000000000000"}, headers=auth("carrier_b")).status_code == 422
 
 
-def test_registered_carriers_vehicles_are_spread_over_several_yards(client):
-    tok = client.post("/v1/auth/login", json={"name": "Rai Bai", "role": "carrier"}).json()["token"]
-    mine = vehicles(client, tok, to_location_id=loc(client, kind="industrial_zone", name="Sóng Thần")["id"])
-    yards = {v["yard"]["name"] for v in mine.values()}
-    assert len(yards) >= 3 and all("(mô phỏng)" in y for y in yards)                              # nhãn mô phỏng trong tên bãi
-    assert len({v["distance_to_target_km"] for v in mine.values()}) >= 3                           # khoảng cách khác nhau theo bãi
+def zones(client):
+    return [x for x in client.get("/v1/locations", headers=auth("shipper_a")).json() if x["kind"] == "industrial_zone"]
+
+
+def km(a, b):
+    return score.haversine_km(a["lat"], a["lng"], b["lat"], b["lng"])
+
+
+def test_every_carrier_has_one_base_within_5km_of_every_pickup_and_its_idle_vehicles_stay_there(client):
+    zs = zones(client)
+    assert len(zs) >= 2
+    seeded = vehicles(client, "carrier_b")                                                        # nhà xe mẫu B: cả 10 xe đậu ở MỘT nhà xe
+    bases = {v["yard"]["id"] for v in seeded.values()}
+    assert len(bases) == 1 and len(seeded) == 10
+    for name in ("Rai Bai", "Nha Xe Hai", "Nha Xe Ba"):                                          # nhà xe tự đăng ký: mỗi nhà xe một bãi riêng
+        tok = client.post("/v1/auth/login", json={"name": name, "role": "carrier"}).json()["token"]
+        mine = vehicles(client, tok)
+        assert len(mine) == 4 and len({v["yard"]["id"] for v in mine.values()}) == 1             # cả đội ở cùng một nhà xe
+        y = next(iter(mine.values()))["yard"]
+        assert y["kind"] == "carrier_base" and "(mô phỏng)" in y["name"]
+        bases.add(y["id"])
+    assert len(bases) == 4                                                                        # mỗi nhà xe một vị trí riêng
+    allv = vehicles(client, "dispatch")
+    for y in {v["yard"]["id"]: v["yard"] for v in allv.values() if v["yard"]}.values():
+        assert all(km(y, z) <= 5.0 for z in zs), (y["name"], [round(km(y, z), 2) for z in zs])   # bán kính 5 km quanh MỌI điểm lấy hàng
+
+
+def test_a_vehicle_that_is_not_carrying_cargo_is_always_pulled_back_to_the_base(client):
+    kcn = zones(client)[0]
+    with SessionLocal() as s:                                                                       # xe đang "lạc" ở KCN (dữ liệu cũ)
+        v = s.execute(select(m.Vehicle).where(m.Vehicle.plate == "51C-100.01")).scalar_one()
+        w = s.execute(select(m.AvailabilityWindow).where(m.AvailabilityWindow.vehicle_id == v.id)).scalars().first()
+        w.location_id = __import__("uuid").UUID(kcn["id"])
+        s.commit()
+    assert vehicles(client, "carrier_b")["51C-100.01"]["yard"]["kind"] == "industrial_zone"
+    client.post("/v1/vehicles/refresh-fleet", headers=auth("carrier_b"))
+    run_worker(client)
+    assert vehicles(client, "carrier_b")["51C-100.01"]["yard"]["kind"] == "carrier_base"
+
+
+def test_refresh_never_moves_a_held_vehicle_away_from_its_job(client):
+    prop = match(client, "shipper_a", "LOT-A-001")["proposals"][0]
+    assert act(client, "shipper_a", prop, "hold").status_code == 200
+    kcn = zones(client)[0]
+    with SessionLocal() as s:
+        v = s.execute(select(m.Vehicle).where(m.Vehicle.plate == prop["vehicle"]["plate"])).scalar_one()
+        w = s.execute(select(m.AvailabilityWindow).where(m.AvailabilityWindow.vehicle_id == v.id)).scalars().first()
+        w.location_id = __import__("uuid").UUID(kcn["id"])
+        s.commit()
+    client.post("/v1/vehicles/refresh-fleet", headers=auth("carrier_b"))
+    run_worker(client)
+    assert vehicles(client, "carrier_b")[prop["vehicle"]["plate"]]["yard"]["kind"] == "industrial_zone"   # xe đang giữ không bị kéo về
+
+
+def test_after_delivering_the_vehicle_returns_to_the_base(client):
+    prop = match(client, "shipper_a", "LOT-A-001")["proposals"][0]
+    confirm_all(client, prop)
+    run_worker(client)
+    post_event(client, "carrier_b", prop["id"], "TRIP_STARTED")
+    run_worker(client)
+    icd = next(x for x in client.get("/v1/locations", headers=auth("shipper_a")).json() if x["kind"] == "icd")
+    with SessionLocal() as s:                                                                       # xe đã chạy tới ICD (vị trí cuối của chuyến)
+        v = s.execute(select(m.Vehicle).where(m.Vehicle.plate == prop["vehicle"]["plate"])).scalar_one()
+        w = s.execute(select(m.AvailabilityWindow).where(m.AvailabilityWindow.vehicle_id == v.id)).scalars().first()
+        w.location_id = __import__("uuid").UUID(icd["id"])
+        s.commit()
+    post_event(client, "carrier_b", prop["id"], "TRIP_COMPLETED", {})
+    run_worker(client)
+    v = vehicles(client, "carrier_b")[prop["vehicle"]["plate"]]
+    assert v["status"] == "available" and v["yard"]["kind"] == "carrier_base"                      # giao xong → về nhà xe
 
 
 def test_proposal_and_owner_rejections_carry_the_yard_but_other_orgs_never_see_it(client):

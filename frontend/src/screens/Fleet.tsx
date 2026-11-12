@@ -144,6 +144,7 @@ export function Fleet({ go }: { go: (to: string) => void }) {
               </label>
               {me?.role === 'carrier' && fleetSync && <span className="muted small">{t('fleet.synced', { n: fleetSync.n, t: fmtTime(fleetSync.at) })}</span>}
             </div>
+            <p className="muted small">{t('fleet.baseNote')}</p>
             <YardGroups list={vehicles.data ?? []} staleLimit={staleLimit} />
           </>)
       ) : (

@@ -92,8 +92,8 @@ const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).fl
 const wordsOf = (lang: 'vi' | 'en') => Object.values(dictionaries[lang]).reduce((n, v) => n + v.split(/\s+/).filter(Boolean).length, 0)
 
 describe('giao diện gọn chữ', () => {
-  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ; nới 2.000 → 2.200 khi thêm ETA tín hiệu thật, nhiều cửa sổ, màn Xác nhận mới; 2.300 khi thêm đọc ảnh; 2.330 khi thêm cảnh báo bản nháp: thiếu/nhiều lô/sai thứ/giờ đã qua; 2.345 khi thêm hero màn bắt đầu; 2.430 khi thêm trang mở đầu + hướng dẫn 4 bước; 2.465 khi thêm đọc PDF + lỗi tệp PDF; 2.500 khi thêm thông báo giới hạn lượt theo IP/toàn hệ thống mỗi phút; 2.600 khi sửa BUG_REPORT 12/11: lý do loại theo trọng lượng/thể tích + slot, bảng lý do, kiểm tra trước khi ghép, hướng dẫn hoàn tất chuyến; 2.700 khi thêm bãi xe + khoảng cách minh bạch và thẻ mô phỏng lợi ích)', () => {
-    expect(wordsOf('vi')).toBeLessThanOrEqual(2700)
+  it('ngân sách chữ tiếng Việt không phình lại (trước đây 2.645 từ; nới 2.000 → 2.200 khi thêm ETA tín hiệu thật, nhiều cửa sổ, màn Xác nhận mới; 2.300 khi thêm đọc ảnh; 2.330 khi thêm cảnh báo bản nháp: thiếu/nhiều lô/sai thứ/giờ đã qua; 2.345 khi thêm hero màn bắt đầu; 2.430 khi thêm trang mở đầu + hướng dẫn 4 bước; 2.465 khi thêm đọc PDF + lỗi tệp PDF; 2.500 khi thêm thông báo giới hạn lượt theo IP/toàn hệ thống mỗi phút; 2.600 khi sửa BUG_REPORT 12/11: lý do loại theo trọng lượng/thể tích + slot, bảng lý do, kiểm tra trước khi ghép, hướng dẫn hoàn tất chuyến; 2.700 khi thêm bãi xe + khoảng cách minh bạch và thẻ mô phỏng lợi ích; 2.750 khi giải thích mô hình nhà xe)', () => {
+    expect(wordsOf('vi')).toBeLessThanOrEqual(2750)
   })
   it('mọi khoá i18n đều được mã nguồn dùng (không để chuỗi chết)', () => {
     const code = walk(SRC).filter((f) => /\.(tsx?)$/.test(f) && !/i18n(\.test)?\.ts$/.test(f)).map((f) => readFileSync(f, 'utf8')).join('\n')

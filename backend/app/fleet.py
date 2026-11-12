@@ -3,6 +3,8 @@
 Mọi dữ liệu ở đây là MÔ PHỎNG (không có GPS thật). Việc làm tươi KHÔNG đi tắt: nó phát `VEHICLE_POSITION` / `VEHICLE_AVAILABLE` qua đúng đường
 nhận sự kiện (`events.ingest` → outbox → worker) nên vẫn có phân quyền, idempotency và audit; ngưỡng `DATA_STALE` (5 phút) không bị nới.
 """
+import hashlib
+import math
 import uuid
 from datetime import datetime, timedelta
 
@@ -17,22 +19,48 @@ from .events import service as events
 from .matching import score
 
 NS = uuid.UUID("6f1c6c1e-0000-4000-8000-00000000b002")
-# Bãi đậu xe mô phỏng quanh hành lang KCN–ICD. kind="yard" (không dùng "depot" để không đụng chỗ đang giả định đúng một depot).
-YARDS = (("yard-hiep-binh", "Bãi Hiệp Bình (mô phỏng)", 10.835, 106.720),
-         ("yard-long-binh", "Bãi Long Bình (mô phỏng)", 10.880, 106.870),
-         ("yard-an-phu", "Bãi An Phú (mô phỏng)", 10.800, 106.760))
+
+# MÔ HÌNH NHÀ XE (giả định mô phỏng, nói rõ trên giao diện): mỗi nhà xe (tổ chức vận tải) có MỘT vị trí nhà xe cố định, nằm trong bán kính
+# 5 km quanh điểm lấy hàng; xe KHÔNG chở hàng luôn đậu ở đó (sau khi giao xong cũng quay về đó). Chỉ xe đang giữ/đang chạy mới rời nhà xe.
+PICKUP_RADIUS_KM = 5.0
+BASE_MIN_OFFSET_KM = 0.8   # nhà xe cách tâm các điểm lấy trong khoảng này…
+BASE_MAX_OFFSET_KM = 2.2   # …nên cách MỌI điểm lấy < 5 km (các KCN mẫu cách nhau ~2,8 km → tối đa ~3,6 km)
+FALLBACK_PICKUPS = ((10.90, 106.74), (10.92, 106.72))  # trùng KCN seed; chỉ dùng khi DB chưa có điểm lấy nào
 DEFAULT_WINDOW_HOURS = 9  # khung rảnh gia hạn thêm khi làm tươi (cấu hình `fleet_window_hours` trong bộ giả định, nếu có)
 REFRESH_BUCKET_SECONDS = 60  # gọi lặp trong cùng phút → cùng source_event_id → không nhân đôi tác động
 
 
-def ensure_yards(session: Session) -> list[m.Location]:
-    """Đảm bảo các bãi đậu tồn tại (idempotent, id cố định) và trả [depot..., bãi...]. DB đã seed từ trước cũng được vá."""
-    for key, name, lat, lng in YARDS:
-        if session.get(m.Location, uuid.uuid5(NS, key)) is None:
-            session.add(m.Location(id=uuid.uuid5(NS, key), name=name, kind="yard", lat=lat, lng=lng))
-    session.flush()
-    rows = session.execute(select(m.Location).where(m.Location.kind.in_(("depot", "yard"))).order_by(m.Location.kind, m.Location.name)).scalars().all()
-    return list(rows)  # "depot" < "yard" theo thứ tự chữ → depot đứng trước
+def base_point(pickups, key: str, min_km: float = BASE_MIN_OFFSET_KM, max_km: float = BASE_MAX_OFFSET_KM) -> tuple[float, float]:
+    """Toạ độ nhà xe xác định theo `key`: lệch tâm các điểm lấy hàng một khoảng [min_km, max_km] theo hướng ngẫu nhiên-xác định (băm `key`)."""
+    pts = list(pickups) or list(FALLBACK_PICKUPS)
+    lat0, lng0 = sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+    h = hashlib.sha256(key.encode()).digest()
+    angle = int.from_bytes(h[:2], "big") / 65535 * 2 * math.pi
+    r = min_km + int.from_bytes(h[2:4], "big") / 65535 * (max_km - min_km)
+    return (lat0 + r * math.sin(angle) / 110.57, lng0 + r * math.cos(angle) / (111.32 * math.cos(math.radians(lat0))))
+
+
+def base_for_org(session: Session, org: m.Organization) -> m.Location:
+    """Nhà xe của một tổ chức vận tải (tạo nếu chưa có; id cố định theo tổ chức nên idempotent, DB cũ cũng được vá)."""
+    loc_id = uuid.uuid5(NS, f"base:{org.id}")
+    loc = session.get(m.Location, loc_id)
+    if loc is None:
+        zones = session.execute(select(m.Location).where(m.Location.kind == "industrial_zone")).scalars().all()
+        lat, lng = base_point([(z.lat, z.lng) for z in zones], str(org.id))
+        label = org.name.split(" · ")[0]
+        loc = m.Location(id=loc_id, name=f"Nhà xe {label} (mô phỏng)"[:200], kind="carrier_base", lat=round(lat, 6), lng=round(lng, 6))
+        session.add(loc)
+        session.flush()
+    return loc
+
+
+def return_to_base(session: Session, veh: m.Vehicle) -> None:
+    """Xe đã giao xong (không chở hàng nữa) → quay về nhà xe: địa điểm của khung rảnh mới nhất = nhà xe."""
+    org = session.get(m.Organization, veh.tenant_id)
+    win = session.execute(select(m.AvailabilityWindow).where(m.AvailabilityWindow.vehicle_id == veh.id)
+                          .order_by(m.AvailabilityWindow.free_from.desc())).scalars().first()
+    if org is not None and win is not None:
+        win.location_id = base_for_org(session, org).id
 
 
 # ------------------------------------------------------------------ 1. làm tươi đội xe
@@ -56,8 +84,10 @@ def _busy_vehicle_ids(session: Session, vehicle_ids: list[uuid.UUID]) -> tuple[s
 
 def refresh_fleet(session: Session, actor: Actor, now: datetime) -> dict:
     """Làm tươi vị trí + khung rảnh của xe ĐANG RẢNH của tổ chức. Bỏ qua xe offline (không tự bật lại), xe đang giữ/cam kết/đang chạy
-    (không ghi đè GPS của chuyến). Vị trí = bãi đang đậu (địa điểm của khung rảnh mới nhất), không phải toạ độ ngẫu nhiên."""
+    (không ghi đè GPS của chuyến). Vị trí = NHÀ XE của tổ chức (xe không chở hàng luôn đậu ở đó), không phải toạ độ ngẫu nhiên."""
     horizon = timedelta(hours=get_active(session).params.get("fleet_window_hours", DEFAULT_WINDOW_HOURS))
+    org = session.get(m.Organization, actor.org_id)
+    base = base_for_org(session, org)  # xe rảnh luôn ở nhà xe
     vehs = session.execute(select(m.Vehicle).where(m.Vehicle.tenant_id == actor.org_id).order_by(m.Vehicle.plate)).scalars().all()
     ids = [v.id for v in vehs]
     wins = _latest_windows(session, ids) if ids else {}
@@ -79,7 +109,7 @@ def refresh_fleet(session: Session, actor: Actor, now: datetime) -> dict:
         _, dup = events.ingest(session, actor, {
             "entity_type": "vehicle", "entity_id": veh.id, "event_type": "VEHICLE_POSITION", "occurred_at": now,
             "source_system": "sim-login", "source_event_id": f"auto:pos:{veh.id}:{bucket}",
-            "payload": {"location_id": str(win.location_id)}}, now)
+            "payload": {"location_id": str(base.id)}}, now)  # VEHICLE_POSITION có location_id → khung rảnh cũng chuyển về nhà xe
         duplicates += int(dup)
         updated += int(not dup)
         # Khung rảnh sắp/đã hết → gia hạn (chỉ khi xe đã rảnh từ trước: không đổi giờ rảnh trong tương lai)
@@ -87,7 +117,7 @@ def refresh_fleet(session: Session, actor: Actor, now: datetime) -> dict:
             _, dup2 = events.ingest(session, actor, {
                 "entity_type": "vehicle", "entity_id": veh.id, "event_type": "VEHICLE_AVAILABLE", "occurred_at": now,
                 "source_system": "sim-login", "source_event_id": f"auto:avail:{veh.id}:{bucket}",
-                "payload": {"location_id": str(win.location_id), "free_from": win.free_from.isoformat(),
+                "payload": {"location_id": str(base.id), "free_from": win.free_from.isoformat(),
                             "free_to": (now + horizon).isoformat()}}, now)
             extended += int(not dup2)
     return {"updated": updated, "window_extended": extended, "already_fresh": duplicates, "skipped": skipped,

@@ -34,7 +34,9 @@ def to_markdown(r: dict) -> str:
           f"| Cờ cảnh báo cut-off P90 của hệ thống | {t['cutoff_flag']*100:.1f}% |", ""]
     b = s["vs_static_baseline"]
     L += [f"So với baseline tĩnh của hành lang (38 km chạy rỗng): tiết kiệm trung bình **{_f(b['km_saved_mean'])} km ≈ {_f(b['cost_saved_vnd_mean'], 0)} VND/chuyến**; "
-          f"top-1 tốt hơn baseline ở {b['share_better_than_baseline']*100:.0f}% số ca. *(Baseline là giả định cấu hình, không phải đo thực.)*", "",
+          f"top-1 tốt hơn baseline ở {b['share_better_than_baseline']*100:.0f}% số ca. *(Baseline 38 km là giả định cấu hình, không phải đo thực; "
+          "mô hình nhà xe giả định mọi xe rảnh đậu trong bán kính 5 km quanh điểm lấy hàng, nên phần lớn chênh lệch này đến từ chính giả định đó — "
+          "đừng đọc nó như lợi ích của riêng việc chọn xe điểm cao nhất; so sánh có ý nghĩa là mục 2.)*", "",
           "## 2. Top-1 so với cách chọn khác (chênh lệch cặp; DƯƠNG = top-1 tốt hơn)", "",
           "Mỗi dòng: chênh lệch trung bình [khoảng tin cậy 95% bootstrap] · tỷ lệ ca top-1 không tệ hơn.", ""]
     for alt, name in NAMES.items():
@@ -56,6 +58,7 @@ def to_markdown(r: dict) -> str:
     L += ["", f"Top-1 trùng xe gần nhất ở {s['top1_is_nearest_share']*100:.0f}% số ca; khi không trùng, top-1 chạy rỗng **nhiều km hơn** xe gần nhất "
           "(điểm cân bằng độ vừa tải + dư thời gian + km) nhưng tới ICD sớm hơn — xem mục 2.", "",
           "## 5. Giới hạn (đọc kỹ)", "",
+          "- Mô hình nhà xe: mỗi nhà xe có MỘT bãi trong bán kính 5 km quanh điểm lấy hàng và xe rảnh luôn ở đó — nên các xe vốn đã gần nhau và mức tiết kiệm km giữa các cách chọn nhỏ; lợi ích lớn hơn nếu đội xe thật rải rộng hơn.",
           "- Phân phối lô/đội xe/bãi/khung rảnh, tỷ lệ xe quá hạn/offline, nhiễu thời gian đều do nhóm đặt — đổi giả định sẽ đổi con số. Hồ sơ `peak` và `sparse` cho thấy độ nhạy.",
           "- 'Thực tế' = ETA luật × nhiễu mô phỏng (cùng phân phối với lịch sử ETA mô phỏng), tách khỏi dự báo; vẫn chưa phải đo từ chuyến thật.",
           "- Tỷ lệ trễ hạn rất thấp ở mọi cách chọn vì hạn lấy hàng/cut-off trong kịch bản khá rộng; lợi ích chính hiện ở **km rỗng, chi phí, và phút tới ICD**.",
