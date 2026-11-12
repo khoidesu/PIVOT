@@ -23,6 +23,20 @@ def _loc(locs: dict, location_id):
     return locs[location_id]
 
 
+def _yard(locs: dict, window) -> dict | None:
+    """Bãi đang đậu của xe = địa điểm của khung rảnh dùng để ghép (None nếu thiếu)."""
+    loc = locs.get(window.location_id) if window is not None else None
+    return None if loc is None else {"name": loc.name, "lat": loc.lat, "lng": loc.lng}
+
+
+def yard_km(yard: dict | None, shipment: m.Shipment, locs: dict, params: dict) -> float | None:
+    """Km ước tính bãi → điểm lấy (cùng công thức deadhead của MatchScore: đường chim bay × hệ số đường bộ)."""
+    origin = locs.get(shipment.origin_location_id)
+    if yard is None or origin is None:
+        return None
+    return round(score.haversine_km(yard["lat"], yard["lng"], origin.lat, origin.lng) * params.get("road_factor", score.DEFAULT_ROAD_FACTOR), 1)
+
+
 def _spread_icds(top: list, slots: list, shipment: m.Shipment, now: datetime, params: dict, reserved_vehicles: set) -> None:
     """Nhiều ICD cùng có slot đạt tại điểm đến → các đề xuất luân phiên giữa các ICD (theo thứ tự giờ slot sớm nhất của mỗi ICD),
     để mọi ICD đều nhận được yêu cầu xác nhận. Trước đây luôn lấy slot sớm nhất nên ICD có nhiều slot sớm hơn "nuốt" hết đề xuất.
@@ -88,8 +102,9 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
         {"PASS": passed, "FAIL": rejected, "UNKNOWN": needs_data}[verdict.status].append(entry)
 
     def reasons(entry):
+        yard = _yard(locs, entry["window"])
         return {"vehicle_id": str(entry["vehicle"].id), "plate": entry["vehicle"].plate,
-                "status": entry["verdict"].status,
+                "status": entry["verdict"].status, "yard": yard["name"] if yard else None, "yard_km": yard_km(yard, shipment, locs, params),
                 "reasons": [bk.gate_to_dict(r) for r in entry["verdict"].rejections]}
 
     rejections = [reasons(e) for e in rejected]
@@ -120,6 +135,7 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
                              for k, v in {c.name: getattr(shipment, c.name) for c in m.Shipment.__table__.columns
                                           if c.name not in ("price_vnd", "customer_name")}.items()},  # không snapshot giá/khách
                 "vehicle": {"id": str(e["vehicle"].id), "plate": e["vehicle"].plate,
+                            "yard_name": (_yard(locs, e["window"]) or {}).get("name"),
                             "position_updated_at": e["vehicle"].position_updated_at.isoformat()
                             if e["vehicle"].position_updated_at else None},
                 "gates": [bk.gate_to_dict(r) for r in e["verdict"].results],

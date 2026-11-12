@@ -12,7 +12,7 @@ from ..access import (
     CAN_CREATE_SHIPMENT, get_visible_shipment, price_visible_ids, visible_shipments_stmt,
     visible_vehicles_stmt,
 )
-from .. import shipment_ops
+from .. import fleet, shipment_ops
 from ..admin import require_admin
 from ..assumptions import get_active
 from ..booking.service import BookingError
@@ -170,8 +170,26 @@ def cancel_shipment(shipment_id: uuid.UUID, actor: Actor = Depends(current_actor
 
 
 @router.get("/vehicles", response_model=list[s.VehicleOut])
-def list_vehicles(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
-    return session.execute(visible_vehicles_stmt(actor).order_by(m.Vehicle.plate)).scalars().all()
+def list_vehicles(to_location_id: uuid.UUID | None = None, actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    """Xe (của tổ chức mình; điều phối viên xem tất cả) kèm bãi đang đậu + trạng thái. `to_location_id` (địa điểm công khai, vd điểm lấy hàng)
+    → thêm khoảng cách ước tính + ETA từ bãi tới đó."""
+    target = None
+    if to_location_id is not None:
+        target = session.get(m.Location, to_location_id)
+        if target is None:
+            raise HTTPException(status_code=422, detail="Unknown to_location_id")
+    vehicles = session.execute(visible_vehicles_stmt(actor).order_by(m.Vehicle.plate)).scalars().all()
+    return fleet.vehicle_views(session, list(vehicles), datetime.now(timezone.utc), target)
+
+
+@router.post("/vehicles/refresh-fleet")
+def refresh_fleet(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    """Nhà vận tải làm tươi vị trí + khung rảnh của xe đang rảnh (đường sự kiện thật, idempotent theo phút). Gọi khi đăng nhập và định kỳ."""
+    if actor.role != "carrier":
+        raise HTTPException(status_code=403, detail="Carrier only")
+    out = fleet.refresh_fleet(session, actor, datetime.now(timezone.utc))
+    session.commit()
+    return out
 
 
 @router.get("/slots", response_model=list[s.SlotOut])

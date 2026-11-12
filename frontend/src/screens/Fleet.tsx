@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, ApiError, type Shipment } from '../api'
+import { api, ApiError, type Shipment, type Vehicle } from '../api'
 import { Chip, ErrorNote, Loading, Note } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { ageMinutes, fmtNum, fmtTime, fmtVnd } from '../fmt'
@@ -13,11 +13,50 @@ const CAN_EDIT = new Set(['shipper']) // tạo/sửa/huỷ lô: chỉ chủ hàn
 const SEES_PRICE = new Set(['shipper', 'carrier'])
 const firstTab = (role?: string): Tab => (role === 'carrier' ? 'vehicles' : role === 'node_operator' ? 'slots' : 'lots') // mặc định theo vai trò
 
+const STATE_KIND: Record<string, string> = { empty: 'good', reserved: 'warn', executing: 'teal', offline: 'bad', window_expired: 'warn', free_later: 'warn', no_window: 'bad' }
+
+/** Xe gom theo bãi đang đậu: xe nào trống, cách điểm lấy bao xa (ƯỚC TÍNH), vị trí cập nhật lúc nào. */
+function YardGroups({ list, staleLimit }: { list: Vehicle[]; staleLimit: number }) {
+  const { t } = useI18n()
+  const groups = new Map<string, Vehicle[]>()
+  for (const v of list) groups.set(v.yard?.name ?? '', [...(groups.get(v.yard?.name ?? '') ?? []), v])
+  return (
+    <div className="stack">
+      {[...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, vs]) => {
+        const empty = vs.filter((v) => v.availability?.state === 'empty').length
+        return (
+          <section key={name} className="stack">
+            <div className="row"><b>{name || t('fleet.noYard')}</b><Chip kind={empty ? 'good' : undefined}>{t('fleet.yardEmpty', { n: empty, total: vs.length })}</Chip></div>
+            <div className="table-wrap"><table>
+              <thead><tr><th>{t('col.plate')}</th><th className="num">{t('col.cap')}</th><th>{t('col.status')}</th><th className="num">{t('col.dist')}</th><th>{t('col.pos')}</th></tr></thead>
+              <tbody>{vs.map((v) => {
+                const age = ageMinutes(v.position_updated_at)
+                const stale = age == null || age > staleLimit
+                const st = v.availability?.state ?? 'no_window'
+                return (
+                  <tr key={v.id}>
+                    <td><b className="mono">{v.plate}</b></td>
+                    <td className="num">{fmtNum(v.capacity_kg)} kg<div className="muted small">{v.capacity_m3} m³</div></td>
+                    <td><Chip kind={STATE_KIND[st]} title={v.availability?.reason}>{t(`veh.state.${st}`)}</Chip></td>
+                    <td className="num" title={t('fleet.estTip')}>{v.distance_to_target_km == null ? '—' : <>{fmtNum(v.distance_to_target_km)} km<div className="muted small">≈ {v.deadhead_eta?.minutes ?? '?'}′</div></>}</td>
+                    <td>{age == null ? '—' : t(age === 0 ? 'common.justNow' : 'common.ago', { n: age })} {stale && <Chip kind="FAIL" title={t('fleet.staleTip', { n: staleLimit })}>{t('fleet.stale')}</Chip>}</td>
+                  </tr>)
+              })}</tbody>
+            </table></div>
+          </section>)
+      })}
+    </div>
+  )
+}
+
 export function Fleet({ go }: { go: (to: string) => void }) {
   const { t } = useI18n()
-  const { me, meta } = useApp()
+  const { me, meta, locations, fleetSync } = useApp()
   const lots = useData(() => api.shipments())
-  const vehicles = useData(() => api.vehicles())
+  const zones = locations.filter((l) => l.kind === 'industrial_zone') // điểm lấy hàng (địa điểm công khai) để tính khoảng cách từ bãi
+  const [target, setTarget] = useState('')
+  const targetId = target || zones[0]?.id || ''
+  const vehicles = useData(() => api.vehicles(targetId || undefined), 0, targetId)
   const slots = useData(() => api.slots())
   const [tab, setTab] = useState<Tab>(firstTab(me?.role))
   const [askCancel, setAskCancel] = useState<string | null>(null)
@@ -96,20 +135,17 @@ export function Fleet({ go }: { go: (to: string) => void }) {
         </>
       ) : tab === 'vehicles' ? (
         (vehicles.data ?? []).length === 0 ? <div className="empty">{t('fleet.empty')}</div> : (
-          <div className="table-wrap"><table>
-            <thead><tr><th>{t('col.plate')}</th><th className="num">{t('col.cap')}</th><th>{t('col.status')}</th><th>{t('col.pos')}</th></tr></thead>
-            <tbody>{vehicles.data?.map((v) => {
-              const age = ageMinutes(v.position_updated_at)
-              const stale = age == null || age > staleLimit
-              return (
-                <tr key={v.id}>
-                  <td><b className="mono">{v.plate}</b></td>
-                  <td className="num">{fmtNum(v.capacity_kg)} kg<div className="muted small">{v.capacity_m3} m³</div></td>
-                  <td><Chip kind={v.status === 'available' ? 'good' : v.status === 'offline' ? 'bad' : 'warn'}>{t(`status.${v.status}`)}</Chip></td>
-                  <td>{age == null ? '—' : t(age === 0 ? 'common.justNow' : 'common.ago', { n: age })} {stale && <Chip kind="FAIL" title={t('fleet.staleTip', { n: staleLimit })}>{t('fleet.stale')}</Chip>}</td>
-                </tr>)
-            })}</tbody>
-          </table></div>)
+          <>
+            <div className="row">
+              <label className="inline">{t('fleet.to')}
+                <select value={targetId} onChange={(e) => setTarget(e.target.value)}>
+                  {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                </select>
+              </label>
+              {me?.role === 'carrier' && fleetSync && <span className="muted small">{t('fleet.synced', { n: fleetSync.n, t: fmtTime(fleetSync.at) })}</span>}
+            </div>
+            <YardGroups list={vehicles.data ?? []} staleLimit={staleLimit} />
+          </>)
       ) : (
         (slots.data ?? []).length === 0 ? <div className="empty">{t('fleet.empty')}</div> : (
           <div className="table-wrap"><table>

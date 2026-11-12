@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, ApiError, EMBED, getSession, setOnUnauthorized, setSession, type Location, type Me, type Meta, type Role, type Session } from './api'
+import { api, ApiError, EMBED, getSession, setOnUnauthorized, setSession, type FleetRefresh, type Location, type Me, type Meta, type Role, type Session } from './api'
 import { setServerTime } from './fmt'
 
 interface AppCtx {
@@ -10,6 +10,7 @@ interface AppCtx {
   epoch: number // tăng khi đăng nhập / làm mới → các màn hình tải lại
   fatal: ApiError | null
   notice: 'expired' | null
+  fleetSync: { n: number; at: string } | null // lần làm tươi vị trí đội xe gần nhất (chỉ nhà vận tải)
   login: (name: string, role: Role) => Promise<void>
   logout: () => void
   bump: () => void
@@ -26,6 +27,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [epoch, setEpoch] = useState(0)
   const [fatal, setFatal] = useState<ApiError | null>(null)
   const [notice, setNotice] = useState<'expired' | null>(null)
+  const [fleetSync, setFleetSync] = useState<{ n: number; at: string } | null>(null)
 
   const clear = useCallback(() => { setMe(null); setMeta(null); setLocations([]); setFatal(null) }, [])
   useEffect(() => { // 401 ở bất kỳ API nào → về màn hình đăng nhập kèm thông báo (trong cửa sổ nhúng: nhờ trang bao ngoài đăng nhập lại)
@@ -64,8 +66,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { void load() }, [load, epoch, session])
 
+  // Nhà vận tải: tự làm tươi vị trí + khung rảnh của xe rảnh khi vào và định kỳ (< ngưỡng quá hạn 5 phút) — bỏ qua khi tab đang ẩn.
+  const role = me?.role
+  useEffect(() => {
+    if (role !== 'carrier') { setFleetSync(null); return }
+    let stop = false
+    const run = () => {
+      if (document.visibilityState === 'hidden') return
+      api.refreshFleet().then((r: FleetRefresh) => { if (!stop) setFleetSync({ n: r.updated + r.already_fresh, at: r.at }) }).catch(() => { /* không chặn giao diện */ })
+    }
+    run()
+    const id = setInterval(run, 2 * 60 * 1000)
+    document.addEventListener('visibilitychange', run)
+    return () => { stop = true; clearInterval(id); document.removeEventListener('visibilitychange', run) }
+  }, [role, me?.user_id, epoch])
+
   const value = useMemo<AppCtx>(() => ({
-    session, me, meta, locations, epoch, fatal, notice,
+    session, me, meta, locations, epoch, fatal, notice, fleetSync,
     login: async (name, role) => {
       const r = await api.login(name, role) // lỗi (tên/vai trò sai…) ném ra cho màn hình đăng nhập hiển thị
       const s: Session = { token: r.token, name: r.me.user_name, role: r.me.role as Role }
@@ -74,7 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     logout: () => { setSession(null); setSessionState(null); clear(); setNotice(null); if (EMBED) window.parent.postMessage({ type: 'logection:logout' }, location.origin) },
     bump: () => setEpoch((n) => n + 1),
     syncClock: () => { api.meta().then((mt) => { setServerTime(mt.server_time); setMeta(mt) }).catch(() => {}) },
-  }), [session, me, meta, locations, epoch, fatal, notice, clear])
+  }), [session, me, meta, locations, epoch, fatal, notice, fleetSync, clear])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 

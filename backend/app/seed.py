@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from . import models as m
+from . import fleet, models as m
 from .config import settings
 from .db import SessionLocal, engine
 
@@ -112,6 +112,8 @@ def seed(session: Session, now: datetime | None = None) -> dict:
         "depot": m.Location(id=uid("loc-depot"), name="Depot Thủ Đức (mô phỏng)", kind="depot", lat=10.87, lng=106.77),
     }
     session.add_all(locs.values())
+    session.flush()
+    fleet.ensure_yards(session)  # thêm các bãi đậu (kind="yard") — xe của người tự đăng ký được rải lên đó; 10 xe seed của B vẫn ở depot
     session.add(m.AssumptionSet(id=uid("assume-v2"), version="assume-v2",
                                 params=ASSUMPTIONS_V1 | {"anchor_at": now.isoformat()}))
     session.flush()

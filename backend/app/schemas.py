@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
@@ -75,6 +76,14 @@ class ShipmentOut(ORM):
     missing_fields: list[str] = []
 
 
+class YardOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    kind: str
+    lat: float
+    lng: float
+
+
 class VehicleOut(ORM):
     id: uuid.UUID
     tenant_id: uuid.UUID
@@ -85,6 +94,15 @@ class VehicleOut(ORM):
     status: str
     position_updated_at: datetime | None
     is_simulated: bool
+    # Bãi đang đậu + trạng thái dễ hiểu + khoảng cách tới điểm cần tới (ƯỚC TÍNH, nhãn `distance_method`)
+    yard: YardOut | None = None
+    free_from: datetime | None = None
+    free_to: datetime | None = None
+    availability: dict[str, str] | None = None
+    position_age_seconds: int | None = None
+    distance_to_target_km: float | None = None
+    distance_method: str | None = None
+    deadhead_eta: dict[str, Any] | None = None
 
 
 class SlotOut(ORM):
@@ -109,7 +127,6 @@ class LocationOut(ORM):
 
 
 # ---------------- ghép (match-runs), đề xuất, sự kiện ----------------
-from typing import Any  # noqa: E402
 
 
 class ShipmentBrief(ORM):
@@ -132,6 +149,7 @@ class VehicleBrief(BaseModel):
     capacity_kg: float
     capacity_m3: float
     carrier_org_name: str | None
+    yard: str | None = None  # bãi đang đậu lúc ghép (từ snapshot; đề xuất cũ không có)
 
 
 class SlotBrief(BaseModel):
