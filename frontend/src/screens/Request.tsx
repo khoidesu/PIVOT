@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { api, ApiError, type IntakeDraft, type Shipment } from '../api'
 import { Chip, ErrorNote, Hint, Note } from '../components/ui'
 import { Icon } from '../components/Icon'
+import { IntakeTile } from '../components/IntakeTile'
 import { ACCEPT, prepareImage } from '../image'
 import { isoToLocalInput, localInputDefault, localInputToIso } from '../fmt'
 import { useI18n } from '../i18n'
@@ -137,13 +138,14 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
       <section className="card">
         <div className="card-h">
           <h1>{editing ? t('req.edit', { code: editing.code }) : t('req.new')}</h1>
-          {!editing && allowed && (
-            <div className="row">
-              <button type="button" className="btn sm" onClick={() => setShowImport((v) => !v)} aria-expanded={showImport}>{t('req.paste')}</button>
-              {meta?.image_intake_enabled && <button type="button" className="btn sm" disabled={drafting} onClick={() => fileRef.current?.click()}>{reading ? t('in.img.reading') : t('req.photo')}</button>}
-              <input ref={fileRef} type="file" accept={ACCEPT} className="sr" tabIndex={-1} aria-hidden onChange={onFile} />
-            </div>)}
         </div>
+        {!editing && allowed && (
+          <div className="tiles">
+            <IntakeTile icon="message" title={t('req.paste')} sub={t('req.paste.sub')} active={showImport} onClick={() => setShowImport((v) => !v)} />
+            {meta?.image_intake_enabled && (
+              <IntakeTile icon="image" index={1} title={reading ? t('in.img.reading') : t('req.photo')} sub={t('req.photo.sub')} busy={reading} disabled={drafting} onClick={() => fileRef.current?.click()} />)}
+            <input ref={fileRef} type="file" accept={ACCEPT} className="sr" tabIndex={-1} aria-hidden onChange={onFile} />
+          </div>)}
         {me && !allowed && <Note kind="warn">{t('req.cannot')}</Note>}
         {notFound && <Note kind="err">{t('req.notFound')}</Note>}
 

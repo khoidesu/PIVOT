@@ -2,14 +2,16 @@
 // Mọi logic ở đây là hàm thuần (không đụng DOM) để test được; màn hình ở screens/Workspace.tsx chỉ vẽ kết quả.
 import type { Role } from './api'
 
-export type LayoutMode = 'grid' | 'cols' | 'focus'
+/** Tỉ lệ khung do người dùng kéo: chiều cao từng hàng và chiều rộng từng cột trong mỗi hàng (mỗi mảng cộng lại = 1). */
+export interface Sizes { rows: number[]; cols: number[][] }
 export interface Win { id: string; name: string; role: Role; token: string; open: boolean }
-export interface WsState { wins: Win[]; focus: string | null; layout: LayoutMode }
+export interface WsState { wins: Win[]; focus: string | null; sizes?: Sizes }
 
 export const MAX_WINS = 8
 export const MIN_WIN_WIDTH = 340 // px: hẹp hơn thì tự bớt cột (giao diện vẫn dùng được ở ~340px)
 export const NARROW_PX = 900 // dưới mức này chỉ hiện một cửa sổ một lúc
-export const EMPTY: WsState = { wins: [], focus: null, layout: 'grid' }
+export const EMPTY: WsState = { wins: [], focus: null }
+export const MIN_FRAC = 0.12 // một khung không bị kéo nhỏ hơn 12% hàng/cột của nó
 
 const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/gi, 'd').toLowerCase().replace(/\s+/g, ' ').trim()
 /** Cùng tên (không phân biệt hoa/dấu) + cùng vai trò = cùng một người = cùng một cửa sổ. */
@@ -58,41 +60,76 @@ export function moveWin(s: WsState, from: string, to: string): WsState {
   return { ...s, wins }
 }
 
-export const setLayout = (s: WsState, layout: LayoutMode): WsState => ({ ...s, layout })
-
-export interface Placement { columns: string; rows: string; items: Record<string, { gridColumn: string; gridRow: string; order: number }> }
-
-/** Số cột thực tế: theo kiểu bố cục, nhưng không để cửa sổ hẹp hơn MIN_WIN_WIDTH. */
-export function columnsFor(n: number, layout: LayoutMode, width: number): number {
+/** Số cột mỗi hàng: gần vuông (√n), nhưng không để cửa sổ hẹp hơn MIN_WIN_WIDTH. */
+export function columnsFor(n: number, width: number): number {
   if (n <= 1) return 1
-  const fit = Math.max(1, Math.floor(width / MIN_WIN_WIDTH))
-  const want = layout === 'cols' ? n : Math.ceil(Math.sqrt(n))
-  return Math.max(1, Math.min(want, fit))
+  return Math.max(1, Math.min(Math.ceil(Math.sqrt(n)), Math.floor(width / MIN_WIN_WIDTH)))
 }
 
-/** Vị trí từng cửa sổ đang mở trong lưới. Cửa sổ lẻ cuối hàng được giãn hết hàng. */
+/** Hình dạng bố cục: số cửa sổ ở từng hàng (hàng cuối có thể ít hơn → các cửa sổ đó tự rộng ra). */
+export function shapeOf(n: number, width: number): number[] {
+  if (n <= 0) return []
+  const cols = columnsFor(n, width)
+  const out: number[] = []
+  for (let left = n; left > 0; left -= cols) out.push(Math.min(cols, left))
+  return out
+}
+
+const even = (k: number) => Array.from({ length: k }, () => 1 / k)
+const okFracs = (a: unknown, k: number): a is number[] =>
+  Array.isArray(a) && a.length === k && a.every((x) => typeof x === 'number' && x >= MIN_FRAC / 2 && x <= 1) && Math.abs(a.reduce((p, c) => p + c, 0) - 1) < 0.02
+
+/** Tỉ lệ đang áp dụng: của người dùng nếu còn khớp hình dạng hiện tại, không thì chia đều (mở/đóng cửa sổ làm đổi hình dạng → về chia đều). */
+export function sizesFor(sizes: Sizes | undefined, shape: number[]): Sizes {
+  const fits = !!sizes && okFracs(sizes.rows, shape.length) && Array.isArray(sizes.cols) && sizes.cols.length === shape.length && shape.every((k, r) => okFracs(sizes.cols[r], k))
+  return fits ? sizes! : { rows: even(shape.length), cols: shape.map(even) }
+}
+
+export interface Rect { left: number; top: number; width: number; height: number } // phần trăm của vùng làm việc
+export interface Splitter { kind: 'col' | 'row'; row: number; index: number; left: number; top: number; width: number; height: number; value: number }
+export interface Placement { shape: number[]; sizes: Sizes; items: Record<string, Rect>; splitters: Splitter[] }
+
+/** Vị trí từng cửa sổ đang mở + các thanh kéo giữa chúng. Vị trí là tuyệt đối (%), nên đổi chỗ/kéo giãn không làm đổi thứ tự DOM. */
 export function placement(s: WsState, width: number): Placement {
   const open = s.wins.filter((x) => x.open)
-  const n = open.length
+  const shape = shapeOf(open.length, width)
+  const sizes = sizesFor(s.sizes, shape)
   const items: Placement['items'] = {}
-  const focus = open.find((x) => x.id === s.focus) ?? open[0]
-  if (s.layout === 'focus' && n > 1 && width >= MIN_WIN_WIDTH * 2) {
-    const others = open.filter((x) => x.id !== focus.id)
-    items[focus.id] = { gridColumn: '1', gridRow: `1 / span ${others.length}`, order: 0 }
-    others.forEach((x, k) => { items[x.id] = { gridColumn: '2', gridRow: String(k + 1), order: k + 1 } })
-    return { columns: 'minmax(0, 2fr) minmax(0, 1fr)', rows: `repeat(${others.length}, minmax(320px, 1fr))`, items }
-  }
-  const cols = columnsFor(n, s.layout, width)
-  const rows = Math.max(1, Math.ceil(n / cols))
-  open.forEach((x, k) => {
-    const lastOdd = k === n - 1 && cols > 1 && n % cols === 1
-    items[x.id] = { gridColumn: lastOdd ? '1 / -1' : 'auto', gridRow: 'auto', order: k }
+  const splitters: Splitter[] = []
+  let k = 0, top = 0
+  shape.forEach((n, r) => {
+    const h = sizes.rows[r] * 100
+    let left = 0
+    for (let c = 0; c < n; c++) {
+      const w = sizes.cols[r][c] * 100
+      items[open[k++].id] = { left, top, width: w, height: h }
+      left += w
+      if (c < n - 1) splitters.push({ kind: 'col', row: r, index: c, left, top, width: 0, height: h, value: Math.round(sizes.cols[r][c] * 100) })
+    }
+    top += h
+    if (r < shape.length - 1) splitters.push({ kind: 'row', row: r, index: r, left: 0, top, width: 100, height: 0, value: Math.round(sizes.rows[r] * 100) })
   })
-  return { columns: `repeat(${cols}, minmax(0, 1fr))`, rows: `repeat(${rows}, minmax(420px, 1fr))`, items }
+  return { shape, sizes, items, splitters }
 }
 
+/** Kéo một thanh chia đi `delta` (phần của hàng/cột, −1..1): khung trước nó to ra, khung sau nó nhỏ lại; cả hai không dưới MIN_FRAC. */
+export function dragSplit(s: WsState, width: number, sp: Pick<Splitter, 'kind' | 'row' | 'index'>, delta: number): WsState {
+  const shape = shapeOf(s.wins.filter((x) => x.open).length, width)
+  const cur = sizesFor(s.sizes, shape)
+  const arr = (sp.kind === 'row' ? cur.rows : cur.cols[sp.row])?.slice()
+  if (!arr || sp.index < 0 || sp.index >= arr.length - 1 || !Number.isFinite(delta)) return s
+  const pair = arr[sp.index] + arr[sp.index + 1]
+  const a = Math.min(pair - MIN_FRAC, Math.max(MIN_FRAC, arr[sp.index] + delta))
+  if (pair < MIN_FRAC * 2) return s
+  arr[sp.index] = a; arr[sp.index + 1] = pair - a
+  const sizes: Sizes = sp.kind === 'row' ? { rows: arr, cols: cur.cols } : { rows: cur.rows, cols: cur.cols.map((c, r) => (r === sp.row ? arr : c)) }
+  return { ...s, sizes }
+}
+
+/** Trả mọi khung về chia đều. */
+export const resetSizes = (s: WsState): WsState => { const { sizes: _drop, ...rest } = s; return rest }
+
 // ----- lưu / khôi phục (sessionStorage của trang bao ngoài: tải lại trang không mất danh sách; đóng tab thì mất, như trước) -----
-const LAYOUTS: LayoutMode[] = ['grid', 'cols', 'focus']
 const ROLE_SET = ['shipper', 'carrier', 'node_operator', 'dispatcher']
 
 export function serialize(s: WsState): string { return JSON.stringify(s) }
@@ -103,9 +140,10 @@ export function parse(raw: string | null): WsState {
     const d = JSON.parse(raw) as Partial<WsState>
     const wins = (Array.isArray(d.wins) ? d.wins : []).filter((w): w is Win =>
       !!w && typeof w.id === 'string' && typeof w.name === 'string' && typeof w.token === 'string' && ROLE_SET.includes(w.role as string) && typeof w.open === 'boolean').slice(0, MAX_WINS)
-    const layout = LAYOUTS.includes(d.layout as LayoutMode) ? (d.layout as LayoutMode) : 'grid'
+    const z = d.sizes as Sizes | undefined
+    const sizes = z && Array.isArray(z.rows) && Array.isArray(z.cols) && z.rows.every((x) => typeof x === 'number') && z.cols.every((c) => Array.isArray(c) && c.every((x) => typeof x === 'number')) ? { rows: z.rows, cols: z.cols } : undefined
     const focus = wins.some((w) => w.id === d.focus) ? (d.focus as string) : firstOpen(wins)
-    return { wins, focus, layout }
+    return sizes ? { wins, focus, sizes } : { wins, focus }
   } catch { return EMPTY }
 }
 

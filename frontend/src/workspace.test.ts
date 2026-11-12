@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addWin, closeWin, columnsFor, EMPTY, focusWin, MAX_WINS, minimizeWin, moveWin, parse, placement, serialize, setLayout, updateToken, winId, WsLimitError, type WsState } from './workspace'
+import { addWin, closeWin, columnsFor, EMPTY, focusWin, MAX_WINS, minimizeWin, moveWin, parse, placement, resetSizes, serialize, shapeOf, dragSplit, updateToken, winId, WsLimitError, type WsState } from './workspace'
 
 const mk = (name: string, role: 'shipper' | 'carrier' | 'node_operator' | 'dispatcher' = 'shipper') => ({ id: winId(name, role), name, role, token: `k-${name}` })
 const three = (): WsState => addWin(addWin(addWin(EMPTY, mk('Nguyên')), mk('Minh', 'carrier')), mk('Khôi', 'node_operator'))
@@ -52,50 +52,60 @@ describe('cửa sổ', () => {
   })
 })
 
-describe('bố cục', () => {
-  it('lưới: số cột theo căn bậc hai nhưng không để cửa sổ hẹp hơn 340px', () => {
-    expect(columnsFor(1, 'grid', 1200)).toBe(1)
-    expect(columnsFor(3, 'grid', 1200)).toBe(2)
-    expect(columnsFor(5, 'grid', 1200)).toBe(3)
-    expect(columnsFor(5, 'grid', 700)).toBe(2) // 700/340 = 2
-    expect(columnsFor(4, 'grid', 400)).toBe(1)
+describe('bố cục kéo giãn (khung chia như trình soạn mã)', () => {
+  it('số cột gần vuông, không để cửa sổ hẹp hơn mức tối thiểu', () => {
+    expect(columnsFor(1, 1200)).toBe(1)
+    expect(columnsFor(4, 1200)).toBe(2)
+    expect(columnsFor(5, 700)).toBe(2) // 700/340 = 2
+    expect(columnsFor(4, 400)).toBe(1)
+    expect(shapeOf(3, 1200)).toEqual([2, 1])
+    expect(shapeOf(5, 1400)).toEqual([3, 2])
+    expect(shapeOf(0, 1200)).toEqual([])
   })
-  it('cột: tất cả cạnh nhau nếu đủ rộng, nếu không thì tự xuống hàng', () => {
-    expect(columnsFor(4, 'cols', 1400)).toBe(4)
-    expect(columnsFor(4, 'cols', 800)).toBe(2)
-  })
-  it('cửa sổ lẻ cuối hàng giãn hết hàng; thứ tự hiển thị theo `order` (không đổi thứ tự DOM)', () => {
+  it('mặc định chia đều; cửa sổ lẻ cuối hàng rộng hết hàng; cửa sổ thu nhỏ không có vị trí', () => {
     const p = placement(three(), 1200)
-    expect(p.columns).toBe('repeat(2, minmax(0, 1fr))')
-    expect(p.items[winId('Khôi', 'node_operator')].gridColumn).toBe('1 / -1')
-    expect(p.items[winId('Nguyên', 'shipper')].gridColumn).toBe('auto')
-    expect(Object.values(p.items).map((x) => x.order)).toEqual([0, 1, 2])
-  })
-  it('tập trung: người đang chọn chiếm cột lớn, người khác xếp dọc bên cạnh', () => {
-    const s = setLayout(focusWin(three(), winId('Minh', 'carrier')), 'focus')
-    const p = placement(s, 1200)
-    expect(p.items[winId('Minh', 'carrier')]).toMatchObject({ gridColumn: '1', gridRow: '1 / span 2' })
-    expect(p.items[winId('Nguyên', 'shipper')]).toMatchObject({ gridColumn: '2', gridRow: '1' })
-    expect(p.items[winId('Khôi', 'node_operator')]).toMatchObject({ gridColumn: '2', gridRow: '2' })
-  })
-  it('tập trung mà trang quá hẹp thì rơi về lưới; cửa sổ thu nhỏ không có vị trí', () => {
-    const s = setLayout(three(), 'focus')
-    expect(placement(s, 500).columns).toBe('repeat(1, minmax(0, 1fr))')
+    expect(p.items[winId('Nguyên', 'shipper')]).toEqual({ left: 0, top: 0, width: 50, height: 50 })
+    expect(p.items[winId('Minh', 'carrier')]).toEqual({ left: 50, top: 0, width: 50, height: 50 })
+    expect(p.items[winId('Khôi', 'node_operator')]).toEqual({ left: 0, top: 50, width: 100, height: 50 })
+    expect(p.splitters.map((x) => x.kind)).toEqual(['col', 'row'])
     expect(Object.keys(placement(minimizeWin(three(), winId('Minh', 'carrier')), 1200).items)).toHaveLength(2)
+  })
+  it('kéo thanh chia: khung trước to ra, khung sau nhỏ lại, tổng không đổi', () => {
+    const s = dragSplit(three(), 1200, { kind: 'col', row: 0, index: 0 }, 0.2)
+    const p = placement(s, 1200)
+    expect(p.items[winId('Nguyên', 'shipper')].width).toBeCloseTo(70)
+    expect(p.items[winId('Minh', 'carrier')]).toMatchObject({ left: 70 })
+    expect(p.items[winId('Minh', 'carrier')].width).toBeCloseTo(30)
+    const r = placement(dragSplit(s, 1200, { kind: 'row', row: 0, index: 0 }, -0.1), 1200)
+    expect(r.items[winId('Khôi', 'node_operator')].height).toBeCloseTo(60)
+    expect(r.items[winId('Nguyên', 'shipper')].width).toBeCloseTo(70) // kéo hàng không làm mất tỉ lệ cột
+  })
+  it('không kéo nhỏ hơn mức tối thiểu; thanh không tồn tại thì bỏ qua', () => {
+    const p = placement(dragSplit(three(), 1200, { kind: 'col', row: 0, index: 0 }, 0.9), 1200)
+    expect(p.items[winId('Minh', 'carrier')].width).toBeCloseTo(12)
+    expect(dragSplit(three(), 1200, { kind: 'col', row: 1, index: 0 }, 0.1)).toEqual(three())
+    expect(dragSplit(three(), 1200, { kind: 'row', row: 0, index: 5 }, 0.1)).toEqual(three())
+  })
+  it('mở/đóng cửa sổ làm đổi hình dạng → về chia đều; đặt lại xoá tỉ lệ', () => {
+    const s = dragSplit(three(), 1200, { kind: 'col', row: 0, index: 0 }, 0.2)
+    const closed = closeWin(s, winId('Khôi', 'node_operator'))
+    expect(placement(closed, 1200).items[winId('Nguyên', 'shipper')]).toEqual({ left: 0, top: 0, width: 50, height: 100 })
+    expect(resetSizes(s).sizes).toBeUndefined()
+    expect(placement(s, 500).shape).toEqual([1, 1, 1]) // trang hẹp: mỗi hàng một cửa sổ, tỉ lệ cũ không còn khớp
   })
 })
 
 describe('lưu và khôi phục', () => {
-  it('khứ hồi giữ nguyên danh sách, kiểu bố cục và tiêu điểm', () => {
-    const s = setLayout(three(), 'cols')
+  it('khứ hồi giữ nguyên danh sách, tỉ lệ khung và tiêu điểm', () => {
+    const s = dragSplit(three(), 1200, { kind: 'col', row: 0, index: 0 }, 0.2)
     expect(parse(serialize(s))).toEqual(s)
   })
   it('dữ liệu hỏng hoặc bị sửa tay không làm vỡ trang', () => {
     expect(parse(null)).toEqual(EMPTY)
     expect(parse('{không phải json')).toEqual(EMPTY)
-    const r = parse(JSON.stringify({ wins: [{ id: 'a', name: 'A', role: 'hacker', token: 't', open: true }, { id: 'b', name: 'B', role: 'carrier', token: 't', open: true }], layout: 'xyz', focus: 'zzz' }))
+    const r = parse(JSON.stringify({ wins: [{ id: 'a', name: 'A', role: 'hacker', token: 't', open: true }, { id: 'b', name: 'B', role: 'carrier', token: 't', open: true }], sizes: 'xyz', focus: 'zzz' }))
     expect(r.wins.map((w) => w.id)).toEqual(['b'])
-    expect(r.layout).toBe('grid')
+    expect(r.sizes).toBeUndefined()
     expect(r.focus).toBe('b')
   })
 })

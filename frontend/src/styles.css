@@ -89,8 +89,8 @@ button, [role='button'], [role='tab'], [role='menuitem'], summary, select, label
 button:disabled, select:disabled, input:disabled { cursor: not-allowed; }
 
 /* ================= khung trong mỗi cửa sổ: hero (điều hướng + bối cảnh) ================= */
-.hero { position: relative; overflow: hidden; background: var(--raised); border-bottom: 1px solid var(--line); isolation: isolate; }
-.hero-art { position: absolute; inset: 0 0 0 auto; width: min(46%, 420px); z-index: -1; pointer-events: none; opacity: 0.5;
+.hero { position: relative; z-index: 20; background: var(--raised); border-bottom: 1px solid var(--line); isolation: isolate; } /* KHÔNG overflow:hidden — menu chuông/avatar thả ra ngoài hero */
+.hero-art { position: absolute; overflow: hidden; inset: 0 0 0 auto; width: min(46%, 420px); z-index: -1; pointer-events: none; opacity: 0.5;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 55%); mask-image: linear-gradient(90deg, transparent, #000 55%); }
 .hero-art svg { width: 100%; height: 100%; display: block; }
 .hero-top { display: flex; align-items: center; gap: 10px 14px; padding: 12px 16px 0; flex-wrap: wrap; }
@@ -175,6 +175,23 @@ label.inline select { min-width: 220px; width: auto; }
 q { quotes: '“' '”'; background: var(--unknown-bg); color: var(--unknown); padding: 1px 6px; border-radius: 6px; }
 @media (max-width: 640px) { .form { grid-template-columns: 1fr; } label.inline select { min-width: 0; width: 100%; } }
 
+/* ô nhập nhanh (dán tin nhắn / tải ảnh): hai lối vào nổi bật của màn Yêu cầu */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { position: relative; overflow: hidden; isolation: isolate; display: flex; align-items: center; gap: 14px; text-align: left; min-height: 76px; padding: 14px 16px; border-radius: var(--radius-lg); color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--primary-line) 45%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 16%, var(--surface)), var(--soft) 62%);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease); will-change: transform; }
+.tile:hover:not(:disabled), .tile.on { border-color: var(--primary-line); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent), 0 14px 30px -18px color-mix(in srgb, var(--primary) 70%, transparent); }
+.tile:active:not(:disabled) { scale: 0.985; }
+.tile:disabled { opacity: 0.55; }
+.tile-ico { width: 46px; height: 46px; border-radius: 14px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; flex: none; box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--primary) 80%, transparent); }
+.tile-txt { display: grid; gap: 2px; min-width: 0; flex: 1; } .tile-txt b { font-size: 15px; font-weight: 600; } .tile-txt small { font-size: 12.5px; color: var(--muted); }
+.tile-go { width: 30px; height: 30px; border-radius: 99px; border: 1px solid var(--field-line); display: grid; place-items: center; flex: none; opacity: 0.55; transition: background 0.2s var(--ease), color 0.2s var(--ease), border-color 0.2s var(--ease), rotate 0.25s var(--ease); }
+.tile:hover:not(:disabled) .tile-go, .tile.on .tile-go { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tile.on .tile-go { rotate: 90deg; opacity: 1; }
+.tile-shine { position: absolute; inset: 0 auto 0 0; width: 40%; z-index: -1; opacity: 0; pointer-events: none; transform: skewX(-18deg); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 34%, transparent), transparent); }
+.tile.busy::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--primary), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: scan 1.1s linear infinite; }
+@keyframes scan { from { background-position: -50% 0; } to { background-position: 150% 0; } }
+
 /* thông báo */
 .note { border-radius: var(--radius); padding: 12px 14px; font-size: 14px; border: 1px solid var(--line); background: var(--surface); }
 .note.ok { background: var(--pass-bg); border-color: color-mix(in srgb, var(--pass) 30%, transparent); color: var(--pass); }
@@ -256,8 +273,11 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
 .bell { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 82%, transparent); border-radius: 99px; color: var(--ink); transition: border-color 0.2s var(--ease), background 0.2s var(--ease); backdrop-filter: blur(8px); }
 .bell .dot { position: absolute; top: -3px; right: -3px; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 10px; background: var(--badge); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--raised); }
 .bell.sev-critical .dot { background: var(--sevs-crit); } .bell.sev-high .dot { background: var(--sevs-high); } .bell.sev-medium .dot { background: var(--sevs-med); } .bell.sev-low .dot { background: var(--sevs-low); }
-.bell-list { min-width: 290px; max-height: 360px; overflow: auto; }
-.bell-list .it { text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: var(--radius-sm); display: grid; gap: 2px; border-left: 3px solid var(--line); min-height: 0; }
+.bell-list { width: min(320px, calc(100vw - 24px)); max-height: min(360px, calc(100dvh - 140px)); overflow: auto; }
+.menu { max-width: calc(100vw - 24px); }
+/* cửa sổ hẹp: menu neo theo mép cửa sổ (không tràn ra ngoài bên trái), vẫn nằm ngay dưới nút */
+@media (max-width: 560px) { .menu, .bell-list { position: fixed; left: 12px; right: 12px; top: auto; width: auto; min-width: 0; margin-top: 8px; transform-origin: top center; } }
+.bell-list .it { text-align: left; border: 0; background: transparent; padding: 8px 10px; height: auto; white-space: normal; border-radius: var(--radius-sm); display: grid; gap: 2px; border-left: 3px solid var(--line); min-height: 0; }
 .bell-list .it.sev-critical { border-left-color: var(--sevs-crit); } .bell-list .it.sev-high { border-left-color: var(--sevs-high); } .bell-list .it.sev-medium { border-left-color: var(--sevs-med); } .bell-list .it.sev-low { border-left-color: var(--sev-low); }
 .bell-list .it.sev-critical.unread { background: var(--sev-crit-bg); } .bell-list .it.sev-high.unread { background: var(--sev-high-bg); }
 .bell-list .it:not(.unread) b { font-weight: 500; }
@@ -356,10 +376,17 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
 .ws-form { padding: 8px; }
 .ws-work { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .ws-bar { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 18px; min-height: 52px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-lg); font-size: 13px; flex-wrap: wrap; }
-.ws-grid { flex: 1; min-height: 0; overflow: auto; display: grid; gap: 10px; align-content: start; }
+.ws-grid { position: relative; flex: 1; min-height: 0; margin: -5px; overflow: hidden; }
+.ws-grid.splitting-col, .ws-grid.splitting-col * { cursor: col-resize !important; user-select: none; } .ws-grid.splitting-row, .ws-grid.splitting-row * { cursor: row-resize !important; user-select: none; }
+/* thanh kéo giữa các khung (như chia tab trong trình soạn mã): kéo chuột, phím mũi tên, bấm đúp = chia đều */
+.ws-split { position: absolute; z-index: 6; touch-action: none; display: grid; place-items: center; border-radius: 99px; }
+.ws-split.col { cursor: col-resize; } .ws-split.row { cursor: row-resize; }
+.ws-split::after { content: ''; border-radius: 99px; background: var(--soft-3); opacity: 0; transition: opacity 0.2s var(--ease), background 0.2s var(--ease); }
+.ws-split.col::after { width: 4px; height: min(64px, 60%); } .ws-split.row::after { height: 4px; width: min(64px, 60%); }
+.ws-split:hover::after, .ws-split:focus-visible::after { opacity: 1; background: var(--primary); }
 .ws-grid.dragging iframe { pointer-events: none; }
-.ws-none { grid-column: 1 / -1; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 40px 16px; }
-.ws-win { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; transition: border-color 0.2s var(--ease); }
+.ws-none { position: absolute; inset: 5px; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 40px 16px; }
+.ws-win { position: absolute; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; transition: border-color 0.2s var(--ease); }
 .ws-win.foc { border-color: color-mix(in srgb, var(--rc) 60%, var(--line)); }
 .ws-win.over { outline: 2px dashed var(--primary-line); outline-offset: 2px; }
 .ws-stripe { display: none; }
@@ -371,7 +398,7 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
 .ws-frame iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--bg); }
 .ws-expired { position: absolute; inset: 0; background: var(--scrim); display: grid; place-content: center; justify-items: center; gap: 10px; text-align: center; padding: 16px; }
 /* màn bắt đầu: hero + bảng chọn vai */
-.ws-start { grid-column: 1 / -1; position: relative; overflow: hidden; isolation: isolate; min-height: 100%; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--raised); display: grid; grid-template-columns: minmax(0, 400px); align-content: center; gap: 28px; padding: clamp(20px, 5vw, 64px); }
+.ws-start { position: absolute; inset: 5px; overflow: hidden; isolation: isolate; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--raised); display: grid; grid-template-columns: minmax(0, 400px); align-content: center; gap: 28px; padding: clamp(20px, 5vw, 64px); }
 .ws-start .hero-art { inset: 0 0 0 auto; width: 66%; opacity: 1; -webkit-mask-image: linear-gradient(90deg, transparent 2%, #000 42%); mask-image: linear-gradient(90deg, transparent 2%, #000 42%); }
 .ws-hero-copy { align-self: start; display: grid; gap: 14px; justify-items: start; max-width: 560px; }
 .ws-hero-title { font-size: clamp(30px, 5vw, 56px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.04; text-wrap: balance; }

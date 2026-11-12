@@ -7,14 +7,14 @@ import { Brand } from '../components/TopBar'
 import { gsap, reducedMotion, useAutoEnter, useGSAP } from '../motion'
 import { useI18n } from '../i18n'
 import {
-  addWin, CHAIN, closeWin, EMPTY, focusWin, MAX_WINS, minimizeWin, moveWin, parse, placement, serialize, setLayout, TEAM, updateToken,
-  winId, WsLimitError, type LayoutMode, type Win, type WsState,
+  addWin, CHAIN, closeWin, EMPTY, focusWin, MAX_WINS, minimizeWin, moveWin, parse, placement, resetSizes, serialize, dragSplit, TEAM, updateToken,
+  winId, WsLimitError, type Splitter, type Win, type WsState,
 } from '../workspace'
 import { applyTheme, currentTheme, type Theme } from '../theme'
 import { LoginForm } from './Login'
 
 const KEY = 'pivot.workspace'
-const LAYOUTS: LayoutMode[] = ['grid', 'cols', 'focus']
+const GAP = 10 // px giữa các khung (cũng là bề rộng vùng bắt của thanh kéo)
 /** Chữ viết tắt trong avatar: 2 chữ cái đầu của hai từ cuối ("Nguyễn Văn An" → VA), một từ → chữ đầu + chữ thứ hai. */
 const initials = (name: string) => {
   const w = name.trim().split(/\s+/)
@@ -41,6 +41,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const [overId, setOverId] = useState<string | null>(null)
   const [width, setWidth] = useState(1200)
   const [theme, setThemeState] = useState<Theme>(currentTheme)
+  const [splitting, setSplitting] = useState<'col' | 'row' | null>(null)
   const root = useRef<HTMLDivElement>(null)
   useAutoEnter(root)                                                   // cửa sổ mới / ngăn thêm người hiện lên mượt (GSAP)
   const started = st.wins.length > 0
@@ -137,6 +138,27 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
     try { for (const p of CHAIN) await enter(p.name, p.role); setPop('closed') } catch (e) { setErr(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) }
   }
 
+  /** Kéo thanh chia: đổi tỉ lệ hai khung kề nhau theo quãng chuột đi (tính bằng phần của hàng/vùng). Khung nhúng tạm không nhận chuột để không "nuốt" sự kiện. */
+  function startSplit(e: React.PointerEvent<HTMLDivElement>, sp: Splitter) {
+    const el = gridEl.current
+    if (!el) return
+    e.preventDefault()
+    const box = el.getBoundingClientRect()
+    let last = sp.kind === 'col' ? e.clientX : e.clientY
+    const target = e.currentTarget
+    target.setPointerCapture(e.pointerId)
+    setSplitting(sp.kind)
+    const move = (ev: PointerEvent) => {
+      const now = sp.kind === 'col' ? ev.clientX : ev.clientY
+      const delta = (now - last) / (sp.kind === 'col' ? box.width : box.height)
+      if (!delta) return
+      const next = dragSplit(stRef.current, width, sp, delta)
+      if (next !== stRef.current) { last = now; commit(next) }
+    }
+    const up = () => { target.removeEventListener('pointermove', move); target.removeEventListener('pointerup', up); target.removeEventListener('pointercancel', up); setSplitting(null) }
+    target.addEventListener('pointermove', move); target.addEventListener('pointerup', up); target.addEventListener('pointercancel', up)
+  }
+
   const wins = st.wins
   const open = wins.filter((w) => w.open)
   const place = placement(st, width)
@@ -212,14 +234,12 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
         <div className="ws-bar">
           <span className="muted">{t('ws.count', { n: open.length })}{wins.length > open.length ? ` · ${t('ws.bgN', { n: wins.length - open.length })}` : ''}</span>
           <span className="grow" />
-          <div className="seg" role="group" aria-label={t('ws.layout')}>
-            {LAYOUTS.map((l) => <button key={l} aria-pressed={st.layout === l} onClick={() => commit(setLayout(stRef.current, l))}>{t(`ws.layout.${l}`)}</button>)}
-          </div>
+          {st.sizes && <button className="btn sm" onClick={() => commit(resetSizes(stRef.current))}>{t('ws.even')}</button>}
           <div className="seg" role="group" aria-label="Language">
             {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
           </div>
         </div>
-        <div ref={gridEl} className={`ws-grid${dragId ? ' dragging' : ''}`} style={narrow ? { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)' } : { gridTemplateColumns: place.columns, gridTemplateRows: place.rows }}>
+        <div ref={gridEl} className={`ws-grid${dragId || splitting ? ' dragging' : ''}${splitting ? ` splitting-${splitting}` : ''}`}>
           {!wins.length
             ? (
               <div className="ws-start">
@@ -238,7 +258,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
             const b = badges[w.id] ?? 0
             return (
               <div key={w.id} className={`ws-win role-${w.role}${w.id === focusId ? ' foc' : ''}${overId === w.id && dragId !== w.id ? ' over' : ''}`}
-                style={{ display: shown ? undefined : 'none', ...(narrow ? {} : { order: p?.order ?? 0, gridColumn: p?.gridColumn, gridRow: p?.gridRow }) }}
+                style={{ display: shown ? undefined : 'none', ...(narrow || !p ? { inset: GAP / 2 } : { left: `calc(${p.left}% + ${GAP / 2}px)`, top: `calc(${p.top}% + ${GAP / 2}px)`, width: `calc(${p.width}% - ${GAP}px)`, height: `calc(${p.height}% - ${GAP}px)` }) }}
                 onDragOver={(e) => { if (dragId) { e.preventDefault(); setOverId(w.id) } }}
                 onDrop={(e) => { e.preventDefault(); if (dragId) commit(moveWin(stRef.current, dragId, w.id)); setDragId(null); setOverId(null) }}>
                 <div className="ws-stripe" />
@@ -260,6 +280,16 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
                 </div>
               </div>)
           })}
+          {!narrow && place.splitters.map((sp) => (
+            <div key={`${sp.kind}-${sp.row}-${sp.index}`} className={`ws-split ${sp.kind}`} role="separator" tabIndex={0}
+              aria-orientation={sp.kind === 'col' ? 'vertical' : 'horizontal'} aria-valuenow={sp.value} aria-valuemin={12} aria-valuemax={88} aria-label={t('ws.resize')} title={t('ws.resize')}
+              style={sp.kind === 'col' ? { left: `calc(${sp.left}% - ${GAP / 2}px)`, top: `calc(${sp.top}% + ${GAP / 2}px)`, height: `calc(${sp.height}% - ${GAP}px)`, width: GAP } : { top: `calc(${sp.top}% - ${GAP / 2}px)`, left: GAP / 2, right: GAP / 2, height: GAP }}
+              onPointerDown={(e) => startSplit(e, sp)}
+              onDoubleClick={() => commit(resetSizes(stRef.current))}
+              onKeyDown={(e) => {
+                const step = e.key === (sp.kind === 'col' ? 'ArrowRight' : 'ArrowDown') ? 0.03 : e.key === (sp.kind === 'col' ? 'ArrowLeft' : 'ArrowUp') ? -0.03 : 0
+                if (step) { e.preventDefault(); commit(dragSplit(stRef.current, width, sp, step)) }
+              }} />))}
         </div>
       </section>
     </div>
