@@ -78,9 +78,8 @@ def provision_org(session: Session, org: m.Organization, role: str, now: datetim
             session.add(m.ShipmentParticipant(shipment_id=ship.id, org_id=org.id, role="shipper", can_see_price=True))
             made["shipments"] += 1
     if role == "carrier" and not session.execute(select(m.Vehicle.id).where(m.Vehicle.tenant_id == org.id)).first():
-        yards = fleet.ensure_yards(session) or [L["zones"][0]]  # rải xe lên các bãi (depot + bãi mô phỏng) để khoảng cách tới điểm lấy khác nhau
+        home = fleet.base_for_org(session, org)  # một nhà xe cho cả đội (trong bán kính 5 km quanh điểm lấy hàng)
         for i, (kg, m3) in enumerate([(24000, 60), (18000, 45), (18000, 45), (8000, 25)], 1):
-            home = yards[(i - 1) % len(yards)]
             plate = f"61{org.id.hex[0].upper()}-{org.id.hex[1:7]}.{i:02d}"  # 7 ký tự hex (≈268 triệu khả năng): không va chạm khi có hàng trăm nhà vận tải
             veh = m.Vehicle(tenant_id=org.id, plate=plate, cargo_types=["dry"], capacity_kg=kg, capacity_m3=m3,
                             status="available", position_updated_at=now - timedelta(minutes=1))

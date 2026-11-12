@@ -17,16 +17,16 @@ _NS = uuid.UUID("6f1c6c1e-0000-4000-8000-00000000c003")
 NODE_ORG = uuid.uuid5(_NS, "node")
 PROFILES = ("dense", "sparse", "peak")
 
-# toạ độ trùng địa điểm seed (test đối chiếu với DB seed): điểm lấy hàng, ICD, bãi
+# toạ độ trùng địa điểm seed (test đối chiếu với DB seed): điểm lấy hàng + ICD
 ZONES = (("kcn1", 10.90, 106.74), ("kcn2", 10.92, 106.72))
 ICD = ("icd", 10.85, 106.80)
-YARDS = (("depot", 10.87, 106.77), *((k.removeprefix("yard-"), lat, lng) for k, _n, lat, lng in fleet.YARDS))
 
-# hồ sơ kịch bản: số xe, trọng số bãi (depot, hiep-binh, long-binh, an-phu), giờ bắt đầu (giờ vận hành), độ rộng hạn lấy hàng, tỷ lệ vị trí tươi
+# hồ sơ kịch bản: số xe, số nhà xe (mỗi nhà xe MỘT bãi trong bán kính 5 km quanh điểm lấy hàng — cùng mô hình với hệ thống thật),
+# giờ bắt đầu (giờ vận hành), độ rộng hạn lấy hàng, tỷ lệ vị trí tươi
 CFG = {
-    "dense": dict(n_veh=(14, 21), yard_w=(0.4, 0.2, 0.2, 0.2), hour=10.0, slack=(90, 300), cutoff_extra=(180, 480), fresh=0.85),
-    "sparse": dict(n_veh=(8, 11), yard_w=(0.1, 0.1, 0.4, 0.4), hour=14.0, slack=(60, 200), cutoff_extra=(150, 420), fresh=0.75),
-    "peak": dict(n_veh=(12, 19), yard_w=(0.25, 0.25, 0.25, 0.25), hour=7.5, slack=(45, 150), cutoff_extra=(130, 300), fresh=0.85),
+    "dense": dict(n_veh=(14, 21), n_carriers=(4, 7), hour=10.0, slack=(90, 300), cutoff_extra=(180, 480), fresh=0.85),
+    "sparse": dict(n_veh=(8, 11), n_carriers=(2, 4), hour=14.0, slack=(60, 200), cutoff_extra=(150, 420), fresh=0.75),
+    "peak": dict(n_veh=(12, 19), n_carriers=(3, 6), hour=7.5, slack=(45, 150), cutoff_extra=(130, 300), fresh=0.85),
 }
 
 
@@ -35,9 +35,8 @@ def _loc(key: str, lat: float, lng: float, kind: str) -> NS:
 
 
 def world() -> dict:
-    locs = {x.id: x for x in [_loc(k, a, b, "industrial_zone") for k, a, b in ZONES] + [_loc(ICD[0], ICD[1], ICD[2], "icd")]
-            + [_loc(k, a, b, "yard") for k, a, b in YARDS]}
-    return {"locs": locs, "zones": [uuid.uuid5(_NS, k) for k, *_ in ZONES], "icd": uuid.uuid5(_NS, ICD[0]), "yards": [uuid.uuid5(_NS, k) for k, *_ in YARDS]}
+    locs = {x.id: x for x in [_loc(k, a, b, "industrial_zone") for k, a, b in ZONES] + [_loc(ICD[0], ICD[1], ICD[2], "icd")]}
+    return {"locs": locs, "zones": [uuid.uuid5(_NS, k) for k, *_ in ZONES], "icd": uuid.uuid5(_NS, ICD[0])}
 
 
 def _uuid(rng: np.random.Generator) -> uuid.UUID:
@@ -63,6 +62,13 @@ def make_scenario(i: int, seed: int, profile: str = "mixed") -> dict:
     ship = NS(id=_uuid(rng), cargo_type="cold" if cold else "dry", weight_kg=kg, volume_m3=round(kg / 400 * float(rng.uniform(0.9, 1.3)), 1),
               ready_at=ready, pickup_deadline=deadline, cutoff_at=cutoff, data_updated_at=now - timedelta(minutes=5),
               origin_location_id=w["zones"][int(rng.integers(0, len(w["zones"])))], dest_location_id=w["icd"])
+    pickups = [(a, b) for _k, a, b in ZONES]
+    bases = []  # mỗi nhà xe mô phỏng có MỘT bãi (id riêng theo kịch bản), xe rảnh luôn ở bãi của nhà xe mình
+    for c in range(int(rng.integers(cfg["n_carriers"][0], cfg["n_carriers"][1]))):
+        lat, lng = fleet.base_point(pickups, f"sim-{seed}-{i}-{c}")
+        b = _loc(f"base-{seed}-{i}-{c}", lat, lng, "carrier_base")
+        w["locs"][b.id] = b
+        bases.append(b.id)
     vehicles, windows, noise = [], {}, {}
     for j in range(int(rng.integers(cfg["n_veh"][0], cfg["n_veh"][1]))):
         cap = float(rng.choice([10000, 16000, 24000]))
@@ -70,7 +76,7 @@ def make_scenario(i: int, seed: int, profile: str = "mixed") -> dict:
                capacity_m3=round(cap / 400 * 1.4, 1), status="offline" if rng.random() < 0.08 else "available",
                position_updated_at=now - timedelta(minutes=float(rng.uniform(0, 4) if rng.random() < cfg["fresh"] else rng.uniform(6, 40))))
         free_from = now + timedelta(minutes=float(rng.uniform(-60, 90)))
-        windows[v.id] = NS(vehicle_id=v.id, location_id=w["yards"][int(rng.choice(len(w["yards"]), p=cfg["yard_w"]))],
+        windows[v.id] = NS(vehicle_id=v.id, location_id=bases[j % len(bases)],
                            free_from=free_from, free_to=free_from + timedelta(hours=float(rng.uniform(3, 10))))
         noise[v.id] = (float(rng.normal(0, 0.15)), float(rng.normal(0, 1.0)))  # (nhiễu thời gian chạy rỗng, hệ số nhiễu trung chuyển)
         vehicles.append(v)

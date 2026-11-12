@@ -101,6 +101,7 @@ Test đáng chú ý: `test_no_future_leakage…` (trôi chỉ xuất hiện ở 
 | 13/11 | Không thấy xe trống đang đậu ở đâu, cách điểm lấy bao xa | Bãi + trạng thái + khoảng cách ước tính ở màn Đội xe và thẻ đề xuất; che dữ liệu liên tổ chức |
 | 13/11 | Sổ lợi ích trống nên chưa có bằng chứng định lượng | Sandbox 100 ca dùng đúng đường code ghép thật (`docs/SANDBOX_REPORT.md`), MÔ PHỎNG, không ghi sổ thật |
 | 13/11 | Slot ICD (mẫu + của người đăng ký) hết hạn theo thời gian → mọi xe `SLOT_WINDOW_MISSED`, "không có phương án khả thi"; `retime` bỏ qua dữ liệu người đăng ký | `app/nodes.py` kéo dài đuôi lịch slot mô phỏng khi ICD đăng nhập / mở tab / lúc ghép; vẫn qua hard gate; 9 test (`tests/test_icd_slots.py`) |
+| 13/11 | Vị trí xe khó hiểu: xe rải nhiều nơi (có xe đậu ngay tại KCN, bãi xa ~15 km), không rõ nhà xe ở đâu | Mô hình nhà xe: mỗi tổ chức một nhà xe < 5 km quanh điểm lấy hàng, xe rảnh luôn ở đó, giao xong quay về; test trên mọi nhà xe |
 
 ## Giới hạn đã biết (không che giấu)
 - Mọi số liệu là **mô phỏng**; "verified" chỉ chứng minh quy trình ghi sổ/xác minh độc lập, **không** chứng minh tiết kiệm thật. Lợi ích mới có một hạng mục (km chạy rỗng × đơn giá phẳng, baseline hằng số 38 km); chưa có chi phí chờ/bốc dỡ/đi vòng, chưa có Bảng A/B/C của DRAFT 11.3.

@@ -154,6 +154,8 @@ def apply_event(session: Session, event_id: uuid.UUID, now: datetime) -> str:
             prop.status, ev.quality_status = "completed", "applied"
             prop.version += 1
             ship.status, veh.status = "completed", "available"
+            from .. import fleet
+            fleet.return_to_base(session, veh)  # không chở hàng nữa → quay về nhà xe
             for r in session.execute(select(m.Reservation).where(
                     m.Reservation.proposal_id == prop.id, m.Reservation.status == "committed")).scalars():
                 r.status = "released"  # tài nguyên được trả sau khi hoàn tất

@@ -113,7 +113,7 @@ def seed(session: Session, now: datetime | None = None) -> dict:
     }
     session.add_all(locs.values())
     session.flush()
-    fleet.ensure_yards(session)  # thêm các bãi đậu (kind="yard") — xe của người tự đăng ký được rải lên đó; 10 xe seed của B vẫn ở depot
+    base_b = fleet.base_for_org(session, orgs["B"])  # nhà xe của B (bán kính 5 km quanh điểm lấy hàng): MỌI xe không chở hàng của B đậu ở đây
     session.add(m.AssumptionSet(id=uid("assume-v2"), version="assume-v2",
                                 params=ASSUMPTIONS_V1 | {"anchor_at": now.isoformat()}))
     session.flush()
@@ -141,7 +141,7 @@ def seed(session: Session, now: datetime | None = None) -> dict:
     session.flush()
     for i, (_, _, _, _, _, _, free_h, loc) in enumerate(vspec, 1):
         session.add(m.AvailabilityWindow(id=uid(f"win-{i}"), vehicle_id=uid(f"veh-{i}"),
-                                         location_id=locs[loc].id, free_from=H(free_h), free_to=H(free_h + 9)))
+                                         location_id=base_b.id, free_from=H(free_h), free_to=H(free_h + 9)))
 
     for code in ("D1", "D2"):  # dock của ICD (mô phỏng): lịch hẹn xe đặt theo dock
         session.add(m.Dock(id=uid(f"dock-{code}"), node_org_id=orgs["C"].id, location_id=locs["icd"].id, code=code, handling_minutes=30))
