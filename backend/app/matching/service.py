@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from .. import models as m
 from ..assumptions import get_active
 from ..auth import Actor
+from .. import nodes
 from ..booking import service as bk
 from ..eta import baseline as eta_mod
 from . import gates, score
@@ -21,6 +22,20 @@ RUN_ROLES = {"shipper", "carrier", "dispatcher"}
 
 def _loc(locs: dict, location_id):
     return locs[location_id]
+
+
+def _yard(locs: dict, window) -> dict | None:
+    """Bãi đang đậu của xe = địa điểm của khung rảnh dùng để ghép (None nếu thiếu)."""
+    loc = locs.get(window.location_id) if window is not None else None
+    return None if loc is None else {"name": loc.name, "lat": loc.lat, "lng": loc.lng}
+
+
+def yard_km(yard: dict | None, shipment: m.Shipment, locs: dict, params: dict) -> float | None:
+    """Km ước tính bãi → điểm lấy (cùng công thức deadhead của MatchScore: đường chim bay × hệ số đường bộ)."""
+    origin = locs.get(shipment.origin_location_id)
+    if yard is None or origin is None:
+        return None
+    return round(score.haversine_km(yard["lat"], yard["lng"], origin.lat, origin.lng) * params.get("road_factor", score.DEFAULT_ROAD_FACTOR), 1)
 
 
 def _spread_icds(top: list, slots: list, shipment: m.Shipment, now: datetime, params: dict, reserved_vehicles: set) -> None:
@@ -46,6 +61,33 @@ def _spread_icds(top: list, slots: list, shipment: m.Shipment, now: datetime, pa
                 break
 
 
+def evaluate_candidates(shipment, vehicles: list, windows: dict, slots: list, reserved_vehicles: set, now: datetime, params: dict, locs: dict):
+    """Lõi THUẦN của bộ ghép (không DB, không ghi): hard gate cho từng xe (chọn slot tốt nhất) → chấm điểm ứng viên đạt → xếp hạng.
+    Trả (passed, rejected, needs_data, scored). Dùng chung cho `run_match` (thật) và sandbox mô phỏng lợi ích — không có công thức thứ hai."""
+    passed, rejected, needs_data = [], [], []
+    for veh in vehicles:
+        win = windows.get(veh.id)
+        best = None
+        for slot in (slots or [None]):
+            verdict = gates.evaluate(shipment, veh, win, slot, now, params, vehicle_reserved=veh.id in reserved_vehicles)
+            if verdict.status == "PASS":
+                best = (slot, verdict)
+                break
+            if best is None or len(verdict.rejections) < len(best[1].rejections):
+                best = (slot, verdict)
+        slot, verdict = best
+        entry = {"vehicle": veh, "slot": slot, "verdict": verdict, "window": win}
+        {"PASS": passed, "FAIL": rejected, "UNKNOWN": needs_data}[verdict.status].append(entry)
+    scored = []
+    for e in passed:
+        sc = score.score_candidate(shipment, e["vehicle"], _loc(locs, e["window"].location_id),
+                                   _loc(locs, shipment.origin_location_id),
+                                   gates.pickup_eta(e["window"], shipment, now, params), params)
+        scored.append({**e, "scored": sc})
+    scored.sort(key=score.rank_key)
+    return passed, rejected, needs_data, scored
+
+
 def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetime, node_org_id: uuid.UUID | None = None) -> dict:
     if actor.role not in RUN_ROLES:
         raise HTTPException(status_code=403, detail="Role cannot run matching")
@@ -53,6 +95,7 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
         raise HTTPException(status_code=409, detail={"code": "SHIPMENT_NOT_OPEN",
                                                      "message": f"Shipment is '{shipment.status}'"})
     bk.expire_stale(session, now)  # tài nguyên hết hạn phải được trả về trước khi ghép
+    nodes.ensure_supply(session, now)  # lịch slot MÔ PHỎNG của mọi ICD còn phía trước (slot sinh ra vẫn qua hard gate như mọi slot)
     aset = get_active(session)
     params = aset.params
     run_id = str(uuid.uuid4())
@@ -72,36 +115,17 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
     reserved_vehicles = set(session.execute(select(m.Reservation.resource_id).where(
         m.Reservation.resource_type == "vehicle", m.Reservation.status.in_(("held", "committed")))).scalars())
 
-    passed, rejected, needs_data = [], [], []
-    for veh in vehicles:
-        win = windows.get(veh.id)
-        best = None
-        for slot in (slots or [None]):
-            verdict = gates.evaluate(shipment, veh, win, slot, now, params, vehicle_reserved=veh.id in reserved_vehicles)
-            if verdict.status == "PASS":
-                best = (slot, verdict)
-                break
-            if best is None or len(verdict.rejections) < len(best[1].rejections):
-                best = (slot, verdict)
-        slot, verdict = best
-        entry = {"vehicle": veh, "slot": slot, "verdict": verdict, "window": win}
-        {"PASS": passed, "FAIL": rejected, "UNKNOWN": needs_data}[verdict.status].append(entry)
+    passed, rejected, needs_data, scored = evaluate_candidates(shipment, vehicles, windows, slots, reserved_vehicles, now, params, locs)
 
     def reasons(entry):
+        yard = _yard(locs, entry["window"])
         return {"vehicle_id": str(entry["vehicle"].id), "plate": entry["vehicle"].plate,
-                "status": entry["verdict"].status,
+                "status": entry["verdict"].status, "yard": yard["name"] if yard else None, "yard_km": yard_km(yard, shipment, locs, params),
                 "reasons": [bk.gate_to_dict(r) for r in entry["verdict"].rejections]}
 
     rejections = [reasons(e) for e in rejected]
     unknowns = [reasons(e) for e in needs_data]
 
-    scored = []
-    for e in passed:
-        sc = score.score_candidate(shipment, e["vehicle"], _loc(locs, e["window"].location_id),
-                                   _loc(locs, shipment.origin_location_id),
-                                   gates.pickup_eta(e["window"], shipment, now, params), params)
-        scored.append({**e, "scored": sc})
-    scored.sort(key=score.rank_key)
     top = scored[: params.get("max_proposals", 3)]
     if node_org_id is None:
         _spread_icds(top, slots, shipment, now, params, reserved_vehicles)
@@ -120,6 +144,7 @@ def run_match(session: Session, actor: Actor, shipment: m.Shipment, now: datetim
                              for k, v in {c.name: getattr(shipment, c.name) for c in m.Shipment.__table__.columns
                                           if c.name not in ("price_vnd", "customer_name")}.items()},  # không snapshot giá/khách
                 "vehicle": {"id": str(e["vehicle"].id), "plate": e["vehicle"].plate,
+                            "yard_name": (_yard(locs, e["window"]) or {}).get("name"),
                             "position_updated_at": e["vehicle"].position_updated_at.isoformat()
                             if e["vehicle"].position_updated_at else None},
                 "gates": [bk.gate_to_dict(r) for r in e["verdict"].results],

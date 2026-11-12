@@ -39,7 +39,7 @@ function RejectionList({ title, items, kind }: { title: string; items: Rejection
       <div className="stack">
         {items.map((r) => (
           <div key={r.vehicle_id} className="stack">
-            <div><Chip kind={kind}>{kind}</Chip> <b className="mono">{r.plate}</b></div>
+            <div><Chip kind={kind}>{kind}</Chip> <b className="mono">{r.plate}</b>{r.yard && <span className="muted small"> · {t('rec.yard', { yard: r.yard, km: r.yard_km ?? '?' })}</span>}</div>
             <ul className="why">{r.reasons.map((x, i) => <li key={i}>{reasonText(x, t, fmtTime)} <span className="code muted">{x.reason_code}</span></li>)}</ul>
           </div>))}
       </div>
@@ -60,7 +60,8 @@ function ProposalCard({ p, rank, onHold, busy }: { p: Proposal; rank: number; on
   return (
     <article className="card stack" aria-label={p.vehicle.plate}>
       <div className="rank">
-        <div><span className="muted small">#{rank}</span> <span className="plate mono">{p.vehicle.plate}</span><div className="muted small">{p.vehicle.carrier_org_name}</div></div>
+        <div><span className="muted small">#{rank}</span> <span className="plate mono">{p.vehicle.plate}</span><div className="muted small">{p.vehicle.carrier_org_name}</div>
+          {p.vehicle.yard && <div className="small" title={t('fleet.estTip')}>{t('rec.yard', { yard: p.vehicle.yard, km: p.deadhead_km ?? '?' })}</div>}</div>
         <div className="score"><span className="score-big">{(p.score ?? 0).toFixed(2)}</span><small className="muted">{t('rec.score')}</small></div>
       </div>
       <ul className="why">{mainReasons(p, t).map((r, i) => <li key={i}>{r}</li>)}</ul>

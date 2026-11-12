@@ -40,5 +40,6 @@ def redact_rejections(items: list[dict], vehicle_org: dict[str, uuid.UUID], acto
                 continue
             keep = SAFE_KEYS.get(x["reason_code"], ())
             reasons.append({**x, "detail": {**{k: x["detail"][k] for k in keep if k in x["detail"]}, "redacted": True}})
-        out.append({**r, "plate": mask_plate(r["plate"]), "reasons": reasons})
+        # bãi đậu + km là thông tin đội xe của nhà vận tải khác → bỏ khỏi bản cho người không phải chủ xe
+        out.append({**{k: v for k, v in r.items() if k not in ("yard", "yard_km")}, "plate": mask_plate(r["plate"]), "reasons": reasons})
     return out

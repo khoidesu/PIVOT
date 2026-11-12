@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .routers import auth, benefits, core, demo, docks, eta, events, incidents, intake, matching, tracking
+from .routers import auth, benefits, core, demo, docks, eta, events, incidents, intake, matching, sandbox, tracking
 from .worker import process_pending
 
 log = logging.getLogger("pivot.main")
@@ -77,6 +77,7 @@ app.include_router(auth.router)
 app.include_router(core.router)
 app.include_router(matching.router)
 app.include_router(events.router)
+app.include_router(sandbox.router)  # trước benefits: /benefits/{id} sẽ nuốt /benefits/sandbox/*
 app.include_router(benefits.router)
 app.include_router(intake.router)
 app.include_router(tracking.router)

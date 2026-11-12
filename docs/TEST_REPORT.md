@@ -97,6 +97,10 @@ Test đáng chú ý: `test_no_future_leakage…` (trôi chỉ xuất hiện ở 
 | Rà soát 12/11 | Đăng nhập tên mới gặp lỗi ràng buộc khác race vẫn trả khoá của người dùng không tồn tại; biển số sinh chỉ 16^4 khả năng | Ném lại lỗi thật; biển số 7 ký tự hex |
 | Rà soát 12/11 | `/v1/tracking` LIMIT 100 trước khi lọc quyền → chuyến cũ của người dùng biến mất; `/v1/benefits` nạp cả sổ rồi lọc | Lọc quyền trong SQL |
 | Rà soát 12/11 | Giao diện: `useData` để phản hồi chậm của token/chuyến cũ ghi đè dữ liệu mới; đổi chuyến phải đợi nhịp polling | Chỉ áp dụng lần gọi mới nhất; tải ngay khi đổi `key` |
+| 13/11 | Xe của nhà vận tải bị `DATA_STALE` hàng loạt, phải bấm tay làm tươi vị trí | Tự làm tươi khi đăng nhập + định kỳ (sự kiện thật, idempotent, chỉ xe rảnh); ngưỡng 5 phút không đổi |
+| 13/11 | Không thấy xe trống đang đậu ở đâu, cách điểm lấy bao xa | Bãi + trạng thái + khoảng cách ước tính ở màn Đội xe và thẻ đề xuất; che dữ liệu liên tổ chức |
+| 13/11 | Sổ lợi ích trống nên chưa có bằng chứng định lượng | Sandbox 100 ca dùng đúng đường code ghép thật (`docs/SANDBOX_REPORT.md`), MÔ PHỎNG, không ghi sổ thật |
+| 13/11 | Slot ICD (mẫu + của người đăng ký) hết hạn theo thời gian → mọi xe `SLOT_WINDOW_MISSED`, "không có phương án khả thi"; `retime` bỏ qua dữ liệu người đăng ký | `app/nodes.py` kéo dài đuôi lịch slot mô phỏng khi ICD đăng nhập / mở tab / lúc ghép; vẫn qua hard gate; 9 test (`tests/test_icd_slots.py`) |
 
 ## Giới hạn đã biết (không che giấu)
 - Mọi số liệu là **mô phỏng**; "verified" chỉ chứng minh quy trình ghi sổ/xác minh độc lập, **không** chứng minh tiết kiệm thật. Lợi ích mới có một hạng mục (km chạy rỗng × đơn giá phẳng, baseline hằng số 38 km); chưa có chi phí chờ/bốc dỡ/đi vòng, chưa có Bảng A/B/C của DRAFT 11.3.

@@ -21,6 +21,7 @@ TEST_FRACTION = 0.3
 MIN_IMPROVEMENT = 0.15
 COVERAGE_RANGE = (0.85, 0.97)
 BASE_KM = 26.0
+NOISE_SIGMA = 0.07  # độ ồn tương đối của thời gian trung chuyển mô phỏng (sandbox lợi ích dùng lại cùng phân phối)
 LABEL = "ml-sim-v1"
 
 _lock = threading.Lock()
@@ -49,7 +50,7 @@ def simulate_history(transit_minutes: float, drift: float = DEFAULT_DRIFT, n: in
     day = np.arange(n) // 24 + 1
     rain = np.array([sim_weather(int(d), int(h)) for d, h in zip(day, hour)])
     mult = np.array([_band_mult(int(h)) for h in hour]) * (1 + 0.18 * rain) * np.where(weekday >= 5, 0.93, 1.0)
-    y = transit_minutes * (km / BASE_KM) * mult * (1 + rng.normal(0, 0.07, n))
+    y = transit_minutes * (km / BASE_KM) * mult * (1 + rng.normal(0, NOISE_SIGMA, n))
     y = np.where(np.arange(n) >= int(n * (1 - TEST_FRACTION)), y * (1 + drift), y)  # drift ở đoạn cuối
     return _features(km, hour, weekday, rain), y, np.arange(n)
 

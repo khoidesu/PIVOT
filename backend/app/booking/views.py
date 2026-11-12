@@ -55,7 +55,7 @@ def proposal_views(session: Session, actor: Actor, props: list[m.Proposal], now:
                 "id", "code", "cargo_type", "weight_kg", "volume_m3", "ready_at", "pickup_deadline", "cutoff_at",
                 "origin_location_id", "dest_location_id", "status")},
             "vehicle": {"id": veh.id, "plate": veh.plate, "capacity_kg": veh.capacity_kg, "capacity_m3": veh.capacity_m3,
-                        "carrier_org_name": names.get(orgs["carrier"])},
+                        "carrier_org_name": names.get(orgs["carrier"]), "yard": (snap.get("vehicle") or {}).get("yard_name")},
             "slot": None if slot is None else {
                 "id": slot.id, "start_at": slot.start_at, "end_at": slot.end_at, "remaining": slot.remaining,
                 "capacity": slot.capacity, "source": slot.source, "node_org_name": names.get(orgs.get("node"))},

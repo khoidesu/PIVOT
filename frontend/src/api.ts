@@ -15,20 +15,40 @@ export interface Shipment {
   cutoff_at: string | null; status: string; is_simulated: boolean; version: number; data_updated_at: string
   price_vnd: number | null; customer_name: string | null; missing_fields: string[]
 }
+export type VehicleState = 'empty' | 'reserved' | 'executing' | 'offline' | 'window_expired' | 'free_later' | 'no_window'
 export interface Vehicle {
   id: string; tenant_id: string; plate: string; cargo_types: string[]; capacity_kg: number; capacity_m3: number
   status: string; position_updated_at: string | null; is_simulated: boolean
+  yard: { id: string; name: string; kind: string; lat: number; lng: number } | null // bãi đang đậu
+  free_from: string | null; free_to: string | null
+  availability: { state: VehicleState; reason: string } | null
+  position_age_seconds: number | null
+  distance_to_target_km: number | null; distance_method: 'estimate' | null // ƯỚC TÍNH (đường chim bay × hệ số đường bộ)
+  deadhead_eta: { minutes: number; p50: string; p90: string; method: string } | null
 }
+export interface SandboxSaving { mean: number; median: number; p10: number; p90: number; ci95: [number, number]; win_rate: number; strict_win_rate: number }
+export interface SandboxResult {
+  meta: { n: number; seed: number; profile: string; assumption_version: string; rule_version: string; generated_at: string; is_simulated: boolean; label: string }
+  summary: {
+    n_cases: number; n_feasible: number; n_infeasible: number; top1_mean: Record<string, number>
+    vs: Record<'random' | 'nearest' | 'first', { mean: Record<string, number>; saving: Record<'km' | 'cost_vnd' | 'min_to_pickup' | 'min_to_icd', SandboxSaving>; rate_diff: Record<string, number> }>
+    vs_static_baseline: { km_saved_mean: number; cost_saved_vnd_mean: number; share_better_than_baseline: number }
+    invalid_without_gate: { first_in_list_rate: number; mean_share_of_fleet_failing_gate: number }
+    top1_is_nearest_share: number; pass_gate_mean: number
+  }
+  cases: { i: number; profile: string; feasible: boolean; top1?: Record<string, number>; random?: Record<string, number> }[]
+}
+export interface FleetRefresh { updated: number; window_extended: number; already_fresh: number; skipped: Record<string, number>; at: string; is_simulated: boolean }
 export interface Slot {
   id: string; node_org_id: string; node_org_name: string | null; location_id: string; start_at: string; end_at: string
   capacity: number; remaining: number; source: string; is_simulated: boolean
 }
 export interface GateItem { gate: string; status: 'PASS' | 'FAIL' | 'UNKNOWN'; reason_code: string; detail: Record<string, unknown> }
-export interface Rejection { vehicle_id: string; plate: string; status: 'FAIL' | 'UNKNOWN'; reasons: GateItem[] }
+export interface Rejection { vehicle_id: string; plate: string; status: 'FAIL' | 'UNKNOWN'; reasons: GateItem[]; yard?: string | null; yard_km?: number | null }
 export interface Proposal {
   id: string; status: string; version: number; is_simulated: boolean; confirmation_source: string | null
   shipment: Pick<Shipment, 'id' | 'code' | 'cargo_type' | 'weight_kg' | 'volume_m3' | 'ready_at' | 'pickup_deadline' | 'cutoff_at' | 'origin_location_id' | 'dest_location_id' | 'status'>
-  vehicle: { id: string; plate: string; capacity_kg: number; capacity_m3: number; carrier_org_name: string | null }
+  vehicle: { id: string; plate: string; capacity_kg: number; capacity_m3: number; carrier_org_name: string | null; yard?: string | null }
   slot: { id: string; start_at: string; end_at: string; remaining: number; capacity: number; source: string; node_org_name: string | null } | null
   score: number | null
   score_components: { fit: number; time_margin: number; empty_km_saved: number; weights: Record<string, number>; missing: string[] }
@@ -210,7 +230,11 @@ export const api = {
   meta: () => request<Meta>('/v1/meta'),
   locations: () => request<Location[]>('/v1/locations'),
   shipments: () => request<Shipment[]>('/v1/shipments'),
-  vehicles: () => request<Vehicle[]>('/v1/vehicles'),
+  vehicles: (toLocationId?: string) => request<Vehicle[]>(`/v1/vehicles${toLocationId ? `?to_location_id=${toLocationId}` : ''}`),
+  sandboxLatest: () => request<SandboxResult>('/v1/benefits/sandbox/latest'),
+  sandboxRun: (n: number, seed: number) => post<SandboxResult>('/v1/benefits/sandbox/run', { n, seed }),
+  refreshSlots: () => post<{ created: number; reason: string; is_simulated: boolean }>('/v1/slots/refresh', {}),
+  refreshFleet: () => post<FleetRefresh>('/v1/vehicles/refresh-fleet', {}),
   slots: () => request<Slot[]>('/v1/slots'),
   createShipment: (b: ShipmentCreate) => post<Shipment>('/v1/shipments', b),
   updateShipment: (id: string, b: ShipmentUpdate) => request<Shipment>(`/v1/shipments/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
