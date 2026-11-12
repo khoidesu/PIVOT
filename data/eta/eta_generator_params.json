@@ -1,0 +1,139 @@
+{
+  "seed": 20261111,
+  "model_version": "eta-onnx-sim-v1",
+  "period": [
+    "2025-11-01",
+    "2026-10-31"
+  ],
+  "split": {
+    "calib_from": "2026-07-01",
+    "test_from": "2026-09-01"
+  },
+  "trips_per_day": 59,
+  "weekend_volume_factor": 0.7,
+  "hour_weight": {
+    "night": 0.25,
+    "normal": 1.0,
+    "peak_am": 1.3,
+    "peak_pm": 1.3
+  },
+  "routes": {
+    "KCN_A_ICD": {
+      "p": 0.55,
+      "distance_mean": 22.0,
+      "distance_sd": 4.5,
+      "time_factor": 1.0
+    },
+    "KCN_B_ICD": {
+      "p": 0.45,
+      "distance_mean": 28.0,
+      "distance_sd": 5.5,
+      "time_factor": 1.06
+    }
+  },
+  "distance_clip_km": [
+    8.0,
+    40.0
+  ],
+  "vehicle_class": {
+    "heavy": {
+      "p": 0.4,
+      "time_factor": 1.12
+    },
+    "medium": {
+      "p": 0.4,
+      "time_factor": 1.0
+    },
+    "light": {
+      "p": 0.2,
+      "time_factor": 0.93
+    }
+  },
+  "effective_speed_kmh": {
+    "night": 26.0,
+    "normal": 19.5,
+    "peak_am": 13.5,
+    "peak_pm": 12.5
+  },
+  "weekend_time_factor": 0.93,
+  "rain": {
+    "p_wet_season": 0.22,
+    "p_dry_season": 0.05,
+    "wet_months": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "afternoon_boost": 1.6,
+    "afternoon_hours": [
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "mean_mm_h": 4.0,
+    "max_mm_h": 30.0,
+    "time_slope_per_mm": 0.018,
+    "time_factor_cap": 1.35
+  },
+  "wind": {
+    "gamma_shape": 2.2,
+    "gamma_scale": 4.0,
+    "rain_bonus_kmh": 6.0,
+    "max_kmh": 60.0,
+    "strong_from_kmh": 50.0,
+    "strong_extra": 0.04
+  },
+  "month_factor": {
+    "10": 1.06,
+    "11": 1.06,
+    "12": 1.06,
+    "2": 0.95
+  },
+  "noise_sigma": {
+    "night": 0.08,
+    "normal": 0.11,
+    "peak_am": 0.15,
+    "peak_pm": 0.16
+  },
+  "gate_queue_mean_min": {
+    "night": 6.0,
+    "normal": 6.0,
+    "peak_am": 6.0,
+    "peak_pm": 14.0
+  },
+  "incident": {
+    "p": 0.025,
+    "p_drift": 0.04,
+    "delay_min_uniform": [
+      20,
+      90
+    ]
+  },
+  "drift": {
+    "from": "2026-09-01",
+    "time_factor": 1.08,
+    "note": "2 tháng cuối (test): giao thông chậm hơn 8% + sự cố 4% — để kiểm tra cổng phát hiện trôi"
+  },
+  "rule_dist": {
+    "speed_kmh": {
+      "night": 28.0,
+      "normal": 21.5,
+      "peak_am": 15.0,
+      "peak_pm": 14.0
+    },
+    "p90_spread": {
+      "night": 0.1,
+      "normal": 0.15,
+      "peak_am": 0.35,
+      "peak_pm": 0.45
+    },
+    "p90_buffer_min": 10.0
+  },
+  "rule_const_min": 90.0
+}

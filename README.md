@@ -50,9 +50,11 @@ cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 
 ## Kiểm thử
 ```bash
-cd backend && .venv/bin/python -m pytest      # 299 test (DB test riêng: pivot_test)
+cd backend && .venv/bin/python -m pytest      # 310 test (DB test riêng: pivot_test)
 cd frontend && npm test && npx tsc --noEmit
 ```
+**Dữ liệu ETA mô phỏng để huấn luyện ngoài (Kaggle):** `cd backend && .venv/bin/python -m app.eta_data_gen [--no-drift]` sinh `data/eta/` (CSV + schema + tham số + hướng dẫn); notebook `data/eta/eta_train_kaggle.ipynb` huấn luyện P50/P90 bằng PyTorch rồi xuất `eta_model.onnx` + `eta_model_card.json`. Đặc tả: `docs/ETA_DATASET_SPEC.md`. Backend **chưa** nạp model ONNX (bước sau).
+
 **ETA Sandbox** (công cụ nội bộ để thử/tinh chỉnh ETA trước khi chốt demo, không cần bật server/DB): `cd backend && .venv/bin/python -m app.eta_sandbox_cli [--only drift|scenarios|signals] [--fresh]` in 3 bảng (quét độ trôi ML · lưới kịch bản theo khung giờ · sức khoẻ OSRM/Open-Meteo/Mapbox). Tương đương qua API (vai Điều phối viên, cần mã quản trị nếu có): `GET /v1/eta/sandbox/drift-sweep`, `/scenarios`, `/signals-health?fresh=true`.
 
 ## Màn hình (menu hiện theo vai trò)
