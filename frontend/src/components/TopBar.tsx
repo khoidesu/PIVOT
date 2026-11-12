@@ -11,6 +11,8 @@ export function Brand() {
   return <div className="brand"><div className="logo" aria-hidden>L</div><b>LOGECTION</b></div>
 }
 
+const SEV_ORDER = ['critical', 'high', 'medium', 'low'] as const
+
 function Bell() {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
@@ -24,15 +26,16 @@ function Bell() {
   }, [open])
   const items = (list.data?.items ?? []).filter((n) => n.channel === 'in_app').slice(0, 15)
   const unread = list.data?.unread ?? 0
+  const topUnread = SEV_ORDER.find((s) => items.some((n) => !n.read && n.payload.severity === s)) // màu chấm số = mức cao nhất chưa đọc
   return (
     <div className="menu-wrap" ref={wrap}>
-      <button className="bell" aria-label={unread > 0 ? `${t('bell.title')}: ${unread}` : t('bell.title')} aria-expanded={open} onClick={() => setOpen((v) => !v)}><Icon name="bell" size={18} />{unread > 0 && <span className="dot" aria-hidden>{unread > 9 ? '9+' : unread}</span>}</button>
+      <button className={`bell${topUnread ? ` sev-${topUnread}` : ''}`} aria-label={unread > 0 ? `${t('bell.title')}: ${unread}` : t('bell.title')} aria-expanded={open} onClick={() => setOpen((v) => !v)}><Icon name="bell" size={18} />{unread > 0 && <span className="dot" aria-hidden>{unread > 9 ? '9+' : unread}</span>}</button>
       {open && (
         <div className="menu bell-list" role="menu">
           {!items.length && <div className="muted small" style={{ padding: 10 }}>{t('bell.empty')}</div>}
           {items.map((n) => (
-            <button key={n.id} role="menuitem" className={`it${n.read ? '' : ' unread'}`} onClick={() => { setOpen(false); window.location.hash = '#/exceptions' }}>
-              <b>{t(`ex.cat.${n.payload.category}`)} · {t(`ex.sev.${n.payload.severity}`)}</b>
+            <button key={n.id} role="menuitem" className={`it sev-${n.payload.severity}${n.read ? '' : ' unread'}`} onClick={() => { setOpen(false); window.location.hash = '#/exceptions' }}>
+              <span className="row"><Chip kind={`sev-${n.payload.severity}`}>{t(`ex.sev.${n.payload.severity}`)}</Chip><b>{t(`ex.cat.${n.payload.category}`)}</b></span>
               <span className="muted small">{n.payload.shipment_code} · {n.payload.plate}{n.payload.escalated ? ` · ${t('ex.escalated')}` : ''}</span>
             </button>))}
           {unread > 0 && <button role="menuitem" onClick={() => { void api.readNotifications().then(() => list.reload(true)) }}>{t('bell.read')}</button>}

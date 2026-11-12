@@ -15,6 +15,8 @@
   --unknown: #854d0e; --unknown-bg: #fdf0d3;
   --sim: #9a3412; --sim-bg: #fdeee2; --sim-line: #f4cfb0;
   --soft: #f7f9fc; --soft-2: #e8edf4; --soft-3: #cdd6e2; --field-line: #c3cddb; --gutter: #f4f7fb; --scrim: rgba(244, 247, 251, 0.92);
+  --sev-crit: #b91c1c; --sev-crit-bg: #fdeaea; --sev-high: #b45309; --sev-high-bg: #ffedd5; --sev-med: #854d0e; --sev-med-bg: #fdf0d3; --sev-low: #1d4ed8; --sev-low-bg: #e6eefd;
+  --sevs-crit: #dc2626; --sevs-high: #c2410c; --sevs-med: #a16207; --sevs-low: #2563eb; /* nền đặc (chữ trắng) cho chấm số và nhãn Nghiêm trọng */
   --focus: #3b82f6; --tip-bg: #0f172a; --on-teal: #ffffff; --badge: #b91c1c;
   --radius: 10px; --radius-sm: 6px;
   --gap: 16px;
@@ -221,7 +223,7 @@ label.inline select { min-width: 220px; width: auto; }
 @media (max-width: 520px) { .map { height: 300px; } }
 
 /* ---- Ngoại lệ + chuông thông báo ---- */
-.ex { border-left: 4px solid var(--line); } .ex.critical, .ex.high { border-left-color: var(--fail); } .ex.medium { border-left-color: var(--unknown); }
+.ex { border-left: 4px solid var(--line); } .ex.critical { border-left-color: var(--sevs-crit); } .ex.high { border-left-color: var(--sevs-high); } .ex.medium { border-left-color: var(--sevs-med); } .ex.low { border-left-color: var(--sev-low); }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .steps li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; } .steps li.done { color: var(--muted); }
 .bell { position: relative; border: 1px solid var(--line); background: transparent; border-radius: 999px; width: 38px; height: 38px; cursor: pointer; font-size: 16px; }
@@ -388,6 +390,7 @@ table.mini { border-collapse: collapse; font-size: 13px; } table.mini th, table.
   --unknown: #f3c06a; --unknown-bg: #33260d;
   --sim: #fdba74; --sim-bg: #33200f; --sim-line: #653d1a;
   --soft: #162132; --soft-2: #1f2d41; --soft-3: #324560; --field-line: #34486a; --gutter: #131e2e; --scrim: rgba(10, 17, 28, 0.9);
+  --sev-crit: #ff9a94; --sev-crit-bg: #351619; --sev-high: #fdba74; --sev-high-bg: #33200f; --sev-med: #f3c06a; --sev-med-bg: #33260d; --sev-low: #7db3ff; --sev-low-bg: #14243f;
   --focus: #7db3ff; --tip-bg: #05090f; --on-teal: #07101c; --badge: #e5484d;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
@@ -515,3 +518,17 @@ button:disabled, .btn:disabled, select:disabled, input:disabled { cursor: not-al
 .img-pair img { width: 100%; max-height: 320px; object-fit: contain; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--soft); }
 .transcript { margin: 0; max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: 'Fira Code Variable', ui-monospace, monospace; font-size: 12.5px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--soft); }
 @media (max-width: 640px) { .img-pair { grid-template-columns: 1fr; } }
+
+/* mức quan trọng của thông báo / ngoại lệ: 4 màu riêng (đỏ · cam · vàng · xanh), không chỉ dựa vào màu — luôn có chữ của mức */
+.chip.sev-critical { background: var(--sevs-crit); color: #fff; }
+.chip.sev-high { background: var(--sev-high-bg); color: var(--sev-high); }
+.chip.sev-medium { background: var(--sev-med-bg); color: var(--sev-med); }
+.chip.sev-low { background: var(--sev-low-bg); color: var(--sev-low); }
+.bell.sev-critical .dot { background: var(--sevs-crit); } .bell.sev-high .dot { background: var(--sevs-high); }
+.bell.sev-medium .dot { background: var(--sevs-med); } .bell.sev-low .dot { background: var(--sevs-low); }
+.bell-list .it { border-left: 4px solid var(--line); border-radius: var(--radius-sm); }
+.bell-list .it.sev-critical { border-left-color: var(--sevs-crit); } .bell-list .it.sev-high { border-left-color: var(--sevs-high); }
+.bell-list .it.sev-medium { border-left-color: var(--sevs-med); } .bell-list .it.sev-low { border-left-color: var(--sev-low); }
+.bell-list .it.sev-critical.unread { background: var(--sev-crit-bg); } .bell-list .it.sev-high.unread { background: var(--sev-high-bg); }
+.bell-list .it.unread b::before { content: none; }
+.bell-list .it.read b, .bell-list .it:not(.unread) b { font-weight: 500; }

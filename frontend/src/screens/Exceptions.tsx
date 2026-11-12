@@ -7,7 +7,7 @@ import { useApp } from '../store'
 import { useData } from '../useData'
 
 const SEV_RANK = { critical: 0, high: 1, medium: 2, low: 3 }
-const SEV_KIND = { critical: 'bad', high: 'bad', medium: 'warn', low: '' } as const
+const SEV_KIND = { critical: 'sev-critical', high: 'sev-high', medium: 'sev-medium', low: 'sev-low' } as const
 const KINDS: Record<string, string[]> = {
   carrier: ['BREAKDOWN', 'TRAFFIC_INCIDENT', 'CARGO_DAMAGE'], node_operator: ['CARGO_DAMAGE'], shipper: ['CARGO_DAMAGE'], dispatcher: [],
 }
