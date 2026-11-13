@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SimBadge, TopBar } from './components/TopBar'
 import { HeroArt } from './components/HeroArt'
 import { Icon } from './components/Icon'
+import { Walkthrough, type WalkthroughStep } from './components/Walkthrough'
 import { MagicGlow } from './components/MagicGlow'
 import { useAutoEnter, useNavIndicator } from './motion'
 import { EmbedBridge } from './components/EmbedBridge'
@@ -43,9 +44,21 @@ function useHashRoute(): [Route, URLSearchParams, (to: string) => void] {
 function Shell() {
   const { t, lang } = useI18n()
   const { fatal, session, me } = useApp()
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false)
   const [wanted, query, go] = useHashRoute()
   const role = me?.role ?? session?.role
   const route: Route = allowedRoute(role, wanted) ? wanted : defaultRoute(role) // đường dẫn không được phép → về mục mặc định
+  const walkthroughSteps: WalkthroughStep[] = [
+    { target: '.nav', title: t('guide.shell.nav.title'), body: t('guide.shell.nav.body') },
+    ...navFor(role).map((r) => ({
+      target: `.nav a[href="#/${r}"]`,
+      title: t(r === 'fleet' ? `nav.fleet.${role}` : `nav.${r}`),
+      body: t(`guide.route.${r}`),
+    })),
+    { target: '.hero-side', title: t('guide.shell.mode.title'), body: t('guide.shell.mode.body') },
+    ...(me ? [{ target: '.who', title: t('guide.shell.profile.title'), body: t('guide.shell.profile.body') }] : []),
+    { target: 'main', title: t('guide.shell.content.title'), body: t('guide.shell.content.body') },
+  ]
   useEffect(() => { document.documentElement.lang = lang }, [lang])
   useEffect(() => { document.documentElement.classList.toggle('embed', EMBED) }, [])
   useEffect(() => { window.scrollTo(0, 0) }, [route])
@@ -68,6 +81,7 @@ function Shell() {
               <a key={r} href={`#/${r}`} aria-current={route === r ? 'page' : undefined}>{t(r === 'fleet' ? `nav.fleet.${role}` : `nav.${r}`)}</a>))}
           </nav>
           <TopBar />
+          <button className="btn sm icon shell-guide" aria-label={t('guide.open')} title={t('guide.open')} onClick={() => setWalkthroughOpen(true)}><Icon name="help" size={16} /></button>
         </div>
         <div className="hero-main">
           <div>
@@ -90,6 +104,7 @@ function Shell() {
         {route === 'benefits' && <Benefits query={query} />}
         {route === 'demo' && <Demo />}
       </main>
+      <Walkthrough steps={walkthroughSteps} open={walkthroughOpen} onClose={() => setWalkthroughOpen(false)} />
     </div>
   )
 }

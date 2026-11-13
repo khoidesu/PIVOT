@@ -4,6 +4,7 @@ import { api, ApiError, getSession, setSession, type Role } from '../api'
 import { Chip, ErrorNote } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { HeroArt } from '../components/HeroArt'
+import { Walkthrough, type WalkthroughStep } from '../components/Walkthrough'
 import { Brand } from '../components/TopBar'
 import { gsap, reducedMotion, useAutoEnter, useGSAP } from '../motion'
 import { useI18n } from '../i18n'
@@ -54,6 +55,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const [accent, setAccentState] = useState(currentAccent)
   const [accentDraft, setAccentDraft] = useState(accent)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false)
   const [windowRects, setWindowRects] = useState<Record<string, WindowRect>>(() => { try { return JSON.parse(sessionStorage.getItem(WINDOW_LAYOUT_KEY) || '{}') } catch { return {} } })
   const [snapPreview, setSnapPreview] = useState<WindowRect | null>(null)
   const [dockTooltip, setDockTooltip] = useState<{ label: string; x: number; y: number } | null>(null)
@@ -336,6 +338,20 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const focusId = st.focus ?? open[0]?.id
   const showDockTooltip = (e: React.MouseEvent<HTMLElement>, label: string) => { const r = e.currentTarget.getBoundingClientRect(); setDockTooltip({ label, x: r.left + r.width / 2, y: r.top - 12 }) }
 
+  const walkthroughSteps: WalkthroughStep[] = [
+    { target: '.ws-bar', title: t('guide.workspace.bar.title'), body: t('guide.workspace.bar.body') },
+    { target: '.ws-add', title: t('guide.workspace.add.title'), body: t('guide.workspace.add.body') },
+    ...(!wins.length ? [{ target: '.ws-start-card', title: t('guide.workspace.roles.title'), body: t('guide.workspace.roles.body') }] : []),
+    ...(open.length ? [
+      { target: '.ws-win.foc .ws-wh', title: t('guide.workspace.move.title'), body: t('guide.workspace.move.body') },
+      ...(!narrow ? [{ target: '.ws-win.foc .ws-ib[aria-label="Maximize"]', title: t('guide.workspace.snap.title'), body: t(open.length > 1 ? 'guide.workspace.snap.body' : 'guide.workspace.snap.single') }] : []),
+      ...(!narrow && place.splitters.length ? [{ target: '.ws-split', title: t('guide.workspace.resize.title'), body: t('guide.workspace.resize.body') }] : []),
+      { target: narrow ? '.ws-nodes' : '.ws-dock', title: t('guide.workspace.switch.title'), body: t(narrow ? 'guide.workspace.switch.mobile' : 'guide.workspace.switch.body') },
+      { target: '.ws-win.foc .ws-frame', title: t('guide.workspace.app.title'), body: t('guide.workspace.app.body') },
+    ] : []),
+    { target: '.ws-appearance', title: t('guide.workspace.appearance.title'), body: t('guide.workspace.appearance.body') },
+  ]
+
   const addMenu = pop === 'form' ? (
     <LoginForm compact onLogin={async (n, r) => { await enter(n, r); setPop('closed') }} />
   ) : (
@@ -445,6 +461,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
           <div className="seg" role="group" aria-label="Language">
             {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
           </div>
+          <button className="btn sm icon" aria-label={t('guide.open')} title={t('guide.open')} onClick={() => setWalkthroughOpen(true)}><Icon name="help" size={16} /></button>
           <span className="muted">{t('ws.count', { n: open.length })}{wins.length > open.length ? ` · ${t('ws.bgN', { n: wins.length - open.length })}` : ''}</span>
           <span className="grow" />
           {st.sizes && <button className="btn sm" onClick={() => commit(resetSizes(stRef.current))}>{t('ws.even')}</button>}
@@ -515,6 +532,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
           </button>)}<span className="ws-dock-divider" /><button className="ws-dock-item ws-dock-add" aria-label={t('ws.add')} title={t('ws.add')} onClick={() => { setErr(null); setPop(pop === 'closed' ? 'list' : 'closed') }}><span className="ws-dock-avatar">+</span></button>
         </div>}
       </section>
+      <Walkthrough steps={walkthroughSteps} open={walkthroughOpen} onClose={() => setWalkthroughOpen(false)} />
     </div>
   )
 }
