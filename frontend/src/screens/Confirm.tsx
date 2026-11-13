@@ -77,7 +77,8 @@ export function Confirm() {
   const { t } = useI18n()
   const { me } = useApp()
   const props = useData(() => api.proposals(), 2000) // polling 2s (DRAFT bảng 2: polling trước)
-  const slots = useData(() => api.slots(), 2000)
+  // bảng slot chỉ hiện cho ICD (và API chỉ trả slot của ICD đó) → vai khác không tải; 10 giây là đủ cho số chỗ còn lại
+  const slots = useData(() => (me?.role === 'node_operator' ? api.slots() : Promise.resolve([])), 10000, me?.role)
   const list = props.data ?? []
   const live = list.filter((p) => LIVE.includes(p.status))
   const unheld = list.filter((p) => p.status === 'proposed') // chưa giữ chỗ: việc của màn Ghép, gom lại cho gọn

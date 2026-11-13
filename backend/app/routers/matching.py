@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from sqlalchemy import or_, select
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from .. import models as m
 from .. import schemas as s
@@ -36,7 +36,7 @@ def create_match_run(body: s.MatchRunIn, actor: Actor = Depends(current_actor), 
     from ..matching.redact import redact_rejections
     vids = {r["vehicle_id"] for r in run["rejections"] + run["needs_data"]}
     veh_org = {str(v.id): v.tenant_id for v in session.query(m.Vehicle).filter(m.Vehicle.id.in_(vids))} if vids else {}
-    return {**run, "proposals": proposal_views(session, actor, run["proposals"], now),
+    return {**run, "proposals": proposal_views(session, actor, run["proposals"], now, with_rejections=False),  # xe bị loại đã có ở cấp kết quả ghép
             "rejections": redact_rejections(run["rejections"], veh_org, actor),
             "needs_data": redact_rejections(run["needs_data"], veh_org, actor)}
 
@@ -55,8 +55,10 @@ def list_proposals(shipment_id: uuid.UUID | None = None, status: str | None = No
         stmt = stmt.where(m.Proposal.shipment_id == shipment_id)
     if status:
         stmt = stmt.where(m.Proposal.status == status)
-    rows = session.execute(stmt.order_by(m.Proposal.created_at.desc(), m.Proposal.score.desc()).limit(200)).scalars().all()
-    return proposal_views(session, actor, list(rows), now)
+    # không nạp cột JSON lớn candidate_rejections (danh sách không trả nó; xem chi tiết đề xuất để có danh sách xe bị loại)
+    rows = session.execute(stmt.options(defer(m.Proposal.candidate_rejections))
+                           .order_by(m.Proposal.created_at.desc(), m.Proposal.score.desc()).limit(200)).scalars().all()
+    return proposal_views(session, actor, list(rows), now, with_rejections=False, with_gates=False)
 
 
 @router.get("/proposals/{proposal_id}", response_model=s.ProposalOut)

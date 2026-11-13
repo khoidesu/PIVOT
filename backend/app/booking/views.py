@@ -19,7 +19,10 @@ def effective_status(prop: m.Proposal, now: datetime) -> str:
     return prop.status
 
 
-def proposal_views(session: Session, actor: Actor, props: list[m.Proposal], now: datetime) -> list[dict]:
+def proposal_views(session: Session, actor: Actor, props: list[m.Proposal], now: datetime, with_rejections: bool = True,
+                   with_gates: bool = True) -> list[dict]:
+    """`with_rejections=False` (danh sách + kết quả ghép): bỏ danh sách xe bị loại của TỪNG đề xuất — giao diện chỉ dùng nó ở màn
+    chi tiết; trên bản công khai nó chiếm ~70% phản hồi (54 đề xuất ≈ 458 KB) và làm máy chủ Render nghẽn khi nhiều màn polling."""
     if not props:
         return []
     ships = {x.id: x for x in session.execute(select(m.Shipment).where(m.Shipment.id.in_({p.shipment_id for p in props}))).scalars()}
@@ -32,7 +35,7 @@ def proposal_views(session: Session, actor: Actor, props: list[m.Proposal], now:
         if party:
             accepted[pid].add(party)
     # tên tổ chức + chủ của các xe bị loại (để che chi tiết đội xe của tổ chức khác)
-    rej_vids = {r["vehicle_id"] for p in props for r in (p.candidate_rejections or [])}
+    rej_vids = {r["vehicle_id"] for p in props for r in (p.candidate_rejections or [])} if with_rejections else set()
     veh_org = {str(v.id): v.tenant_id for v in session.execute(select(m.Vehicle).where(
         m.Vehicle.id.in_(rej_vids))).scalars()} if rej_vids else {}
     org_ids = {v.tenant_id for v in vehs.values()} | {s.tenant_id for s in ships.values()} | {s.node_org_id for s in slots.values()}
@@ -61,8 +64,8 @@ def proposal_views(session: Session, actor: Actor, props: list[m.Proposal], now:
                 "capacity": slot.capacity, "source": slot.source, "node_org_name": names.get(orgs.get("node"))},
             "score": prop.score, "score_components": prop.score_components,
             "estimated_saving_vnd": snap.get("estimated_saving_vnd"), "deadhead_km": snap.get("deadhead_km"),
-            "eta": snap.get("eta"), "gates": snap.get("gates", []),
-            "rejections": redact_rejections(prop.candidate_rejections, veh_org, actor),
+            "eta": snap.get("eta"), "gates": snap.get("gates", []) if with_gates else [],  # danh sách: bỏ (chỉ màn Ghép/chi tiết dùng)
+            "rejections": redact_rejections(prop.candidate_rejections, veh_org, actor) if with_rejections else [],
             "rule_version": prop.rule_version, "model_version": prop.model_version, "assumption_version": prop.assumption_version,
             "expires_at": prop.expires_at, "hold_seconds_left": seconds_left,
             "parties": {p: {"org_name": names.get(orgs.get(p)), "accepted": p in done} for p in bk.PARTIES if p in orgs},

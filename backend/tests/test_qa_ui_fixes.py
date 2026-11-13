@@ -64,3 +64,16 @@ def test_meta_reports_extractor_kind_without_key(client, monkeypatch):
     r = client.get("/v1/meta", headers=auth("shipper_a"))
     assert r.json()["extractor_kind"] == "hybrid"
     assert "secret-test-key-123" not in r.text
+
+
+def test_proposal_list_is_lean_but_detail_keeps_rejections(client):
+    """Bản công khai (14/11): danh sách đề xuất kèm toàn bộ xe bị loại của từng đề xuất ≈ 458 KB → máy chủ Render nghẽn khi polling.
+    Danh sách và đề xuất trong kết quả ghép bỏ `rejections`/`gates` của từng đề xuất; màn chi tiết vẫn đủ (và vẫn che dữ liệu)."""
+    run = match(client, "shipper_a", "LOT-A-001")
+    assert run["rejections"]                                         # kết quả ghép vẫn có danh sách xe bị loại ở cấp trên
+    assert all(p["rejections"] == [] and p["gates"] for p in run["proposals"])   # thẻ đề xuất vẫn có điều kiện để giải thích
+    lst = client.get("/v1/proposals", headers=auth("shipper_a")).json()
+    assert lst and all(p["rejections"] == [] and p["gates"] == [] for p in lst)
+    assert all(p["parties"] and "my_actions" in p for p in lst)      # đủ cho màn Xác nhận/Theo dõi/Luồng demo
+    detail = client.get(f"/v1/proposals/{run['proposals'][0]['id']}", headers=auth("shipper_a")).json()
+    assert detail["rejections"] and detail["gates"]
