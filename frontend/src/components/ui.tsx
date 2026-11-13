@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { ApiError } from '../api'
 import { reasonText, useI18n, tCode } from '../i18n'
 import { fmtTime } from '../fmt'
+import { isConnError } from '../conn'
 
 export const Chip = ({ kind, children, title }: { kind?: string; children: ReactNode; title?: string }) => (
   <span className={`chip ${kind ?? ''}`} title={title}>{children}</span>
@@ -29,6 +30,15 @@ export function ErrorNote({ error }: { error: ApiError }) {
       )}
     </Note>
   )
+}
+
+/** Trạng thái lỗi của một truy vấn `useData` (QA-07), dùng chung cho mọi màn:
+ *  mất kết nối + còn dữ liệu cũ → cảnh báo "Dữ liệu cũ · mất kết nối"; chưa có dữ liệu → lỗi kết nối; lỗi khác → ErrorNote. */
+export function QueryNote({ q }: { q: { error: ApiError | null; data: unknown } }) {
+  const { t } = useI18n()
+  if (!q.error) return null
+  if (q.data != null && isConnError(q.error)) return <Note kind="warn">{t('conn.stale')}</Note>
+  return <ErrorNote error={q.error} />
 }
 
 export const Loading = () => { const { t } = useI18n(); return <div className="empty">{t('common.loading')}</div> }

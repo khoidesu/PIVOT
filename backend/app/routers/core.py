@@ -36,7 +36,25 @@ def _shipment_out(ship: m.Shipment, show_sensitive: bool) -> s.ShipmentOut:
 
 def shipment_out_many(session: Session, actor: Actor, ships: list[m.Shipment]) -> list[s.ShipmentOut]:
     visible = price_visible_ids(session, actor, ships)
-    return [_shipment_out(x, x.id in visible) for x in ships]
+    # Tên tổ chức sở hữu lô (chỉ tên; lô đã hiển thị với người xem) — để phân biệt lô trùng mã giữa các chủ hàng (QA-10).
+    tids = {x.tenant_id for x in ships}
+    names = dict(session.execute(select(m.Organization.id, m.Organization.name).where(m.Organization.id.in_(tids))).all()) if tids else {}
+    out = []
+    for x in ships:
+        o = _shipment_out(x, x.id in visible)
+        o.tenant_name = names.get(x.tenant_id)
+        out.append(o)
+    return out
+
+
+def _extractor_kind() -> str:
+    """Bộ trích xuất nhập liệu đang chạy thật (theo cấu hình + có khoá). Không lộ khoá."""
+    mode = settings.intake_extractor
+    if mode == "llm" and settings.anthropic_api_key:
+        return "llm"
+    if mode == "hybrid" and settings.gemini_api_key:
+        return "hybrid"
+    return "rule"
 
 
 @router.get("/me", response_model=s.MeOut)
@@ -54,7 +72,8 @@ def meta(actor: Actor = Depends(current_actor), session: Session = Depends(get_s
                      stale_shipment_minutes=params["stale_shipment_minutes"],
                      admin_key_required=bool(settings.admin_key),
                      image_intake_enabled=bool(settings.gemini_api_key and settings.intake_image_enabled),
-                     pdf_intake_enabled=settings.intake_pdf_enabled)
+                     pdf_intake_enabled=settings.intake_pdf_enabled,
+                     extractor_kind=_extractor_kind())
 
 
 @router.post("/demo/retime", dependencies=[Depends(require_admin)])
@@ -204,6 +223,11 @@ def refresh_fleet(actor: Actor = Depends(current_actor), session: Session = Depe
 
 @router.get("/slots", response_model=list[s.SlotOut])
 def list_slots(actor: Actor = Depends(current_actor), session: Session = Depends(get_session)):
+    """ICD (node_operator) chỉ thấy slot của tổ chức mình (QA-06); chủ hàng/nhà vận tải/điều phối viên thấy mọi ICD kèm tên.
+    Bộ ghép đọc slot trực tiếp trong DB nên không phụ thuộc endpoint này."""
     names = dict(session.execute(select(m.Organization.id, m.Organization.name).where(m.Organization.org_type == "node")).all())
+    stmt = select(m.Slot).order_by(m.Slot.start_at)
+    if actor.role == "node_operator":
+        stmt = stmt.where(m.Slot.node_org_id == actor.org_id)
     return [s.SlotOut.model_validate(x).model_copy(update={"node_org_name": names.get(x.node_org_id)})
-            for x in session.execute(select(m.Slot).order_by(m.Slot.start_at)).scalars().all()]
+            for x in session.execute(stmt).scalars().all()]

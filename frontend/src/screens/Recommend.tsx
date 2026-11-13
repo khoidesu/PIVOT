@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError, type GateItem, type MatchRun, type Proposal, type Rejection } from '../api'
-import { Chip, ErrorNote, Loading, More, Note } from '../components/ui'
-import { fmtNum, fmtTime, fmtVnd, nowMs } from '../fmt'
+import { Chip, ErrorNote, Loading, More, Note, QueryNote } from '../components/ui'
+import { fmtNum, fmtTime, fmtVnd, multiTenant, nowMs } from '../fmt'
 import { preflight } from '../preflight'
 import { reasonText, useI18n, type TFn, tCode } from '../i18n'
 import { useApp } from '../store'
@@ -93,8 +93,9 @@ function ProposalCard({ p, rank, onHold, busy }: { p: Proposal; rank: number; on
 export function Recommend({ go, query }: { go: (to: string) => void; query: URLSearchParams }) {
   const { t } = useI18n()
   const { me, meta } = useApp()
-  const lots = useData(() => api.shipments())
+  const lots = useData(() => api.shipments(), 10000) // polling chậm: phát hiện mất kết nối và tự hồi (QA-07)
   const open = (lots.data ?? []).filter((s) => s.status === 'open')
+  const showOrg = multiTenant(open)
   const [lotId, setLotId] = useState(query.get('lot') ?? '')
   const [pickedIcd, setPickedIcd] = useState('')
   const [run, setRun] = useState<MatchRun | null>(null)
@@ -103,7 +104,10 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
   const [error, setError] = useState<ApiError | null>(null)
 
   useEffect(() => { setRun(null); setError(null) }, [lotId, me?.role])
-  useEffect(() => { if (!lotId && open.length) setLotId(open[0].id) }, [open.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  const openIds = open.map((s) => s.id).join(',')
+  useEffect(() => { // lô đang chọn rời danh sách chờ ghép (polling: bị giữ/huỷ ở cửa sổ khác) → chọn lô đầu, không ghép nhầm lô cũ
+    if (lots.data && (!lotId || !open.some((s) => s.id === lotId))) setLotId(open[0]?.id ?? '')
+  }, [openIds, lots.data != null]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const vehicles = useData(() => api.vehicles())
   const slotList = useData(() => api.slots())
@@ -144,11 +148,12 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
       <section className="card stack">
         <h1>{t('rec.title')}</h1>
         {me && !allowed && <Note kind="warn">{t('rec.cannot')}</Note>}
-        {lots.loading && !lots.data ? <Loading /> : open.length === 0 ? <div className="empty">{t('rec.noOpen')}</div> : (
+        <QueryNote q={lots} />
+        {lots.data == null ? (lots.error ? null : <Loading />) : open.length === 0 ? <div className="empty">{t('rec.noOpen')}</div> : (
           <div className="row">
             <label className="inline">{t('rec.pick')}
               <select value={lotId} onChange={(e) => setLotId(e.target.value)} disabled={!allowed}>
-                {open.map((s) => <option key={s.id} value={s.id}>{s.code} · {tCode(t, 'cargo.', s.cargo_type)} · {s.weight_kg == null ? '?' : `${fmtNum(s.weight_kg)} kg`}{s.missing_fields.length ? ' (!)' : ''}</option>)}
+                {open.map((s) => <option key={s.id} value={s.id}>{s.code}{showOrg && s.tenant_name ? ` (${s.tenant_name})` : ''} · {tCode(t, 'cargo.', s.cargo_type)} · {s.weight_kg == null ? '?' : `${fmtNum(s.weight_kg)} kg`}{s.missing_fields.length ? ' (!)' : ''}</option>)}
               </select>
             </label>
             <label className="inline">{t('rec.icd')}

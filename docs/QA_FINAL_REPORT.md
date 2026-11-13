@@ -8,7 +8,12 @@
 
 ## 1. Tóm tắt điều hành
 
-**Kết luận: SẴN SÀNG NỘP CÓ ĐIỀU KIỆN.**
+**Kết luận: SẴN SÀNG NỘP.** (cập nhật 13/11 sau 3 lượt sửa — xem mục 9: cả 12 lỗi QA-01 → QA-12 và lỗi tương phản đã sửa, không còn lỗi Blocker/Major mở. Nội dung mục 1–8 bên dưới giữ nguyên như lúc kiểm thử để đối chiếu.)
+
+<details><summary>Kết luận gốc lúc kiểm thử</summary>
+
+**Kết luận gốc: SẴN SÀNG NỘP CÓ ĐIỀU KIỆN.**
+
 
 Phần lõi nghiệp vụ đúng và bền: hard gate, MatchScore, state machine booking, chống đặt trùng, idempotency, phân quyền giữa tổ chức, sổ lợi ích và Control Tower đều đạt khi gọi API thật. Race test chạy song song lặp 10–15 lần không có lần nào hỏng. 10/10 kịch bản demo đạt trong 5 lần chạy (4 lần qua CLI, 1 lần qua giao diện). **Không có lỗi Blocker.**
 
@@ -18,11 +23,13 @@ Trước khi quay video nên sửa hai việc:
 
 Bộ test frontend đang **đỏ ở HEAD** (37/42; xem QA-09).
 
-| Mức độ | Số lỗi |
-|---|---|
-| Blocker | 0 |
-| Major | 1 |
-| Minor | 11 |
+</details>
+
+| Mức độ | Số lỗi lúc kiểm thử | Còn mở (13/11, sau lượt 3) |
+|---|---|---|
+| Blocker | 0 | 0 |
+| Major | 1 | 0 |
+| Minor | 11 | 0 |
 
 Số liệu chính:
 
@@ -268,10 +275,19 @@ Ghi chú phương pháp: mỗi người là một `<iframe>`. Do các cửa sổ
 | QA-03 | **Đã sửa** (13/11) | `backend/app/routers/intake.py`: dependency `_require_shipper` cho cả 3 endpoint, chạy trước validate body/đọc tệp/tính lượt. Test cũ dùng nhà vận tải đổi sang chủ hàng khác. | `tests/test_qa_final_fixes.py` (4 vai × 3 endpoint; 403 không tốn lượt `UsageGuard`, không gọi bộ trích xuất, không ghi vết); curl `dev:carrier_b` → 403 |
 | QA-04 | **Đã sửa** (13/11) | `backend/app/schemas.py` (gốc `In` `allow_inf_nan=False`, `finite_json` cho payload sự kiện, trần `weight_kg ≤ 100.000`, `volume_m3 ≤ 500`), `routers/eta.py`, `routers/tracking.py` (`speedup`), `main.py` (handler 422 an toàn). Không migration; hai lô Infinity cũ mất khi reset seed. | NaN/±Infinity/±1e309 cho lô tạo + sửa, 6 kiểu payload sự kiện, ETA predict → 422, không 500, không thêm dòng DB; curl → 422 |
 | QA-08 | **Đã sửa** (13/11) | `backend/app/events/service.py` (`_merge_repeat_report`): cùng chuyến + cùng loại + đang mở → gộp (`repeat_reports`, `last_note`), không thêm playbook/SLA/thông báo; đã resolved → mở mới; báo lặp nặng hơn → nâng mức + báo một lần. | 2 lần báo → 1 ngoại lệ (BREAKDOWN, CARGO_DAMAGE); resolve rồi báo lại → open + resolved; giả lập "Hỏng xe" bật 2 lần → 1 BREAKDOWN + 1 DELAY_RISK; chạy thật trên server local |
+| QA-05 | **Đã sửa** (13/11, lượt 3) | `frontend/src/screens/Fleet.tsx`: tab mặc định suy ra lúc render theo vai (trước chốt ở `useState` khi `me` chưa tới trong cửa sổ nhúng) | `fix3_icd_default_slot.png`, `fix3_three_party.png`, `fix3_workspace_mobile375.png` (Khôi mở thẳng tab Slot; Minh → Xe; Nguyên/Phú → Lô) |
+| QA-06 | **Đã sửa** (13/11, lượt 3) | `backend/app/routers/core.py` (`/v1/slots`: `node_operator` lọc `node_org_id` trong SQL); bảng Slot có cột ICD cho vai khác | `backend/tests/test_qa_ui_fixes.py` (ICD chỉ thấy slot mình; vai khác thấy ≥ 2 ICD kèm tên; ghép vẫn ra đề xuất); `fix3_dispatcher_slots_icd.png` |
+| QA-07 | **Đã sửa** (13/11, lượt 3) | `useData.ts` (giữ dữ liệu cũ, `stale`, tự thử lại 4 giây khi mất kết nối/5xx), `conn.ts`, `components/ui.tsx` (`QueryNote` dùng chung; `role=status/alert`), `store.tsx` (tự tải lại me/meta), `Recommend.tsx`/`Fleet.tsx`/`Tracking.tsx` (tách đang tải · lỗi · rỗng thật; lô polling 10 giây) | Playwright tắt uvicorn ~15 giây: Ghép/Lô hàng/Theo dõi hiện "Dữ liệu cũ · mất kết nối, thử lại…", Ghép mở mới lúc mất kết nối hiện "Không kết nối được API" (không còn "Không có lô chờ ghép"); bật lại → cả 4 trang tự hồi trong ≤ 7 giây, không chuyển màn. `fix3_down_*.png`, `fix3_back_*.png`; `src/conn.test.ts` |
+| QA-10 | **Đã sửa** (13/11, lượt 3) | `ShipmentOut.tenant_name` (chỉ đọc), `fmt.multiTenant`; nhãn lô ở Ghép và bảng Lô ghi tên tổ chức khi thấy nhiều tổ chức | `fix3_dispatcher_lots_org.png`, `fix3_dispatcher_recommend_org.png`; test `test_shipments_carry_owner_org_name` |
+| QA-11 | **Đã sửa** (13/11, lượt 3) | `/v1/meta.extractor_kind` (rule/hybrid/llm theo cấu hình và có khoá, không lộ khoá); ô nhập ghi "Tách thành trường" hoặc "Luật + AI tách" (chỉ khi `hybrid`) | `fix3_intake_tile_rule.png`; test `test_meta_reports_extractor_kind_without_key` |
+| QA-12 | **Đã sửa** (13/11, lượt 3) | `Tracking.tsx`: chuyến vừa hoàn tất → một trạng thái (thẻ chuyến + "LOT đã hoàn tất" + nút Lợi ích), ẩn nút giả lập | `fix3_tracking_after_complete.png` |
+| Tương phản chip "Chờ ghép" | **Đã sửa** (13/11, lượt 3) | `theme.ts` + `styles.css`: chữ nhấn suy theo chế độ (trước: màu nhấn pha trắng cả ở chế độ sáng ≈ 1,3:1) | Đo trên trình duyệt: 9,1:1 (sáng), 10,8:1 (tối); `fix3_carrier_lots_chip_light.png`, `fix3_carrier_lots_chip_dark.png` |
 
 Commit: `Fix workspace tiling, raw i18n keys and frontend tests (QA-01, QA-02, QA-09)` (một commit, chưa push). Kiểm thêm: `tsc --noEmit` + `npm run build` sạch; `python -m app.demo.run_scenarios` 10/10; Playwright: luồng ba bên Nguyên tạo lô → Ghép → Giữ slot → Minh, Khôi, Nguyên xác nhận → Hành trình bắt đầu → Theo dõi chạy mô phỏng → Hoàn tất → Lợi ích có lô (`fix1_flow_confirmed.png`, `fix1_flow_completed.png`, `fix1_flow_benefits.png`), console không lỗi. QA-03 → QA-08, QA-10 → QA-12 chưa sửa (ngoài phạm vi lượt này; QA-05 và QA-12 vẫn thấy trong ảnh trên).
 
 Lượt 2 (13/11, chỉ backend): QA-03, QA-04, QA-08. Commit `Fix intake role, non-finite numbers and repeat incident reports (QA-03, QA-04, QA-08)` (chưa push). Kiểm: `pytest` 501 pass; `python -m app.demo.run_scenarios` 10/10 × 2; `python -m app.intake_file_eval_cli rule` 11/11 tệp, 0 ô SAI. Còn mở: QA-05, QA-06, QA-07, QA-10, QA-11, QA-12.
+
+Lượt 3 (13/11, giao diện + tài liệu): QA-05, QA-06, QA-07, QA-10, QA-11, QA-12 + tương phản chip. Kiểm: `pytest` **506 pass**, `vitest` **49 pass**, `tsc` + `vite build` sạch, `run_scenarios` 10/10; Playwright 4 vai × mọi màn trong menu × VI/EN: không khoá thô (`[a-z]+\.[a-z_.]+`), không `{placeholder}`, có nhãn MÔ PHỎNG; 375/768/1440 không cuộn ngang (trong khung và trang ngoài); console không lỗi. Khôi phục `docs/DEPLOY.md`, `docs/DEPLOY_RENDER_NEON.md` (README vẫn liên kết). **Không còn lỗi mở.**
 
 ---
 

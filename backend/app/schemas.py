@@ -54,6 +54,7 @@ class MetaOut(BaseModel):
     admin_key_required: bool = False
     image_intake_enabled: bool = False
     pdf_intake_enabled: bool = False
+    extractor_kind: str = "rule"  # rule | hybrid | llm — bộ trích xuất nhập liệu đang chạy (không lộ khoá)
 
 
 class ShipmentCreate(In):
@@ -98,6 +99,7 @@ class ShipmentOut(ORM):
     price_vnd: int | None = None
     customer_name: str | None = None
     missing_fields: list[str] = []
+    tenant_name: str | None = None  # tên tổ chức sở hữu lô (chỉ đọc)
 
 
 class YardOut(BaseModel):

@@ -7,13 +7,14 @@ export interface Session { token: string; name: string; role: Role }
 export interface LoginResult { token: string; is_new: boolean; me: Me }
 
 export interface Me { user_id: string; user_name: string; org_id: string; org_name: string; org_type: string; role: string }
-export interface Meta { data_mode: 'mock' | 'live'; is_simulated: boolean; server_time: string; stale_position_minutes: number; stale_shipment_minutes?: number; admin_key_required: boolean; image_intake_enabled?: boolean; pdf_intake_enabled?: boolean }
+export interface Meta { data_mode: 'mock' | 'live'; is_simulated: boolean; server_time: string; stale_position_minutes: number; stale_shipment_minutes?: number; admin_key_required: boolean; image_intake_enabled?: boolean; pdf_intake_enabled?: boolean; extractor_kind?: 'rule' | 'hybrid' | 'llm' }
 export interface Location { id: string; name: string; kind: string; lat: number; lng: number }
 export interface Shipment {
   id: string; tenant_id: string; code: string; cargo_type: string; weight_kg: number | null; volume_m3: number | null
   origin_location_id: string; dest_location_id: string; ready_at: string; pickup_deadline: string | null
   cutoff_at: string | null; status: string; is_simulated: boolean; version: number; data_updated_at: string
   price_vnd: number | null; customer_name: string | null; missing_fields: string[]
+  tenant_name?: string | null // tên tổ chức sở hữu lô (chỉ đọc)
 }
 export type VehicleState = 'empty' | 'reserved' | 'executing' | 'offline' | 'window_expired' | 'free_later' | 'no_window'
 export interface Vehicle {

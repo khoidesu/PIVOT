@@ -42,9 +42,9 @@ export function applyAccent(value: string, persist = false) {
   root.style.setProperty('--primary-line', `color-mix(in srgb, ${value} 78%, black)`)
   root.style.setProperty('--on-primary', ink)
   root.style.setProperty('--focus', value)
-  root.style.setProperty('--teal', value)
-  root.style.setProperty('--teal-strong', `color-mix(in srgb, ${value} 68%, white)`)
-  root.style.setProperty('--teal-weak', `color-mix(in srgb, ${value} 14%, var(--surface))`)
+  // --teal/--teal-strong/--teal-weak (chữ nhấn) suy ra trong styles.css theo chế độ sáng/tối để giữ tương phản AA
+  root.style.setProperty('--accent', value)
+  root.classList.add('has-accent')
   if (persist) { try { localStorage.setItem(ACCENT_KEY, value) } catch { /* bỏ qua */ } }
 }
 

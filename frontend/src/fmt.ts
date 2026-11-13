@@ -26,3 +26,6 @@ export function localInputDefault(offsetHours: number) {
 
 /** ISO → giá trị cho <input type="datetime-local"> theo giờ Việt Nam (UTC+7). */
 export const isoToLocalInput = (iso: string) => new Date(new Date(iso).getTime() + 7 * 3600_000).toISOString().slice(0, 16)
+
+/** Người xem thấy lô của nhiều tổ chức (điều phối viên, nhà vận tải) → cần ghi tên tổ chức để phân biệt lô trùng mã (QA-10). */
+export const multiTenant = (rows: { tenant_id: string }[]) => new Set(rows.map((r) => r.tenant_id)).size > 1

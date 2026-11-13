@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { api, ApiError, type Shipment, type Vehicle } from '../api'
-import { Chip, ErrorNote, Loading, Note } from '../components/ui'
+import { Chip, ErrorNote, Loading, Note, QueryNote } from '../components/ui'
 import { Icon } from '../components/Icon'
-import { ageMinutes, fmtNum, fmtTime, fmtVnd } from '../fmt'
+import { ageMinutes, fmtNum, fmtTime, fmtVnd, multiTenant } from '../fmt'
 import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
@@ -52,13 +52,16 @@ function YardGroups({ list, staleLimit }: { list: Vehicle[]; staleLimit: number 
 export function Fleet({ go }: { go: (to: string) => void }) {
   const { t } = useI18n()
   const { me, meta, locations, fleetSync } = useApp()
-  const lots = useData(() => api.shipments())
+  // Tab mặc định theo vai trò, suy ra lúc render: trong cửa sổ nhúng `me` tới sau lần render đầu (token qua postMessage),
+  // nên không chốt bằng giá trị khởi tạo của useState (QA-05: ICD từng mở vào tab "Lô" trống).
+  const [picked, setTab] = useState<Tab | null>(null)
+  const tab: Tab = picked ?? firstTab(me?.role)
+  const lots = useData(() => api.shipments(), tab === 'lots' ? 10000 : 0) // polling chậm khi đang xem Lô: thấy lô mới, phát hiện mất kết nối (QA-07)
   const zones = locations.filter((l) => l.kind === 'industrial_zone') // điểm lấy hàng (địa điểm công khai) để tính khoảng cách từ bãi
   const [target, setTarget] = useState('')
   const targetId = target || zones[0]?.id || ''
   const vehicles = useData(() => api.vehicles(targetId || undefined), 5000, targetId)
   const slots = useData(() => api.slots(), 15000)
-  const [tab, setTab] = useState<Tab>(firstTab(me?.role))
   const [askCancel, setAskCancel] = useState<string | null>(null)
   const [showCancelled, setShowCancelled] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -85,6 +88,8 @@ export function Fleet({ go }: { go: (to: string) => void }) {
   const ownerOf = (s: Shipment) => canEdit && s.tenant_id === me?.org_id
   const visibleLots = (lots.data ?? []).filter((s) => showCancelled || s.status !== 'cancelled')
   const cur = tab === 'lots' ? lots : tab === 'vehicles' ? vehicles : slots
+  const showOrg = multiTenant(visibleLots)
+  const isIcd = me?.role === 'node_operator' // ICD chỉ nhận slot của mình (QA-06) → không cần cột ICD
 
   return (
     <section className="card stack">
@@ -102,8 +107,8 @@ export function Fleet({ go }: { go: (to: string) => void }) {
       </div>
       {error && <ErrorNote error={error} />}
       {msg && <Note kind="ok">{msg}</Note>}
-      {cur.error && <ErrorNote error={cur.error} />}
-      {cur.loading && !cur.data ? <Loading /> : tab === 'lots' ? (
+      <QueryNote q={cur} />
+      {cur.data == null ? (cur.error ? null : <Loading />) : tab === 'lots' ? (
         <>
           {lots.data?.some((x) => x.status === 'cancelled') && <label className="check small"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} />{t('fleet.showCancelled')}</label>}
           {visibleLots.length === 0 ? <div className="empty">{t('fleet.empty')}</div> : (
@@ -111,7 +116,7 @@ export function Fleet({ go }: { go: (to: string) => void }) {
               <thead><tr><th>{t('col.lot')}</th><th className="num">{t('col.load')}</th><th>{t('col.due')}</th>{seesPrice && <th className="num">{t('col.price')}</th>}<th>{t('col.status')}</th><th /></tr></thead>
               <tbody>{visibleLots.map((s) => (
                 <tr key={s.id}>
-                  <td><b>{s.code}</b><div className="muted small">{tCode(t, 'cargo.', s.cargo_type)}</div></td>
+                  <td><b>{s.code}</b><div className="muted small">{tCode(t, 'cargo.', s.cargo_type)}{showOrg && s.tenant_name && <> · {s.tenant_name}</>}</div></td>
                   <td className="num">{s.weight_kg == null ? '—' : `${fmtNum(s.weight_kg)} kg`}<div className="muted small">{s.volume_m3 == null ? '—' : `${s.volume_m3} m³`}</div></td>
                   <td className="nw">{fmtTime(s.pickup_deadline)}<div className="muted small">{fmtTime(s.cutoff_at)}</div></td>
                   {seesPrice && <td className="num">{s.price_vnd != null ? fmtVnd(s.price_vnd) : '—'}</td>}
@@ -150,10 +155,11 @@ export function Fleet({ go }: { go: (to: string) => void }) {
       ) : (
         (slots.data ?? []).length === 0 ? <div className="empty">{t('fleet.empty')}</div> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>{t('col.time')}</th><th>{t('col.left')}</th></tr></thead>
+            <thead><tr><th>{t('col.time')}</th>{!isIcd && <th>{t('col.icd')}</th>}<th>{t('col.left')}</th></tr></thead>
             <tbody>{slots.data?.filter((s) => (ageMinutes(s.end_at) ?? 0) <= 60).map((s) => ( // chỉ slot hiện tại/sắp tới (đã qua > 1 giờ thì ẩn)
               <tr key={s.id}>
                 <td className="nw">{fmtTime(s.start_at)}–{fmtTime(s.end_at).slice(-5)}</td>
+                {!isIcd && <td>{s.node_org_name ?? '—'}</td>}
                 <td><Chip kind={s.remaining === 0 ? 'FAIL' : 'PASS'} title={t('cf.srcTip', { src: s.source })}>{s.remaining}/{s.capacity}</Chip></td>
               </tr>))}</tbody>
           </table></div>)

@@ -34,7 +34,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 ```
 
-**Đăng nhập đơn giản: chỉ nhập tên + chọn vai trò** (không mật khẩu — chỉ dành cho demo). **Một trang, nhiều người:** thanh dọc bên trái liệt kê từng người; bấm **+** để thêm (4 người của nhóm bấm một lần, hoặc "Mở cả chuỗi ba bên", hoặc tên khác để có bên A, B khác nhau). Mỗi người là một cửa sổ riêng (lưới / cột / tập trung, kéo để đổi chỗ, thu nhỏ vẫn chạy nền, số đỏ là việc đang chờ). Tối đa 8 người; bản cũ "mỗi tab một người" không còn cần thiết.
+**Đăng nhập đơn giản: chỉ nhập tên + chọn vai trò** (không mật khẩu — chỉ dành cho demo). **Một trang, nhiều người:** **dock nổi ở đáy** có biểu tượng từng người; bấm **+** để thêm (4 người của nhóm, "Mở cả chuỗi ba bên", hoặc "Người khác…" để có bên A, B khác nhau). Mỗi người là một cửa sổ riêng, xếp theo **khung chia kéo giãn** (không chồng nhau): kéo thanh chia giữa hai cửa sổ để đổi tỉ lệ, bấm đúp hoặc "Chia đều" để trả về; nút **□** phóng to/về chỗ cũ, **–** thu nhỏ (vẫn chạy nền), **×** đóng (các cửa sổ còn lại tự sắp lại); kéo tiêu đề thả lên cửa sổ khác để đổi chỗ; 3 cửa sổ trên màn đủ rộng xếp 3 cột. Dưới 640px chỉ hiện một cửa sổ. Số đỏ trên dock là việc đang chờ. Tối đa 8 người.
 - Vai trò: **Chủ hàng**, **Nhà vận tải**, **Điều hành ICD**, **Điều phối viên**.
 - Tên tự đặt. Cùng tên + cùng vai trò = cùng một tài khoản; **tên mới = tổ chức riêng + dữ liệu mẫu mô phỏng** (chủ hàng 4 lô, nhà vận tải 4 xe, ICD 8 slot), nên hai tab chủ hàng tên khác nhau là hai công ty tách biệt và ghép chéo được với nhau.
 - Tài khoản mẫu có sẵn (kịch bản demo/test dùng): **Nguyên, Phước** (Chủ hàng, tổ chức A) · **Minh** (Nhà vận tải, B) · **Khôi** (Điều hành ICD, C) · **Phú** (Điều phối viên) — đăng nhập đúng tên + vai trò đó thì vào các tài khoản này.
@@ -50,8 +50,8 @@ cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 
 ## Kiểm thử
 ```bash
-cd backend && .venv/bin/python -m pytest      # 351 test (DB test riêng: pivot_test)
-cd frontend && npm test && npx tsc --noEmit
+cd backend && .venv/bin/python -m pytest      # 506 test (DB test riêng: pivot_test)
+cd frontend && npm test && npx tsc --noEmit   # 49 test
 ```
 **Dữ liệu ETA mô phỏng để huấn luyện ngoài (Kaggle):** `cd backend && .venv/bin/python -m app.eta_data_gen [--no-drift]` sinh `data/eta/` (CSV + schema + tham số + hướng dẫn); notebook `data/eta/eta_train_kaggle.ipynb` huấn luyện P50/P90 bằng PyTorch rồi xuất `eta_model.onnx` + `eta_model_card.json`. Đặc tả: `docs/ETA_DATASET_SPEC.md`. Model ONNX đã huấn luyện (bản **không drift**, qua cổng promote; bản có drift của Kaggle lưu ở `backend/model/archive_drift/`; dữ liệu tương ứng `data/eta_nodrift/`) đặt ở `backend/model/` (`eta_model.onnx` + `eta_model_card.json`) và **được backend nạp** bằng `onnxruntime`: chỉ dùng khi mã băm + hợp đồng đặc trưng khớp **và** qua cổng promote (giảm MAE ≥15% so với baseline mạnh nhất, độ phủ P90 ∈ [0,85; 0,97]); lỗi/không đạt → ETA luật. `PIVOT_ETA_MODEL_DIR` (đặt rỗng để tắt), `PIVOT_ETA_MODEL_FORCE=true` (ép dùng khi cổng KHÔNG đạt — chỉ để thử/demo, luôn gắn nhãn "bật thủ công"). Hard gate vẫn chỉ dùng P50 của luật. **Hướng dẫn test tính năng ETA có model: [`docs/test.md`](docs/test.md)** (12 kịch bản + kết quả mong đợi).
 
@@ -64,10 +64,19 @@ cd frontend && npm test && npx tsc --noEmit
 **ETA Sandbox** (công cụ nội bộ để thử/tinh chỉnh ETA trước khi chốt demo, không cần bật server/DB): `cd backend && .venv/bin/python -m app.eta_sandbox_cli [--only drift|scenarios|signals] [--fresh]` in 3 bảng (quét độ trôi ML · lưới kịch bản theo khung giờ · sức khoẻ OSRM/Open-Meteo/Mapbox). Tương đương qua API (vai Điều phối viên, cần mã quản trị nếu có): `GET /v1/eta/sandbox/drift-sweep`, `/scenarios`, `/signals-health?fresh=true`.
 
 ## Màn hình (menu hiện theo vai trò)
-**Yêu cầu** (gõ tay hoặc nút *Dán tin nhắn* → bản nháp có dẫn nguồn) · **Lô / Xe / Slot** (sửa, huỷ lô) · **Ghép** (khuyến nghị + lý do; chi tiết kỹ thuật ở mục *Chi tiết*) · **Xác nhận** · **Theo dõi** (bản đồ OSM, mốc geofence, ETA P50–P90) · **Lịch dock** (Gantt, check-in/bốc dỡ, dwell) · **Ngoại lệ** (mức độ, playbook, SLA, ghép lại) · **Hành trình** (timeline, tái lập) · **Lợi ích**; chuông thông báo ở thanh đầu. Chủ hàng thấy cả 6; nhà vận tải không có *Yêu cầu* ở menu (vẫn vào được bằng nút *+ Yêu cầu*); ICD thấy *Slot · Xác nhận · Lịch dock · Theo dõi · Ngoại lệ · Hành trình*; điều phối viên thấy phần còn lại và mở *Kịch bản demo* từ menu avatar.
+**Yêu cầu** (gõ tay, *Dán tin nhắn* hoặc *Tải ảnh, PDF* → bản nháp có dẫn nguồn) · **Lô / Xe / Slot** (sửa, huỷ lô) · **Ghép** (khuyến nghị + lý do; chi tiết kỹ thuật ở mục *Chi tiết*) · **Xác nhận** · **Theo dõi** (bản đồ, mốc geofence, ETA P50–P90) · **Lịch dock** (Gantt, check-in/bốc dỡ, dwell) · **Ngoại lệ** (mức độ, playbook, SLA, ghép lại) · **Hành trình** (timeline, tái lập) · **Lợi ích**; chuông thông báo ở đầu mỗi cửa sổ. Menu từng vai:
+
+| Vai | Menu |
+|---|---|
+| Chủ hàng | Yêu cầu · Lô hàng · Ghép · Xác nhận · Theo dõi · Ngoại lệ · Hành trình · Lợi ích |
+| Nhà vận tải | Xe & lô · Ghép · Xác nhận · Lịch dock · Theo dõi · Ngoại lệ · Hành trình · Lợi ích (**không** có Yêu cầu — chỉ chủ hàng tạo lô) |
+| Điều hành ICD | Slot · Xác nhận · Lịch dock · Theo dõi · Ngoại lệ · Hành trình (chỉ thấy slot của ICD mình) |
+| Điều phối viên | như nhà vận tải; *Kịch bản demo* ở menu avatar |
+
+Mất kết nối API: mọi màn giữ dữ liệu cũ kèm dòng "Dữ liệu cũ · mất kết nối", tự thử lại và tự hồi khi API sống lại.
 
 ## Tính năng chính
-- **Yêu cầu**: tạo, **sửa** (khoá lạc quan, bị khoá khi đã giữ/cam kết) và **huỷ** (xoá mềm, giữ audit); nhập từ văn bản dán → bản nháp có trích đoạn nguồn, người dùng duyệt rồi mới tạo.
+- **Yêu cầu**: tạo, **sửa** (khoá lạc quan, bị khoá khi đã giữ/cam kết) và **huỷ** (xoá mềm, giữ audit); nhập từ văn bản dán/PDF/ảnh → bản nháp có trích đoạn nguồn, người dùng duyệt rồi mới tạo (mặc định bộ luật, ghi rõ "không phải AI"; nhãn ô nhập theo bộ trích xuất đang chạy, `/v1/meta.extractor_kind`).
 - **Ghép**: hard gate trước điểm; không có phương án thì không ép ghép; đội xe của tổ chức khác được che chi tiết.
 - **Booking**: hold có hạn, xác nhận theo từng bên, re-check, chống đặt trùng, `Idempotency-Key`.
 - **Sự kiện**: đầu vào xe (`VEHICLE_POSITION`, `VEHICLE_AVAILABLE`) và chuyến (`TRIP_*`, `ETA_UPDATED`) idempotent qua outbox; chỉ nhà vận tải sở hữu xe được báo.

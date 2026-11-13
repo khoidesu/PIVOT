@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, ApiError, EMBED, getSession, setOnUnauthorized, setSession, type FleetRefresh, type Location, type Me, type Meta, type Role, type Session } from './api'
+import { RETRY_MS } from './conn'
 import { setServerTime } from './fmt'
 
 interface AppCtx {
@@ -65,6 +66,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => { void load() }, [load, epoch, session])
+  const failing = !!fatal
+  useEffect(() => { // khởi động lúc mất kết nối: tự thử lại tới khi API sống lại (QA-07), không cần tải lại trang
+    if (!failing) return
+    const id = setInterval(() => { void load() }, RETRY_MS)
+    return () => clearInterval(id)
+  }, [failing, load])
 
   // Nhà vận tải: tự làm tươi vị trí + khung rảnh của xe rảnh khi vào và định kỳ (< ngưỡng quá hạn 5 phút) — bỏ qua khi tab đang ẩn.
   // ICD: tự kéo dài lịch slot mô phỏng (để dữ liệu mẫu không tự hết hạn theo thời gian).

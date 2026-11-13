@@ -651,3 +651,16 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
   .nav { max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .nav::-webkit-scrollbar { display: none; }
 }
+
+/* Màu nhấn do người dùng chọn (theme.ts đặt --accent trên <html>). Chữ nhấn/nền nhạt suy ra THEO CHẾ ĐỘ:
+   sáng → pha đen cho chữ (vàng chanh pha trắng trên nền nhạt chỉ ~1,3:1, không đạt AA); tối → pha trắng như cũ. */
+:root.has-accent:not([data-theme='dark']) {
+  --teal: color-mix(in srgb, var(--accent) 38%, black);
+  --teal-strong: color-mix(in srgb, var(--accent) 30%, black);
+  --teal-weak: color-mix(in srgb, var(--accent) 22%, white);
+}
+:root.has-accent[data-theme='dark'] {
+  --teal: var(--accent);
+  --teal-strong: color-mix(in srgb, var(--accent) 68%, white);
+  --teal-weak: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError, type EtaSignals, type SimMode, type TripTrack } from '../api'
 import { RouteMap } from '../components/RouteMap'
-import { Chip, ErrorNote, Hint, Loading, More, Note } from '../components/ui'
+import { Chip, ErrorNote, Hint, Loading, More, Note, QueryNote } from '../components/ui'
 import { fmtTime } from '../fmt'
 import { useI18n, tCode } from '../i18n'
 import { allowedRoute } from '../nav'
@@ -128,6 +128,7 @@ function WaitingNote() {
   const { me } = useApp()
   const props = useData(() => api.proposals(), 4000)
   const waiting = (props.data ?? []).filter((p) => p.status === 'pending_acceptance')
+  if (props.data == null) return <QueryNote q={props} /> // đang tải / mất kết nối: không báo "chưa có chuyến"
   if (!waiting.length) {
     return (
       <div className="empty stack" style={{ justifyItems: 'center' }}>
@@ -178,12 +179,19 @@ export function Tracking({ query }: { query: URLSearchParams }) {
   }
 
   if (list.loading && !list.data) return <Loading />
+  // Chuyến vừa hoàn tất rời danh sách "đang chạy" nhưng chi tiết còn hiện → một trạng thái duy nhất: thẻ chuyến + nút Lợi ích (QA-12)
+  const justDone = !!trip && trip.status === 'completed' && !trips.length // còn chuyến khác thì effect ở trên tự chọn chuyến đó
   return (
     <section className="stack">
       <div className="card stack">
         <div className="card-h"><h1>{t('tk.title')}</h1><Chip kind="sim">{t('badge.mock')}</Chip></div>
-        {list.error && <ErrorNote error={list.error} />}
-        {!trips.length ? <WaitingNote /> : (
+        <QueryNote q={list} />
+        {justDone ? (
+          <Note kind="ok">
+            <span className="row">{t('tk.doneNow', { code: trip.shipment_code })}
+              {allowedRoute(me?.role, 'benefits') && <a className="btn sm primary" href="#/benefits">{t('nav.benefits')}</a>}</span>
+          </Note>
+        ) : list.data == null ? null : !trips.length ? <WaitingNote /> : (
           <div className="row">
             {trips.map((x) => (
               <button key={x.proposal_id} className={`tab${x.proposal_id === pid ? ' on' : ''}`} onClick={() => setPid(x.proposal_id)}>
@@ -207,7 +215,7 @@ export function Tracking({ query }: { query: URLSearchParams }) {
             <CompleteTrip trip={trip} isCarrier={me?.role === 'carrier'} onDone={async () => { await detail.reload(true); await list.reload(true) }} />
             <EtaBlock trip={trip} />
             {trip.eta_signals && <SignalsBlock sig={trip.eta_signals} />}
-            {canSim && (
+            {canSim && trip.status !== 'completed' && (
               <div className="row">
                 <button className="btn" onClick={() => run(() => api.simStart(trip.proposal_id))}>{t('tk.sim')}</button><Hint text={t('tk.simHint')} />
                 <select value={mode} aria-label={t('tk.sim')} onChange={(e) => { const v = e.target.value as SimMode; setMode(v); void run(() => api.simMode(trip.proposal_id, v)) }}>

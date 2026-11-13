@@ -148,7 +148,7 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
         </div>
         {!editing && allowed && (
           <div className="tiles">
-            <IntakeTile icon="message" title={t('req.paste')} sub={t('req.paste.sub')} active={showImport} onClick={() => setShowImport((v) => !v)} />
+            <IntakeTile icon="message" title={t('req.paste')} sub={t(meta?.extractor_kind === 'hybrid' ? 'req.paste.subAi' : 'req.paste.sub')} /* QA-11: theo bộ trích xuất đang chạy */ active={showImport} onClick={() => setShowImport((v) => !v)} />
             {(meta?.image_intake_enabled || meta?.pdf_intake_enabled) && (
               <IntakeTile icon="image" index={1} title={reading ? t('in.img.reading') : t('req.photo')} sub={t('req.photo.sub')} busy={reading} disabled={drafting} onClick={() => fileRef.current?.click()} />)}
             <input ref={fileRef} type="file" accept={acceptFor(!!meta?.image_intake_enabled, !!meta?.pdf_intake_enabled)} className="sr" tabIndex={-1} aria-hidden onChange={onFile} />
