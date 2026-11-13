@@ -8,7 +8,7 @@ Mục tiêu: một **link duy nhất** để mọi người cùng dùng (giao di
 ## Những gì được triển khai
 - 1 web service Docker (`Dockerfile`): React build + FastAPI + worker nền chạy cùng tiến trình.
 - Cơ sở dữ liệu là **Postgres ngoài (Neon)**, không phải DB do Render quản lý. Khi khởi động: `alembic upgrade head` → seed **chỉ khi DB trống** (các lần sau không đụng dữ liệu người dùng).
-- Biến môi trường (trong `render.yaml`): `PIVOT_DATABASE_URL` (dán chuỗi Neon trong Dashboard, `sync: false`), `PIVOT_ADMIN_KEY` (Render tự sinh), `PIVOT_DATA_MODE=mock`. Các bước chi tiết: `DEPLOY_RENDER_NEON.md`.
+- Biến môi trường (trong `render.yaml`): `PIVOT_DATABASE_URL` (dán chuỗi Neon trong Dashboard, `sync: false`; backend cũng chấp nhận alias `PIVOT_DB_URL`), `PIVOT_ADMIN_KEY` (Render tự sinh), `PIVOT_DATA_MODE=mock`. Các bước chi tiết: `DEPLOY_RENDER_NEON.md`.
 
 ## Các bước (bạn làm — cần đăng nhập, tôi không làm thay được)
 1. **Đẩy mã lên GitHub** `khoidesu/PIVOT` (nhánh `main`) — Render lấy mã từ đây.

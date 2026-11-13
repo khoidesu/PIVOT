@@ -8,7 +8,7 @@
 1. **Neon**: đã có project + chuỗi kết nối **trực tiếp** (host không `-pooler`, có `sslmode=require`).
 2. **Push mã lên GitHub** (`git push origin main`).
 3. **Render**: <https://dashboard.render.com> → đăng nhập bằng GitHub → **New → Blueprint** → chọn repo `khoidesu/PIVOT` → Render đọc `render.yaml`.
-4. Render hỏi giá trị cho biến `PIVOT_DATABASE_URL` → dán chuỗi Neon → **Apply**. (`PIVOT_ADMIN_KEY` tự sinh, xem ở service → Environment.)
+4. Render hỏi giá trị cho biến `PIVOT_DATABASE_URL` → dán chuỗi Neon → **Apply**. Ứng dụng cũng nhận tên tương thích `PIVOT_DB_URL` nếu đã tạo biến này thủ công. (`PIVOT_ADMIN_KEY` tự sinh, xem ở service → Environment.)
 5. Chờ build 5–10 phút → link dạng `https://logection-xxxx.onrender.com`.
 6. **Giữ thức 24/7**: Render free ngủ sau ~15 phút không truy cập. Vào <https://uptimerobot.com> → Add New Monitor → HTTP(s) → URL `https://logection-xxxx.onrender.com/healthz` → interval 5 phút. (Một service chạy liên tục ≈ 744 giờ/tháng, nằm trong hạn mức giờ free hiện hành của một workspace; nếu có nhiều service free khác thì có thể vượt.)
 7. Kiểm tra: mở link → đăng nhập **Phú — Điều phối viên** → menu avatar → Kịch bản demo → nhập `PIVOT_ADMIN_KEY` → Chạy tất cả (kỳ vọng 10/10 khi web và DB cùng vùng Singapore).

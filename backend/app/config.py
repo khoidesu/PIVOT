@@ -1,11 +1,14 @@
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="PIVOT_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="PIVOT_", env_file=".env", extra="ignore", populate_by_name=True)
 
-    database_url: str = "postgresql+psycopg://pivot:pivot_dev@localhost:5433/pivot"
+    database_url: str = Field(
+        default="postgresql+psycopg://pivot:pivot_dev@localhost:5433/pivot",
+        validation_alias=AliasChoices("PIVOT_DATABASE_URL", "PIVOT_DB_URL"),
+    )
     admin_key: str | None = None  # có giá trị → các thao tác phá dữ liệu demo (reset/kịch bản/làm tuổi dữ liệu) cần header X-Admin-Key
     static_dir: str | None = None  # thư mục giao diện đã build; có giá trị → API phục vụ luôn giao diện (một link duy nhất)
     cors_origins: str = ""  # danh sách origin phân tách bằng dấu phẩy (chỉ cần khi giao diện chạy ở domain khác)

@@ -62,6 +62,18 @@ def test_provider_database_urls_are_normalised():
         assert Settings(database_url=given).database_url == "postgresql+psycopg://u:p@h:5432/db"
 
 
+def test_database_url_accepts_both_render_environment_names(monkeypatch):
+    monkeypatch.delenv("PIVOT_DATABASE_URL", raising=False)
+    monkeypatch.setenv("PIVOT_DB_URL", "postgresql://neon.example/db?sslmode=require")
+    assert Settings().database_url == "postgresql+psycopg://neon.example/db?sslmode=require"
+
+
+def test_database_url_prefers_documented_environment_name(monkeypatch):
+    monkeypatch.setenv("PIVOT_DATABASE_URL", "postgresql://primary.example/db")
+    monkeypatch.setenv("PIVOT_DB_URL", "postgresql://alias.example/db")
+    assert Settings().database_url == "postgresql+psycopg://primary.example/db"
+
+
 def test_security_headers_and_health(client):
     r = client.get("/healthz")
     assert r.status_code == 200 and r.headers["x-content-type-options"] == "nosniff" and r.headers["referrer-policy"] == "no-referrer"
