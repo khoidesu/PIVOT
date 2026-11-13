@@ -1,13 +1,15 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import background from '../../assets/background.png'
 import { Chip } from '../components/ui'
 import { Icon, type IconName } from '../components/Icon'
 import DotGrid from '../components/DotGrid'
 import { Brand } from '../components/TopBar'
+import { AppearancePanel } from '../components/Appearance'
 import { TextType } from '../components/TextType'
 import { useI18n } from '../i18n'
 import { gsap, reducedMotion, useGSAP } from '../motion'
+import { applyAccent, applyTheme, currentAccent, currentTheme, type Theme } from '../theme'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -21,6 +23,21 @@ export function Landing({ onStart }: { onStart: () => void }) {
   const { t, lang, setLang } = useI18n()
   const root = useRef<HTMLDivElement>(null)
   const guide = useRef<HTMLElement>(null)
+  // Giao diện (sáng/tối + màu nhấn) đổi được ngay ở trang mở đầu; cùng lưu localStorage với khu làm việc nên chọn một lần là đồng bộ.
+  const [theme, setThemeState] = useState<Theme>(currentTheme)
+  const [accent, setAccentState] = useState(currentAccent)
+  const [lookOpen, setLookOpen] = useState(false)
+  const lookEl = useRef<HTMLDivElement>(null)
+  useEffect(() => { applyTheme(theme) }, [theme])
+  useEffect(() => {
+    if (!lookOpen) return
+    const out = (e: MouseEvent) => { if (!lookEl.current?.contains(e.target as Node)) setLookOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setLookOpen(false) }
+    document.addEventListener('mousedown', out); document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc) }
+  }, [lookOpen])
+  const setTheme = (th: Theme) => { applyTheme(th, true); setThemeState(th) }
+  const setAccent = (c: string) => { if (!/^#[\da-f]{6}$/i.test(c)) return; applyAccent(c, true); setAccentState(c.toLowerCase()) }
 
   useGSAP(() => {
     if (reducedMotion()) return
@@ -42,7 +59,7 @@ export function Landing({ onStart }: { onStart: () => void }) {
         <DotGrid
           className="land-dots"
           baseColor="#756b82"
-          activeColor="#dfff40"
+          activeColor={accent}
           dotSize={2.4}
           gap={15}
           proximity={145}
@@ -62,23 +79,26 @@ export function Landing({ onStart }: { onStart: () => void }) {
         />
         <header className="land-nav">
           <Brand />
-          <button className="btn sm linkish" onClick={toGuide}>{t('land.guide')}</button>
-          <span className="grow" />
-          <div className="seg" role="group" aria-label="Language">
-            {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
-          </div>
-          <button className="btn sm primary" onClick={onStart}>{t('land.start')}</button>
         </header>
         <div className="land-copy">
           <Chip kind="sim">{t('badge.mock')}</Chip>
           <h1 className="land-title" aria-label={t('ws.hero.title')}>
             <span className="sr">{t('ws.hero.title')}</span>
-            {t('ws.hero.title').split(' ').map((word, index) => <span className="land-title-word" aria-hidden="true" key={`${word}-${index}`}>{word}{'\u00a0'}</span>)}
+            {t('ws.hero.title').split(' ').map((word, index) => <span key={`${word}-${index}`}>{index > 0 && ' '}<span className="land-title-word" aria-hidden="true">{word}</span></span>)}
           </h1>
           <TextType text={t('land.sub')} />
           <div className="row">
             <button className="btn primary" onClick={onStart}>{t('land.start')}</button>
             <button className="btn" onClick={toGuide}>{t('land.guide')}</button>
+            <div className="seg" role="group" aria-label="Language">
+              {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
+            </div>
+            <div className="land-look" ref={lookEl}>
+              <button className="btn icon" aria-label={t('theme.appearance')} title={t('theme.appearance')} aria-haspopup="dialog" aria-expanded={lookOpen} onClick={() => setLookOpen((o) => !o)}>
+                <Icon name="palette" size={17} />
+              </button>
+              {lookOpen && <AppearancePanel className="land-look-pop" theme={theme} accent={accent} onTheme={setTheme} onAccent={setAccent} />}
+            </div>
           </div>
         </div>
       </section>

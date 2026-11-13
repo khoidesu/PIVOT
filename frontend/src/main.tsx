@@ -7,5 +7,8 @@ import '@fontsource/fira-sans/700.css'
 import '@fontsource-variable/fira-code'
 import App from './App'
 import './styles.css'
+import { applyAccent, currentAccent } from './theme'
+
+applyAccent(currentAccent()) // màu nhấn (mặc định xanh logo) áp ngay từ đầu cho mọi trang, kể cả trang mở đầu
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)

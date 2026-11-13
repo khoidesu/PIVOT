@@ -5,13 +5,14 @@ import { Icon } from '../components/Icon'
 import { HeroArt } from '../components/HeroArt'
 import { Walkthrough, type WalkthroughStep } from '../components/Walkthrough'
 import { Brand } from '../components/TopBar'
+import { AppearancePanel } from '../components/Appearance'
 import { gsap, reducedMotion, useAutoEnter, useGSAP } from '../motion'
 import { useI18n } from '../i18n'
 import {
   addWin, CHAIN, closeWin, EMPTY, focusWin, MAX_WINS, minimizeWin, insertWin, parse, placement, resetSizes, serialize, dragSplit, TEAM, updateToken,
   winId, WsLimitError, type Splitter, type Win, type WsState,
 } from '../workspace'
-import { ACCENT_PRESETS, applyAccent, applyTheme, currentAccent, currentTheme, type Theme } from '../theme'
+import { applyAccent, applyTheme, currentAccent, currentTheme, type Theme } from '../theme'
 import { LoginForm } from './Login'
 
 const KEY = 'pivot.workspace'
@@ -45,7 +46,6 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const [width, setWidth] = useState(1200)
   const [theme, setThemeState] = useState<Theme>(currentTheme)
   const [accent, setAccentState] = useState(currentAccent)
-  const [accentDraft, setAccentDraft] = useState(accent)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [walkthroughOpen, setWalkthroughOpen] = useState(false)
   const [maxId, setMaxId] = useState<string | null>(null) // cửa sổ đang phóng to (phủ vùng làm việc); bỏ phóng to → về đúng ô của nó trong lưới
@@ -137,7 +137,6 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const setTheme = (th: Theme) => { applyTheme(th, true); setThemeState(th) }
   useEffect(() => {
     applyAccent(accent)
-    setAccentDraft(accent)
     for (const f of frames.current.values()) f.contentWindow?.postMessage({ type: 'logection:accent', accent }, location.origin)
   }, [accent])
   const setAccent = (color: string) => {
@@ -298,42 +297,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
               onClick={() => { setPop('closed'); setAppearanceOpen((open) => !open) }}>
               <Icon name="palette" size={17} />{!slim && <span>{t('theme.label')}</span>}
             </button>
-            {appearanceOpen && (
-              <section className="ws-appearance-pop" role="dialog" aria-label={t('theme.appearance')}>
-                <h2>{t('theme.appearance')}</h2>
-                <div className="ws-appearance-block">
-                  <span className="ws-appearance-label">{t('theme.mode')}</span>
-                  <div className="ws-mode-options" role="group" aria-label={t('theme.mode')}>
-                    {(['light', 'dark'] as const).map((m) => (
-                      <button key={m} className={theme === m ? 'on' : ''} aria-pressed={theme === m} onClick={() => setTheme(m)}>
-                        <Icon name={m === 'light' ? 'sun' : 'moon'} size={16} /><span>{t(`theme.${m}`)}</span>
-                      </button>))}
-                  </div>
-                </div>
-                <div className="ws-appearance-block">
-                  <span className="ws-appearance-label">{t('theme.accent')}</span>
-                  <div className="ws-color-grid" role="group" aria-label={t('theme.presets')}>
-                    {ACCENT_PRESETS.map((color) => (
-                      <button key={color} className={`ws-color-swatch${accent.toLowerCase() === color.toLowerCase() ? ' selected' : ''}`}
-                        style={{ backgroundColor: color }} aria-label={`${t('theme.accent')} ${color}`} title={color} aria-pressed={accent.toLowerCase() === color.toLowerCase()}
-                        onClick={() => setAccent(color)} />))}
-                  </div>
-                </div>
-                <div className="ws-custom-color">
-                  <span className="ws-appearance-label">{t('theme.custom')}</span>
-                  <label className="ws-color-hex">
-                    <span>{t('theme.hex')}</span>
-                    <input aria-label={t('theme.hex')} value={accentDraft.toUpperCase()} maxLength={7}
-                      onChange={(e) => setAccentDraft(e.target.value)}
-                      onBlur={() => /^#[\da-f]{6}$/i.test(accentDraft) ? setAccent(accentDraft) : setAccentDraft(accent)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }} />
-                  </label>
-                  <label className="ws-color-picker" title={t('theme.colorPicker')}>
-                    <input type="color" aria-label={t('theme.colorPicker')} value={accent} onChange={(e) => setAccent(e.target.value)} />
-                    <span>{t('theme.colorPicker')}</span>
-                  </label>
-                </div>
-              </section>)}
+            {appearanceOpen && <AppearancePanel theme={theme} accent={accent} onTheme={setTheme} onAccent={setAccent} />}
           </div>
           {wins.length > 0 && pop !== 'closed' && (
             <div className="ws-pop" role="menu">

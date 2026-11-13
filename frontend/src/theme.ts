@@ -3,11 +3,11 @@
 export type Theme = 'light' | 'dark'
 const KEY = 'pivot.theme'
 const ACCENT_KEY = 'pivot.accent'
-export const DEFAULT_ACCENT = '#dff24b'
+export const DEFAULT_ACCENT = '#1a6ff0' // xanh dương của logo (giữa dải #19c6f6 → #1a39f0; chữ trắng trên nền này 4,6:1)
 export const ACCENT_PRESETS = [
   '#ff6868', '#35c2cd', '#a98bca', DEFAULT_ACCENT, '#ff7a36',
   '#7352d0', '#e80046', '#f83f8c', '#567d3e', '#8ddbd0',
-  '#f1eee7', '#a0a0a6', '#06734e', '#800773', '#661f30',
+  '#dff24b', '#a0a0a6', '#06734e', '#800773', '#661f30',
 ] as const
 
 export const isTheme = (v: unknown): v is Theme => v === 'light' || v === 'dark'
@@ -47,6 +47,9 @@ export function applyAccent(value: string, persist = false) {
   root.classList.add('has-accent')
   if (persist) { try { localStorage.setItem(ACCENT_KEY, value) } catch { /* bỏ qua */ } }
 }
+
+/** Chế độ đang hiển thị thật (index.html đặt sẵn trước khi React chạy: đã lưu → theo lưu, chưa → theo hệ điều hành). */
+export const shownTheme = (): Theme => (isTheme(document.documentElement.dataset.theme) ? document.documentElement.dataset.theme : currentTheme())
 
 export function applyTheme(t: Theme, persist = false) {
   document.documentElement.dataset.theme = t

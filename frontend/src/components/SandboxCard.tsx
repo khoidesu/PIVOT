@@ -27,7 +27,7 @@ function Histogram({ values }: { values: number[] }) {
         {bins.counts.map((c, i) => {
           const h = (c / bins.max) * H
           const neg = bins.lo + (i + 0.5) * bins.w < 0
-          return <rect key={i} x={i * bw + 1} y={H - h} width={bw - 2} height={h} rx={2} fill={neg ? 'var(--fail, #d64545)' : 'var(--accent, #dff24b)'} opacity={0.9} />
+          return <rect key={i} x={i * bw + 1} y={H - h} width={bw - 2} height={h} rx={2} fill={neg ? 'var(--fail, #d64545)' : 'var(--accent, #1a6ff0)'} opacity={0.9} />
         })}
         {zero != null && <line x1={zero} x2={zero} y1={0} y2={H} stroke="currentColor" strokeDasharray="3 3" opacity={0.5} vectorEffect="non-scaling-stroke" />}
       </svg>

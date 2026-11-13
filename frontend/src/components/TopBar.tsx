@@ -6,9 +6,11 @@ import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { Chip, Hint } from './ui'
 import { Icon } from './Icon'
+import logoUrl from '../assets/logo.webp'
 
+/** Logo sản phẩm (ảnh của nhóm, đã tách nền trắng → nền trong suốt). */
 export function Brand() {
-  return <div className="brand"><div className="logo" aria-hidden>L</div><b>LOGECTION</b></div>
+  return <div className="brand"><img className="brand-logo" src={logoUrl} alt="LOGECTION" width={720} height={217} decoding="async" /></div>
 }
 
 const SEV_ORDER = ['critical', 'high', 'medium', 'low'] as const

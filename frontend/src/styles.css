@@ -4,7 +4,7 @@
 :root {
   /* chế độ SÁNG */
   --bg: #ecece6; --raised: #f6f6f1; --surface: #ffffff; --ink: #111210; --muted: #5c5d56; --line: #dcdcd3;
-  --primary: #dff24b; --primary-hover: #d0e532; --on-primary: #111210; --primary-line: #b5c81d;
+  --primary: #1a6ff0; --primary-hover: #4a8ff4; --on-primary: #ffffff; --primary-line: #1457bd;
   --teal: #4f5d00; --teal-strong: #3a4500; --teal-weak: #f0f5c4;          /* tên cũ giữ lại: màu nhấn dạng chữ/liên kết */
   --hot: #e2560f;                                                         /* cam: vệt đường trong hero */
   --pass: #166a40; --pass-bg: #e3f3ea;
@@ -26,7 +26,7 @@
 }
 :root[data-theme='dark'] {
   --bg: #09090a; --raised: #101011; --surface: #161617; --ink: #f4f4f0; --muted: #9c9c95; --line: #28282b;
-  --primary: #dff24b; --primary-hover: #ecfb72; --on-primary: #10110a; --primary-line: #dff24b;
+  --primary: #1a6ff0; --primary-hover: #4a8ff4; --on-primary: #ffffff; --primary-line: #1a6ff0;
   --teal: #dff24b; --teal-strong: #ecfb72; --teal-weak: #22250f;
   --hot: #ff6b2c;
   --pass: #6fe3a1; --pass-bg: #10291c;
@@ -37,7 +37,7 @@
   --soft: #1c1c1e; --soft-2: #252528; --soft-3: #3b3b40; --field-line: #353539; --gutter: #121213; --scrim: rgba(9, 9, 10, 0.9);
   --sev-crit: #ff8f87; --sev-crit-bg: #33161a; --sev-high: #ffb07a; --sev-high-bg: #33200f; --sev-med: #f3d06a; --sev-med-bg: #332b0d; --sev-low: #8ab8ff; --sev-low-bg: #14233d;
   --sevs-crit: #e5484d; --sevs-high: #e0590b; --sevs-med: #a16207; --sevs-low: #3b82f6;
-  --focus: #dff24b; --tip-bg: #050505; --on-teal: #10110a; --badge: #e5484d;
+  --focus: #1a6ff0; --tip-bg: #050505; --on-teal: #10110a; --badge: #e5484d;
   --box-a: #3a3a40; --box-b: #2e2e33; --box-c: #242428;
   --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 20px 44px rgba(0, 0, 0, 0.45);
 }
@@ -113,8 +113,7 @@ button:disabled, select:disabled, input:disabled { cursor: not-allowed; }
 main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 56px; display: grid; gap: var(--gap); }
 .embed main { max-width: none; padding: 16px 14px 40px; }
 .brand { display: flex; align-items: center; gap: 10px; }
-.logo { width: 32px; height: 32px; border-radius: 10px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-weight: 700; font-size: 16px; letter-spacing: -0.02em; flex: none; }
-.brand b { font-size: 15px; font-weight: 700; letter-spacing: 0.09em; }
+.brand-logo { display: block; height: 52px; margin-block: -8px; width: auto; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25)); }
 .ctrl { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 
 /* ================= thẻ + bố cục ================= */
@@ -345,7 +344,6 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
 .ws-rail.slim { width: 72px; }
 .ws-rail-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 12px 12px 16px; min-height: 60px; }
 .ws-rail.slim .ws-rail-h { flex-direction: column; padding: 14px 0 8px; gap: 10px; }
-.ws-rail.slim .brand b { display: none; }
 .ws-rail-t { font-size: 11.5px; font-weight: 500; color: var(--muted); padding: 6px 18px 4px; }
 .ws-collapse, .ws-ib { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 99px; background: var(--primary); color: var(--on-primary); padding: 0; flex: none; transition: background 0.2s var(--ease), color 0.2s var(--ease), transform 0.12s var(--ease); }
 .ws-collapse:hover { background: var(--primary-hover); } .ws-collapse:active, .ws-ib:active { transform: scale(0.92); }
@@ -480,7 +478,7 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
 :root[data-theme='dark'] .land-img { filter: saturate(0.92) brightness(0.9); }
 .land-nav { display: flex; align-items: center; gap: 10px 16px; padding: 20px clamp(18px, 4vw, 48px); flex-wrap: wrap; }
 .btn.linkish { border-color: transparent; background: transparent; color: var(--muted); } .btn.linkish:hover:not(:disabled) { color: var(--ink); background: var(--soft-2); border-color: transparent; }
-.land-copy { margin: auto 0; padding: 24px clamp(18px, 4vw, 48px) 12vh; display: grid; gap: 18px; justify-items: start; max-width: 620px; }
+.land-copy { margin: auto 0; padding: 24px clamp(18px, 4vw, 48px) 12vh; display: grid; gap: 18px; justify-items: start; max-width: 1000px; }
 .land-title { font-size: clamp(34px, 5.4vw, 64px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.03; text-wrap: balance; }
 .land-sub { margin: 0; color: var(--muted); font-size: 16px; max-width: 46ch; }
 .text-type-cursor { display: inline-block; height: 1em; border-right: 2px solid var(--primary); vertical-align: -0.12em; margin-left: 2px; animation: text-type-blink .8s steps(2, start) infinite; }
@@ -499,7 +497,7 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
 
 /* MagicBento-style cursor glow on existing cards and account windows. Visual only; surfaces keep their own handlers. */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .magic-glow-target { --magic-x: -999px; --magic-y: -999px; --magic-rgb: var(--accent-rgb, 223, 242, 75); }
+  .magic-glow-target { --magic-x: -999px; --magic-y: -999px; --magic-rgb: var(--accent-rgb, 26, 111, 240); }
   .card, .fact, .note, .ws-start-card, .ws-node, .ws-bar, .land-step { position: relative; isolation: isolate; }
   .magic-glow-target::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 180ms ease; }
   .magic-glow-target::before {
@@ -513,6 +511,8 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
 
 .brand-btn { border: 0; background: transparent; padding: 0; border-radius: var(--radius-sm); }
 @media (max-width: 980px) { .land-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.land-look { position: relative; }
+.ws-appearance-pop.land-look-pop { left: 0; right: auto; top: calc(100% + 10px); bottom: auto; width: min(292px, calc(100vw - 40px)); z-index: 40; }
 @media (max-width: 720px) { .land-img { width: 130%; opacity: 0.35; } .land-copy { padding-bottom: 8vh; } }
 @media (max-width: 520px) { .land-steps { grid-template-columns: 1fr; } }
 
@@ -660,7 +660,7 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
   --teal-weak: color-mix(in srgb, var(--accent) 22%, white);
 }
 :root.has-accent[data-theme='dark'] {
-  --teal: var(--accent);
+  --teal: color-mix(in srgb, var(--accent) 78%, white); /* chữ/liên kết nhấn: màu đậm (vd xanh logo) trên nền tối cần sáng lên để đạt AA */
   --teal-strong: color-mix(in srgb, var(--accent) 68%, white);
   --teal-weak: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
