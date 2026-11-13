@@ -19,7 +19,7 @@ function Bell() {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement>(null)
-  const list = useData(() => api.notifications(), 4000)
+  const list = useData(() => api.notifications(), 8000) // 8 giây: đủ nhanh cho chuông, giảm tải DB khi nhiều cửa sổ
   useEffect(() => {
     if (!open) return
     const out = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false) }

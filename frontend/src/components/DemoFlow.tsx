@@ -8,7 +8,7 @@ import { Icon } from './Icon'
 import { Chip, QueryNote } from './ui'
 
 const FLOW_KEY = 'pivot.tour.flow' // mốc gốc của luồng đang theo dõi (theo tab)
-const POLL_MS = 4000
+const POLL_MS = 5000
 
 function load(): FlowBaseline | null {
   try { const raw = sessionStorage.getItem(FLOW_KEY); return raw ? (JSON.parse(raw) as FlowBaseline) : null } catch { return null }
@@ -32,6 +32,7 @@ export function useDemoFlow(token: string | null, active: boolean) {
     if (!token || !on) return
     let stop = false
     const tick = async () => {
+      if (document.visibilityState === 'hidden') return // tab trình duyệt đang ẩn: không đọc
       try {
         const r = readAs(token)
         const [shipments, proposals, benefits, exceptions] = await Promise.all([r.shipments(), r.proposals(), r.benefits(), r.exceptions()])

@@ -7,8 +7,9 @@ import { useData } from '../useData'
 /** Chỉ chạy trong cửa sổ nhúng: báo cho trang bao ngoài số việc đang chờ người này (hiện ở thanh bên). */
 export function EmbedBridge() {
   const { setLang } = useI18n()
-  const proposals = useData(() => api.proposals(), 5000)
-  const notes = useData(() => api.notifications(), 5000)
+  // số việc chờ trên dock: vẫn chạy khi cửa sổ thu nhỏ (background), nhưng giãn nhịp 10 giây để không dồn tải DB
+  const proposals = useData(() => api.proposals(), 10000, null, true)
+  const notes = useData(() => api.notifications(), 10000, null, true)
   const n = (proposals.data ?? []).filter((p) => p.my_actions.accept).length + (notes.data?.unread ?? 0)
   useEffect(() => { window.parent.postMessage({ type: 'logection:badge', n }, location.origin) }, [n])
   useEffect(() => { applyAccent(currentAccent()) }, [])

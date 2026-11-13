@@ -70,6 +70,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   }, { scope: root, dependencies: [started] })
   const [slim, setSlim] = useState(() => { try { return localStorage.getItem('pivot.railSlim') === '1' } catch { return false } }) // thanh người: rộng (có tên) hoặc thu gọn (chỉ avatar)
   const frames = useRef(new Map<string, HTMLIFrameElement>())
+  const sendVisibleRef = useRef<(id: string) => void>(() => {})
   const readyIds = useRef(new Set<string>())          // cửa sổ đã bắt tay xong (nhận được logection:navigate)
   const pendingNav = useRef(new Map<string, string>()) // màn cần mở khi cửa sổ vừa tạo bắt tay xong
   const gridEl = useRef<HTMLDivElement | null>(null)
@@ -133,7 +134,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
         readyIds.current.add(id)
         const nav = pendingNav.current.get(id)
         if (nav) { pendingNav.current.delete(id); setTimeout(() => hit[1].contentWindow?.postMessage({ type: 'logection:navigate', route: nav }, location.origin), 0) }
-        sendSession(id); hit[1].contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:accent', accent }, location.origin)
+        sendSession(id); sendVisibleRef.current(id); hit[1].contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:accent', accent }, location.origin)
       }
       else if (d.type === 'logection:badge') setBadges((b) => (b[id] === d.n ? b : { ...b, [id]: d.n ?? 0 }))
       else if (d.type === 'logection:logout') commit(closeWin(stRef.current, id))
@@ -248,6 +249,17 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
     const id = setTimeout(() => setFlashId(null), 2800)
     return () => { clearTimeout(id); tw?.kill(); if (el) gsap.set(el, { clearProps: 'outlineOffset' }) }
   }, [flashId])
+  // Báo từng cửa sổ có đang được nhìn thấy không (thu nhỏ / màn hẹp không phải cửa sổ đang chọn / bị cửa sổ phóng to che) → khung ẩn ngừng polling
+  const visibleOf = (w: Win) => w.open && (!narrowNow || w.id === focusNow) && (!maxNow || w.id === maxNow)
+  const narrowNow = width < 768
+  const focusNow = st.focus ?? st.wins.find((w) => w.open)?.id
+  const maxNow = !narrowNow && maxId && st.wins.some((w) => w.id === maxId && w.open) ? maxId : null
+  const visSig = st.wins.map((w) => `${w.id}:${visibleOf(w) ? 1 : 0}`).join(',')
+  const sendVisible = useCallback((id: string) => {
+    const w = stRef.current.wins.find((x) => x.id === id)
+    if (w) frames.current.get(id)?.contentWindow?.postMessage({ type: 'logection:visible', visible: visibleOf(w) }, location.origin)
+  }, [visSig]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { sendVisibleRef.current = sendVisible; for (const id of readyIds.current) sendVisible(id) }, [sendVisible])
   const flowDone = demo.flow ? demo.flow.steps.filter((s) => s.done).length : 0
   const flowCur = demo.flow?.steps.find((s) => s.key === demo.flow?.current) ?? null
 

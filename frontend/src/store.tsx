@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, ApiError, EMBED, getSession, setOnUnauthorized, setSession, type FleetRefresh, type Location, type Me, type Meta, type Role, type Session } from './api'
-import { RETRY_MS } from './conn'
+import { RETRY_MS, setHostHidden } from './conn'
 import { allowedRoute } from './nav'
 import { setServerTime } from './fmt'
 
@@ -54,6 +54,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (e.origin !== location.origin || e.source !== window.parent) return
       const d = e.data as { type?: string; session?: Session; route?: unknown } | null
       // Luồng demo: trang bao ngoài xin mở một màn. Nhận ở đây (luôn chạy, kể cả khi khung còn ở màn đăng nhập), áp dụng khi đã biết vai.
+      if (d?.type === 'logection:visible') { setHostHidden(!(d as { visible?: boolean }).visible); return }
       if (d?.type === 'logection:navigate' && typeof d.route === 'string' && /^[a-z]+(\?[\w=&-]*)?$/.test(d.route)) { setNavWanted(d.route); return }
       if (d?.type !== 'logection:session' || !d.session) return
       setSession(d.session); setSessionState(d.session); setNotice(null); setEpoch((n) => n + 1)

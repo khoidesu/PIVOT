@@ -128,7 +128,7 @@ async def security_headers(request: Request, call_next):
 
 
 @app.get("/healthz")
-def healthz():
+async def healthz():  # async: chạy trên event loop, không mượn thread của API → vẫn trả lời khi DB/threadpool đang quá tải (tránh Render khởi động lại oan)
     return {"status": "ok"}
 
 

@@ -5,6 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PIVOT_", env_file=".env", extra="ignore", populate_by_name=True)
 
+    db_pool_size: int = 10        # PIVOT_DB_POOL_SIZE — Neon gói miễn phí cho ~100 kết nối trực tiếp (nhiều hơn qua pooler)
+    db_max_overflow: int = 10     # PIVOT_DB_MAX_OVERFLOW
+    db_pool_timeout: float = 10.0  # PIVOT_DB_POOL_TIMEOUT (giây chờ một kết nối rảnh)
     database_url: str = Field(
         default="postgresql+psycopg://pivot:pivot_dev@localhost:5433/pivot",
         validation_alias=AliasChoices("PIVOT_DATABASE_URL", "PIVOT_DB_URL"),
