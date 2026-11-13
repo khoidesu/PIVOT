@@ -303,9 +303,10 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
       ...(!narrow ? [{ target: '.ws-win.foc .ws-ib.max', title: t('guide.workspace.snap.title'), body: t('guide.workspace.snap.body') }] : []),
       ...(!narrow && !maxed && place.splitters.length ? [{ target: '.ws-split', title: t('guide.workspace.resize.title'), body: t('guide.workspace.resize.body') }] : []),
       { target: narrow ? '.ws-nodes' : '.ws-dock', title: t('guide.workspace.switch.title'), body: t(narrow ? 'guide.workspace.switch.mobile' : 'guide.workspace.switch.body') },
+      { target: '.ws-flow-btn', title: t('guide.workspace.flow.title'), body: t('guide.workspace.flow.body') },
       { target: '.ws-win.foc .ws-frame', title: t('guide.workspace.app.title'), body: t('guide.workspace.app.body') },
     ] : []),
-    { target: '.ws-appearance', title: t('guide.workspace.appearance.title'), body: t('guide.workspace.appearance.body') },
+    { target: '.ws-appearance:not(.ws-flow-btn)', title: t('guide.workspace.appearance.title'), body: t('guide.workspace.appearance.body') },
   ]
 
   const addMenu = pop === 'form' ? (
