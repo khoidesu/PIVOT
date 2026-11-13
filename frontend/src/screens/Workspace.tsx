@@ -431,7 +431,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
                 </div>
               </section>)}
           </div>
-          {pop !== 'closed' && (
+          {wins.length > 0 && pop !== 'closed' && (
             <div className="ws-pop" role="menu">
               {addMenu}
             </div>)}

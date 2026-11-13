@@ -58,7 +58,7 @@ function ProposalCard({ p, rank, onHold, busy }: { p: Proposal; rank: number; on
   const { t } = useI18n()
   const c = p.score_components
   return (
-    <article className="card stack" aria-label={p.vehicle.plate}>
+    <article className="card stack proposal-card" aria-label={p.vehicle.plate}>
       <div className="rank">
         <div><span className="muted small">#{rank}</span> <span className="plate mono">{p.vehicle.plate}</span><div className="muted small">{p.vehicle.carrier_org_name}</div>
           {p.vehicle.yard && <div className="small" title={t('fleet.estTip')}>{t('rec.yard', { yard: p.vehicle.yard, km: p.deadhead_km ?? '?' })}</div>}</div>
@@ -197,7 +197,7 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
               </div>
             </Note>)}
           {run.proposals.length > 0 && (
-            <div className="grid3">{run.proposals.map((p, i) => <ProposalCard key={p.id} p={p} rank={i + 1} onHold={hold} busy={holding === p.id} />)}</div>
+            <div className="grid3 proposal-results">{run.proposals.map((p, i) => <ProposalCard key={p.id} p={p} rank={i + 1} onHold={hold} busy={holding === p.id} />)}</div>
           )}
           <RejectionList title={t('rec.rejected', { n: run.rejections.length })} items={run.rejections} kind="FAIL" />
           <RejectionList title={t('rec.unknown', { n: run.needs_data.length })} items={run.needs_data} kind="UNKNOWN" />
