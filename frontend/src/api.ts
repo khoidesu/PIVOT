@@ -188,9 +188,10 @@ export function setAdminKey(k: string) {
   try { adminKey ? sessionStorage.setItem('pivot.adminKey', adminKey) : sessionStorage.removeItem('pivot.adminKey') } catch { /* bỏ qua */ }
 }
 
-async function request<T>(path: string, init: RequestInit & { idem?: string } = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit & { idem?: string; token?: string } = {}): Promise<T> {
+  const auth = init.token ?? session?.token // token riêng: trang bao ngoài đọc thay một cửa sổ (Luồng demo), không đụng phiên
   const headers: Record<string, string> = {
-    ...(session ? { Authorization: `Bearer dev:${session.token}` } : {}),
+    ...(auth ? { Authorization: `Bearer dev:${auth}` } : {}),
     ...(init.body ? { 'Content-Type': 'application/json' } : {}),
     ...(init.idem ? { 'Idempotency-Key': init.idem } : {}),
     ...(adminKey && path.startsWith('/v1/demo/') ? { 'X-Admin-Key': adminKey } : {}),
@@ -201,7 +202,7 @@ async function request<T>(path: string, init: RequestInit & { idem?: string } = 
   } catch {
     throw new ApiError(0, 'NETWORK', 'Cannot reach the API')
   }
-  if (res.status === 401 && session && !path.startsWith('/v1/auth/')) { // phiên không còn hợp lệ (vd dữ liệu đã reset)
+  if (res.status === 401 && session && !init.token && !path.startsWith('/v1/auth/')) { // phiên không còn hợp lệ (vd dữ liệu đã reset)
     setSession(null)
     onUnauthorized?.()
   }
@@ -282,3 +283,11 @@ export const api = {
   runScenario: (id: string) => post<ScenarioResult>(`/v1/demo/scenarios/${id}/run`, {}),
   retime: () => post<{ retimed_by_seconds: number }>('/v1/demo/retime', {}),
 }
+
+/** Chỉ ĐỌC bằng token của một cửa sổ cụ thể (trang bao ngoài không có phiên riêng). Dùng cho "Luồng demo". */
+export const readAs = (token: string) => ({
+  shipments: () => request<Shipment[]>('/v1/shipments', { token }),
+  proposals: () => request<Proposal[]>('/v1/proposals', { token }),
+  benefits: () => request<BenefitList>('/v1/benefits', { token }),
+  exceptions: () => request<ExceptionItem[]>('/v1/exceptions', { token }),
+})

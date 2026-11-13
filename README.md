@@ -35,6 +35,8 @@ cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 ```
 
 **Đăng nhập đơn giản: chỉ nhập tên + chọn vai trò** (không mật khẩu — chỉ dành cho demo). **Một trang, nhiều người:** **dock nổi ở đáy** có biểu tượng từng người; bấm **+** để thêm (4 người của nhóm, "Mở cả chuỗi ba bên", hoặc "Người khác…" để có bên A, B khác nhau). Mỗi người là một cửa sổ riêng, xếp theo **khung chia kéo giãn** (không chồng nhau): kéo thanh chia giữa hai cửa sổ để đổi tỉ lệ, bấm đúp hoặc "Chia đều" để trả về; nút **□** phóng to/về chỗ cũ, **–** thu nhỏ (vẫn chạy nền), **×** đóng (các cửa sổ còn lại tự sắp lại); kéo tiêu đề thả lên cửa sổ khác để đổi chỗ; 3 cửa sổ trên màn đủ rộng xếp 3 cột. Dưới 640px chỉ hiện một cửa sổ. Số đỏ trên dock là việc đang chờ. Tối đa 8 người.
+
+**Luồng demo** (nút cờ trên dock; tự mở lần đầu vào khu làm việc): danh sách 6 bước của luồng lõi ba bên (tạo lô → ghép + giữ slot → ba bên xác nhận → chạy chuyến → hoàn tất → lợi ích) + mục *Thử sự cố*. Mỗi bước **tự tích theo dữ liệu API thật** (chỉ đọc, không có nút "đánh dấu xong", không thao tác thay ai); nút **Làm ở đây** mở/đưa lên cửa sổ của đúng bên cần làm (kể cả tổ chức tự đăng ký có xe/ICD được chọn), mở sẵn đúng màn và làm viền cửa sổ sáng lên; bước hiện tại hiện gọn trên thanh trên cùng.
 - Vai trò: **Chủ hàng**, **Nhà vận tải**, **Điều hành ICD**, **Điều phối viên**.
 - Tên tự đặt. Cùng tên + cùng vai trò = cùng một tài khoản; **tên mới = tổ chức riêng + dữ liệu mẫu mô phỏng** (chủ hàng 4 lô, nhà vận tải 4 xe, ICD 8 slot), nên hai tab chủ hàng tên khác nhau là hai công ty tách biệt và ghép chéo được với nhau.
 - Tài khoản mẫu có sẵn (kịch bản demo/test dùng): **Nguyên, Phước** (Chủ hàng, tổ chức A) · **Minh** (Nhà vận tải, B) · **Khôi** (Điều hành ICD, C) · **Phú** (Điều phối viên) — đăng nhập đúng tên + vai trò đó thì vào các tài khoản này.
@@ -51,7 +53,7 @@ cd frontend && npm install && npm run dev          # mở http://127.0.0.1:5173
 ## Kiểm thử
 ```bash
 cd backend && .venv/bin/python -m pytest      # 506 test (DB test riêng: pivot_test)
-cd frontend && npm test && npx tsc --noEmit   # 49 test
+cd frontend && npm test && npx tsc --noEmit   # 63 test
 ```
 **Dữ liệu ETA mô phỏng để huấn luyện ngoài (Kaggle):** `cd backend && .venv/bin/python -m app.eta_data_gen [--no-drift]` sinh `data/eta/` (CSV + schema + tham số + hướng dẫn); notebook `data/eta/eta_train_kaggle.ipynb` huấn luyện P50/P90 bằng PyTorch rồi xuất `eta_model.onnx` + `eta_model_card.json`. Đặc tả: `docs/ETA_DATASET_SPEC.md`. Model ONNX đã huấn luyện (bản **không drift**, qua cổng promote; bản có drift của Kaggle lưu ở `backend/model/archive_drift/`; dữ liệu tương ứng `data/eta_nodrift/`) đặt ở `backend/model/` (`eta_model.onnx` + `eta_model_card.json`) và **được backend nạp** bằng `onnxruntime`: chỉ dùng khi mã băm + hợp đồng đặc trưng khớp **và** qua cổng promote (giảm MAE ≥15% so với baseline mạnh nhất, độ phủ P90 ∈ [0,85; 0,97]); lỗi/không đạt → ETA luật. `PIVOT_ETA_MODEL_DIR` (đặt rỗng để tắt), `PIVOT_ETA_MODEL_FORCE=true` (ép dùng khi cổng KHÔNG đạt — chỉ để thử/demo, luôn gắn nhãn "bật thủ công"). Hard gate vẫn chỉ dùng P50 của luật. **Hướng dẫn test tính năng ETA có model: [`docs/test.md`](docs/test.md)** (12 kịch bản + kết quả mong đợi).
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api, ApiError, getSession, setSession, type Role } from '../api'
 import { Chip, ErrorNote } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -6,8 +7,10 @@ import { HeroArt } from '../components/HeroArt'
 import { Walkthrough, type WalkthroughStep } from '../components/Walkthrough'
 import { Brand } from '../components/TopBar'
 import { AppearancePanel } from '../components/Appearance'
+import { DemoFlowPanel, useDemoFlow } from '../components/DemoFlow'
+import { loginNameFor, MAIN_STEPS } from '../demoFlow'
 import { gsap, reducedMotion, useAutoEnter, useGSAP } from '../motion'
-import { useI18n } from '../i18n'
+import { tCode, useI18n } from '../i18n'
 import {
   addWin, CHAIN, closeWin, EMPTY, focusWin, MAX_WINS, minimizeWin, insertWin, parse, placement, resetSizes, serialize, dragSplit, TEAM, updateToken,
   winId, WsLimitError, type Splitter, type Win, type WsState,
@@ -16,6 +19,7 @@ import { applyAccent, applyTheme, currentAccent, currentTheme, type Theme } from
 import { LoginForm } from './Login'
 
 const KEY = 'pivot.workspace'
+const TOUR_SEEN = 'pivot.tour.seen'
 const OLD_LAYOUT_KEY = 'pivot.windowLayout' // vị trí cửa sổ nổi của bản 58e5309 — không dùng nữa, chỉ dọn
 const GAP = 10 // px giữa các khung (cũng là bề rộng vùng bắt của thanh kéo)
 /** Chữ viết tắt trong avatar: 2 chữ cái đầu của hai từ cuối ("Nguyễn Văn An" → VA), một từ → chữ đầu + chữ thứ hai. */
@@ -48,6 +52,9 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const [accent, setAccentState] = useState(currentAccent)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [walkthroughOpen, setWalkthroughOpen] = useState(false)
+  // Luồng demo: tự mở MỘT lần khi vào khu làm việc lần đầu (nhớ trong localStorage); sau đó mở bằng nút trên dock.
+  const [flowOpen, setFlowOpen] = useState(() => { try { return localStorage.getItem(TOUR_SEEN) !== '1' } catch { return false } })
+  const [flashId, setFlashId] = useState<string | null>(null)
   const [maxId, setMaxId] = useState<string | null>(null) // cửa sổ đang phóng to (phủ vùng làm việc); bỏ phóng to → về đúng ô của nó trong lưới
   const [dockTooltip, setDockTooltip] = useState<{ label: string; x: number; y: number } | null>(null)
   const [splitting, setSplitting] = useState<'col' | 'row' | null>(null)
@@ -63,6 +70,8 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   }, { scope: root, dependencies: [started] })
   const [slim, setSlim] = useState(() => { try { return localStorage.getItem('pivot.railSlim') === '1' } catch { return false } }) // thanh người: rộng (có tên) hoặc thu gọn (chỉ avatar)
   const frames = useRef(new Map<string, HTMLIFrameElement>())
+  const readyIds = useRef(new Set<string>())          // cửa sổ đã bắt tay xong (nhận được logection:navigate)
+  const pendingNav = useRef(new Map<string, string>()) // màn cần mở khi cửa sổ vừa tạo bắt tay xong
   const gridEl = useRef<HTMLDivElement | null>(null)
   const popEl = useRef<HTMLDivElement | null>(null)
   const appearanceEl = useRef<HTMLDivElement | null>(null)
@@ -120,7 +129,12 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
       const hit = [...frames.current].find(([, f]) => f.contentWindow === e.source)
       if (!hit) return
       const id = hit[0]
-      if (d.type === 'logection:ready') { sendSession(id); hit[1].contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:accent', accent }, location.origin) }
+      if (d.type === 'logection:ready') {
+        readyIds.current.add(id)
+        const nav = pendingNav.current.get(id)
+        if (nav) { pendingNav.current.delete(id); setTimeout(() => hit[1].contentWindow?.postMessage({ type: 'logection:navigate', route: nav }, location.origin), 0) }
+        sendSession(id); hit[1].contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:accent', accent }, location.origin)
+      }
       else if (d.type === 'logection:badge') setBadges((b) => (b[id] === d.n ? b : { ...b, [id]: d.n ?? 0 }))
       else if (d.type === 'logection:logout') commit(closeWin(stRef.current, id))
       else if (d.type === 'logection:expired') { const w = stRef.current.wins.find((x) => x.id === id); if (w) void relogin(w) }
@@ -180,6 +194,13 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
     return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc) }
   }, [appearanceOpen])
 
+  useEffect(() => {
+    if (!flowOpen) return
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setFlowOpen(false) }
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [flowOpen])
+
   async function enter(name: string, role: Role) {
     const r = await api.login(name, role)
     try { commit(addWin(stRef.current, { id: winId(r.me.user_name, role), name: r.me.user_name, role, token: r.token })) }
@@ -193,6 +214,42 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
     setErr(null)
     try { for (const p of CHAIN) await enter(p.name, p.role); setPop('closed') } catch (e) { setErr(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) }
   }
+
+  // ---- Luồng demo -------------------------------------------------------------------------
+  useEffect(() => { if (flowOpen) { try { localStorage.setItem(TOUR_SEEN, '1') } catch { /* bỏ qua */ } } }, [flowOpen])
+  useEffect(() => { for (const id of [...readyIds.current]) if (!st.wins.some((w) => w.id === id)) { readyIds.current.delete(id); pendingNav.current.delete(id) } }, [st.wins])
+  // đọc tiến độ bằng token của cửa sổ chủ hàng trong chuỗi (ưu tiên Nguyên)
+  const shipperWin = st.wins.find((w) => w.id === winId(CHAIN[0].name, CHAIN[0].role)) ?? st.wins.find((w) => w.role === 'shipper')
+  const demo = useDemoFlow(shipperWin?.token ?? null, flowOpen)
+  /** "Làm ở đây": mở/đưa lên cửa sổ của vai cần làm, điều hướng tới đúng màn, viền cửa sổ sáng lên. Không thao tác thay. */
+  async function goTo(role: Role, route: string, org: string | null) {
+    setErr(null)
+    // Bên trong đề xuất là tổ chức tự đăng ký ("<tên> · <vai>") → mở đúng người đó; tổ chức mẫu → người của nhóm (Nguyên/Minh/Khôi).
+    const named = loginNameFor(org)
+    const person = named ? { name: named, role } : CHAIN.find((p) => p.role === role) ?? TEAM.find((p) => p.role === role)
+    let w = stRef.current.wins.find((x) => person && x.id === winId(person.name, role)) ?? (named ? undefined : stRef.current.wins.find((x) => x.role === role))
+    if (!w && person) {
+      try { await enter(person.name, role) } catch (e) { setErr(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))); return }
+      w = stRef.current.wins.find((x) => x.role === role && x.id === stRef.current.focus) ?? stRef.current.wins.find((x) => x.role === role)
+    }
+    if (!w) return
+    commit(focusWin(stRef.current, w.id))
+    setMaxId((m) => (m && m !== w!.id ? w!.id : m))
+    const f = frames.current.get(w.id)
+    if (f && readyIds.current.has(w.id)) f.contentWindow?.postMessage({ type: 'logection:navigate', route }, location.origin)
+    else pendingNav.current.set(w.id, route)
+    setFlashId(null); setTimeout(() => setFlashId(w!.id), 0)
+    setFlowOpen(false) // gấp thẻ để không che cửa sổ cần thao tác; bước hiện tại vẫn hiện gọn trên thanh trên
+  }
+  useEffect(() => { // viền cửa sổ cần thao tác sáng lên vài giây (GSAP; "giảm chuyển động" → chỉ viền tĩnh)
+    if (!flashId) return
+    const el = root.current?.querySelector<HTMLElement>(`[data-window-id="${CSS.escape(flashId)}"]`)
+    const tw = el && !reducedMotion() ? gsap.fromTo(el, { outlineOffset: -1 }, { outlineOffset: -5, duration: 0.45, repeat: 5, yoyo: true, ease: 'sine.inOut' }) : null
+    const id = setTimeout(() => setFlashId(null), 2800)
+    return () => { clearTimeout(id); tw?.kill(); if (el) gsap.set(el, { clearProps: 'outlineOffset' }) }
+  }, [flashId])
+  const flowDone = demo.flow ? demo.flow.steps.filter((s) => s.done).length : 0
+  const flowCur = demo.flow?.steps.find((s) => s.key === demo.flow?.current) ?? null
 
   /** Kéo thanh chia: đổi tỉ lệ hai khung kề nhau theo quãng chuột đi (tính bằng phần của hàng/vùng). Khung nhúng tạm không nhận chuột để không "nuốt" sự kiện. */
   function startSplit(e: React.PointerEvent<HTMLDivElement>, sp: Splitter) {
@@ -292,6 +349,16 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
           <button className="ws-add" data-label={t('ws.add')} onMouseEnter={(e) => showDockTooltip(e, t('ws.add'))} onMouseLeave={() => setDockTooltip(null)} aria-label={t('ws.add')} title={t('ws.add')} aria-expanded={pop !== 'closed'} aria-haspopup="menu" onClick={() => { setErr(null); setAppearanceOpen(false); setPop(pop === 'closed' ? 'list' : 'closed') }}>
             <Icon name="plus" size={16} />{!slim && <span>{t('ws.add')}</span>}
           </button>
+          <div className="ws-appearance-wrap ws-flow-wrap">
+            <button className="ws-appearance ws-flow-btn" data-label={t('flow.title')} onMouseEnter={(e) => showDockTooltip(e, t('flow.title'))} onMouseLeave={() => setDockTooltip(null)}
+              aria-label={demo.flow ? `${t('flow.title')} · ${t('flow.progress', { n: flowDone, m: MAIN_STEPS.length })}` : t('flow.title')} title={t('flow.title')} aria-expanded={flowOpen} aria-haspopup="dialog"
+              onClick={() => { setPop('closed'); setAppearanceOpen(false); setFlowOpen((o) => !o) }}>
+              <Icon name="flag" size={17} />{!slim && <span>{t('flow.title')}</span>}
+              {demo.flow && <span className="ws-flow-count" aria-hidden>{flowDone}/{MAIN_STEPS.length}</span>}
+            </button>
+            {flowOpen && createPortal( // ra ngoài dock (dock có transform nên không neo theo màn hình được); đặt cố định phía trên dock
+              <DemoFlowPanel flow={demo} hasWindows={wins.length > 0} onChain={() => void chain()} onGo={(r, route, org) => void goTo(r, route, org)} onClose={() => setFlowOpen(false)} />, document.body)}
+          </div>
           <div className="ws-appearance-wrap" ref={appearanceEl}>
             <button className="ws-appearance" data-label={t('theme.appearance')} onMouseEnter={(e) => showDockTooltip(e, t('theme.appearance'))} onMouseLeave={() => setDockTooltip(null)} aria-label={t('theme.appearance')} title={t('theme.appearance')} aria-expanded={appearanceOpen} aria-haspopup="dialog"
               onClick={() => { setPop('closed'); setAppearanceOpen((open) => !open) }}>
@@ -316,6 +383,14 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
           <button className="btn sm icon" aria-label={t('guide.open')} title={t('guide.open')} onClick={() => setWalkthroughOpen(true)}><Icon name="help" size={16} /></button>
           <span className="muted">{t('ws.count', { n: open.length })}{wins.length > open.length ? ` · ${t('ws.bgN', { n: wins.length - open.length })}` : ''}</span>
           <span className="grow" />
+          {!flowOpen && flowCur && (
+            <div className="ws-flow-mini" role="status" data-step={flowCur.key}>
+              <button className="btn sm linkish" onClick={() => setFlowOpen(true)} aria-label={`${t('flow.title')} · ${t('flow.progress', { n: flowDone, m: MAIN_STEPS.length })}`}>
+                <Icon name="flag" size={14} /><span className="ws-flow-mini-n">{flowDone}/{MAIN_STEPS.length}</span>
+              </button>
+              <b className="ws-flow-mini-t">{tCode(t, 'flow.s.', flowCur.key)}</b>
+              <button className="btn sm primary" onClick={() => void goTo(flowCur.role, flowCur.route, flowCur.org)}>{t('flow.go')}</button>
+            </div>)}
           {st.sizes && <button className="btn sm" onClick={() => commit(resetSizes(stRef.current))}>{t('ws.even')}</button>}
         </div>
         <div ref={gridEl} className={`ws-grid${dragId || splitting ? ' dragging' : ''}${splitting ? ` splitting-${splitting}` : ''}`}>
@@ -337,7 +412,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
             const shown = w.open && (!narrow || w.id === focusId)
             const b = badges[w.id] ?? 0
             return (
-              <div key={w.id} data-window-id={w.id} className={`ws-win role-${w.role}${w.id === focusId ? ' foc' : ''}${overId === w.id && dragId !== w.id ? ` over drop-${dropSide}` : ''}${isMax ? ' maximized' : ''}`}
+              <div key={w.id} data-window-id={w.id} className={`ws-win role-${w.role}${w.id === focusId ? ' foc' : ''}${overId === w.id && dragId !== w.id ? ` over drop-${dropSide}` : ''}${isMax ? ' maximized' : ''}${flashId === w.id ? ' flash' : ''}`}
                 style={{ display: shown ? undefined : 'none', ...(narrow || isMax || !p
                   ? { inset: GAP / 2, zIndex: isMax || w.id === focusId ? 20 : 1 }
                   : { left: `calc(${p.left}% + ${GAP / 2}px)`, top: `calc(${p.top}% + ${GAP / 2}px)`, width: `calc(${p.width}% - ${GAP}px)`, height: `calc(${p.height}% - ${GAP}px)` }) }}

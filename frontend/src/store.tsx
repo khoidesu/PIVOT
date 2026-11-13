@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, ApiError, EMBED, getSession, setOnUnauthorized, setSession, type FleetRefresh, type Location, type Me, type Meta, type Role, type Session } from './api'
 import { RETRY_MS } from './conn'
+import { allowedRoute } from './nav'
 import { setServerTime } from './fmt'
 
 interface AppCtx {
@@ -29,6 +30,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [fatal, setFatal] = useState<ApiError | null>(null)
   const [notice, setNotice] = useState<'expired' | null>(null)
   const [fleetSync, setFleetSync] = useState<{ n: number; at: string } | null>(null)
+  const [navWanted, setNavWanted] = useState<string | null>(null)
+  const navRole = session?.role
+  useEffect(() => { // chỉ mở màn mà vai này được vào (allowedRoute); màn không được phép thì bỏ qua
+    if (!navWanted || !navRole) return
+    setNavWanted(null)
+    if (allowedRoute(navRole, navWanted.split('?')[0])) window.location.hash = `#/${navWanted}`
+  }, [navWanted, navRole])
 
   const clear = useCallback(() => { setMe(null); setMeta(null); setLocations([]); setFatal(null) }, [])
   useEffect(() => { // 401 ở bất kỳ API nào → về màn hình đăng nhập kèm thông báo (trong cửa sổ nhúng: nhờ trang bao ngoài đăng nhập lại)
@@ -44,7 +52,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!EMBED) return
     const on = (e: MessageEvent) => {
       if (e.origin !== location.origin || e.source !== window.parent) return
-      const d = e.data as { type?: string; session?: Session } | null
+      const d = e.data as { type?: string; session?: Session; route?: unknown } | null
+      // Luồng demo: trang bao ngoài xin mở một màn. Nhận ở đây (luôn chạy, kể cả khi khung còn ở màn đăng nhập), áp dụng khi đã biết vai.
+      if (d?.type === 'logection:navigate' && typeof d.route === 'string' && /^[a-z]+(\?[\w=&-]*)?$/.test(d.route)) { setNavWanted(d.route); return }
       if (d?.type !== 'logection:session' || !d.session) return
       setSession(d.session); setSessionState(d.session); setNotice(null); setEpoch((n) => n + 1)
     }

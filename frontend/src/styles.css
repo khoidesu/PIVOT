@@ -664,3 +664,32 @@ button.who b { display: block; font-size: 13px; line-height: 1.2; font-weight: 6
   --teal-strong: color-mix(in srgb, var(--accent) 68%, white);
   --teal-weak: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
+
+/* ---- Luồng demo (thẻ trên dock; trạng thái từng bước suy từ API thật) ---- */
+.ws-flow-wrap { position: relative; }
+.ws-flow-btn { position: relative; }
+.ws-appearance span.ws-flow-count { display: block; position: absolute; top: -7px; right: -9px; padding: 1px 6px; border-radius: var(--pill); background: var(--primary); color: var(--on-primary); font-size: 10px; font-weight: 700; line-height: 16px; font-variant-numeric: tabular-nums; pointer-events: none; }
+.ws-appearance-pop.ws-flow-pop { position: fixed; z-index: 160; left: 50%; right: auto; bottom: 76px; transform: translateX(-50%); width: 330px; gap: 10px; max-height: min(72vh, 600px); overflow-y: auto; overscroll-behavior: contain; }
+.ws-flow-h { display: flex; align-items: center; gap: 8px; }
+.ws-flow-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ws-flow-step { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid transparent; border-radius: var(--radius-sm); }
+.ws-flow-step.cur { border-color: color-mix(in srgb, var(--primary) 55%, transparent); background: var(--teal-weak); }
+.ws-flow-step.done .ws-flow-body b { color: var(--muted); font-weight: 500; }
+.ws-flow-dot { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--soft-2); color: var(--muted); font-size: 12px; font-weight: 600; }
+.ws-flow-step.done .ws-flow-dot { background: var(--pass-bg); color: var(--pass); }
+.ws-flow-step.cur .ws-flow-dot { background: var(--primary); color: var(--on-primary); }
+.ws-flow-body { display: grid; gap: 4px; min-width: 0; }
+.ws-flow-body b { font-size: 13px; }
+.ws-flow-roles { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ws-flow-done { color: var(--pass); font-size: 13px; font-weight: 600; }
+.ws-win.flash { outline: 3px solid var(--primary); outline-offset: -3px; }
+/* Thẻ nằm ở document.body (portal) vì dock có transform: cố định phía trên dock; màn hẹp → bottom sheet ngang màn hình */
+@media (max-width: 640px) {
+  .ws-appearance-pop.ws-flow-pop { left: 8px; right: 8px; bottom: 70px; transform: none; width: auto; max-height: 62vh; }
+}
+
+.ws-flow-mini { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 4px 3px 2px; border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent); border-radius: var(--pill); background: var(--teal-weak); }
+.ws-flow-mini .btn.linkish { gap: 6px; color: var(--ink); }
+.ws-flow-mini-n { font-variant-numeric: tabular-nums; font-weight: 600; }
+.ws-flow-mini-t { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .ws-flow-mini-t { display: none; } }

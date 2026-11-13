@@ -2,7 +2,7 @@
 
 Theo DRAFT mục 12: mỗi màn hình trả lời một câu hỏi kinh doanh. Dữ liệu **mô phỏng** — nói rõ điều này ngay đầu video.
 
-**Cách quay (một trang, nhiều cửa sổ):** mở một trang, bấm **+** → "Mở cả chuỗi ba bên" (Nguyên, Minh, Khôi) rồi thêm **Phú** (Điều phối viên); bấm người ở thanh bên trái để chuyển, hoặc để cả ba cạnh nhau (bố cục Lưới/Cột) cho cảnh phối hợp. Muốn cho thấy hai công ty khác nhau, đăng nhập thêm một chủ hàng tên khác (vd *Hoa*): hai bên không thấy dữ liệu của nhau.
+**Cách quay (một trang, nhiều cửa sổ):** mở một trang, bấm **Bắt đầu** → thẻ **Luồng demo** tự mở → "Mở cả chuỗi ba bên" (Nguyên, Minh, Khôi), thêm **Phú** (Điều phối viên) bằng **+**. Từ 0:20 tới 4:20 có thể đi theo thẻ Luồng demo: mỗi bước bấm **Làm ở đây** (trên thanh trên cùng) để đưa đúng cửa sổ lên, thao tác thật trong cửa sổ đó, bước tự tích khi API ghi nhận — tiện cho người xem theo dõi tiến độ 1/6 → 6/6. Ba cửa sổ đứng cạnh nhau (khung chia kéo giãn) cho cảnh phối hợp. Nên quay trên DB sạch (`python -m app.seed`): DB có tài khoản tự đăng ký thì xe/ICD được chọn có thể thuộc người khác — Luồng demo vẫn mở đúng cửa sổ của bên đó. Muốn cho thấy hai công ty khác nhau, đăng nhập thêm một chủ hàng tên khác (vd *Hoa*): hai bên không thấy dữ liệu của nhau.
 
 **Chuẩn bị (30 giây trước khi quay):** `docker compose up -d` · `python -m app.seed` · mở backend + frontend · mở http://127.0.0.1:5173 · giữ tiếng Việt (có thể bật EN ở cuối).
 

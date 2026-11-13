@@ -122,7 +122,7 @@ describe('giao diện gọn chữ', () => {
   })
   it('mọi khoá i18n đều được mã nguồn dùng (không để chuỗi chết)', () => {
     const code = walk(SRC).filter((f) => /\.(tsx?)$/.test(f) && !/i18n(\.test)?\.ts$/.test(f)).map((f) => readFileSync(f, 'utf8')).join('\n')
-    const dynamic = ['status.', 'ps.', 'cargo.', 'role.', 'rd.', 'party.', 'gate.', 'reason.', 'tl.code.', 'tl.q.', 'tl.resolve.', 'tl.exc.', 'in.note.', 'in.f.', 'err.',
+    const dynamic = ['flow.s.', 'status.', 'ps.', 'cargo.', 'role.', 'rd.', 'party.', 'gate.', 'reason.', 'tl.code.', 'tl.q.', 'tl.resolve.', 'tl.exc.', 'in.note.', 'in.f.', 'err.',
       'demo.s.', 'rec.comp.', 'rec.s.', 'bf.status.', 'bf.sub.', 'nav.', 'fleet.tab.', 'cf.ok.', 'tk.ms.', 'tk.mode.', 'ex.sev.', 'ex.cat.', 'ex.step.', 'ex.owner.', 'ex.kind.', 'dk.status.', 'eta.status.', 'eta.reason.', 'eta.band.', 'veh.state.', 'sbx.vs.', 'ws.layout.', 'theme.', 'in.llm.', 'in.img.', 'land.g',
       'guide.route.'] // App.tsx dựng khoá bằng t(`guide.route.${r}`) theo từng mục menu — khoá động, không phải chuỗi chết (QA-09)
     const dead = Object.keys(dictionaries.vi).filter((k) => !dynamic.some((p) => k.startsWith(p)) && !code.includes(`'${k}'`) && !code.includes(`\`${k}\``))
