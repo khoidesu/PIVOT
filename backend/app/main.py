@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import math
+import time
 from contextlib import asynccontextmanager
 
 import os
@@ -38,10 +39,42 @@ def sim_tick_once() -> None:
         pass
 
 
+class Activity:
+    """Lần cuối có request API thật (không tính /healthz của Render/UptimeRobot) + tín hiệu đánh thức worker.
+
+    14/11: worker truy vấn DB mỗi giây kể cả khi không ai dùng web → Neon (gói miễn phí) không bao giờ được tạm nghỉ và hết hạn
+    mức ("Your account or project has exceeded the quota"). Nay worker chỉ chạy khi có người dùng; rảnh quá
+    `worker_idle_after_s` giây thì đóng kết nối DB và ngủ tới request kế tiếp."""
+
+    def __init__(self) -> None:
+        self.last = time.monotonic()
+        self.kick: asyncio.Event | None = None
+
+    def touch(self) -> None:
+        self.last = time.monotonic()
+        if self.kick is not None:
+            self.kick.set()
+
+    def idle(self, idle_after: float) -> bool:
+        return idle_after > 0 and time.monotonic() - self.last > idle_after
+
+
+activity = Activity()
+
+
 async def background_loop(interval: float = 1.0) -> None:
     """Vòng worker nền. Một lần lỗi (vd Neon ngắt kết nối) chỉ ghi log rồi chạy tiếp — nếu để lỗi thoát ra ngoài thì task
-    asyncio chết lặng lẽ và outbox/mô phỏng dừng hẳn cho tới khi khởi động lại."""
+    asyncio chết lặng lẽ và outbox/mô phỏng dừng hẳn cho tới khi khởi động lại. Không ai dùng web → ngủ (xem `Activity`)."""
+    activity.kick = asyncio.Event()
     while True:
+        if activity.idle(settings.worker_idle_after_s):
+            from .db import engine
+            activity.kick.clear()  # xoá TRƯỚC khi đóng kết nối: request tới trong lúc đó vẫn đánh thức được
+            log.info("worker idle: closing DB connections and sleeping until the next API request")
+            await asyncio.to_thread(engine.dispose)  # không giữ kết nối mở → Neon tự tạm nghỉ được
+            if activity.idle(settings.worker_idle_after_s):
+                await activity.kick.wait()  # request API kế tiếp đánh thức (không hẹn giờ: hẹn giờ cũng đánh thức Neon)
+            log.info("worker resumed")
         try:
             await asyncio.to_thread(process_pending)
             await asyncio.to_thread(sim_tick_once)
@@ -119,6 +152,8 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    if request.url.path.startswith("/v1/"):  # có người dùng thật → worker chạy (giữ /healthz ngoài để UptimeRobot không giữ Neon thức)
+        activity.touch()
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")

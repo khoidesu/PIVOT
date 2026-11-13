@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     cors_origins: str = ""  # danh sách origin phân tách bằng dấu phẩy (chỉ cần khi giao diện chạy ở domain khác)
     hold_seconds: int = 120  # DRAFT 5.4: hold có hạn, demo 120 giây
     data_mode: str = "mock"  # mock | live — hiển thị trên UI (DRAFT mục 7)
+    worker_idle_after_s: float = 120.0  # PIVOT_WORKER_IDLE_AFTER_S — không có request API trong N giây → worker ngủ, đóng kết nối DB (0 = không bao giờ ngủ)
     worker_inline: bool = True  # worker outbox chạy nền cùng API (tắt khi chạy `python -m app.worker` riêng)
     intake_extractor: str = "rule"  # rule | llm | hybrid  (llm cần PIVOT_ANTHROPIC_API_KEY; hybrid = luật trước + Gemini bổ sung, cần PIVOT_GEMINI_API_KEY)
     gemini_api_key: str | None = None  # KHÔNG ghi vào mã/log; cấp qua biến môi trường hoặc backend/.env (đã .gitignore)

@@ -18,3 +18,10 @@
 - Worker nền truy vấn mỗi giây nên Neon không tự ngủ; theo dõi *Usage* của Neon (giờ tính toán free hàng tháng).
 - Dữ liệu nằm ở Neon: restart/redeploy không mất. Muốn sạch: nút *Làm mới dữ liệu demo*.
 - `autoDeploy: true`: mỗi push lên `main` là deploy. Đổi thành `false` nếu muốn kiểm soát.
+
+## Giữ Neon trong hạn mức gói miễn phí (14/11/2026)
+- Sự cố: Neon trả `Your account or project has exceeded the quota` → mọi API lỗi 500. Nguyên nhân: worker nền truy vấn DB **mỗi giây, 24/7**; UptimeRobot giữ Render thức nên worker không bao giờ dừng → Neon không bao giờ tạm nghỉ.
+- Đã sửa trong mã: worker chỉ chạy khi có request API (`/v1/...`); rảnh quá `PIVOT_WORKER_IDLE_AFTER_S` (mặc định 120 giây) thì đóng kết nối DB và ngủ tới request kế tiếp. `/healthz` (UptimeRobot, Render) **không** đánh thức worker và không chạm DB → Neon tự tạm nghỉ sau ~5 phút không ai dùng web.
+- Vẫn tốn giờ tính toán khi có người mở web (mỗi cửa sổ polling vài giây một lần); tab trình duyệt ẩn thì ngừng polling.
+- Khi đã hết hạn mức: chờ Neon đặt lại hạn mức theo chu kỳ, nâng gói, hoặc tạo project Neon mới rồi dán chuỗi kết nối mới vào Render → `PIVOT_DATABASE_URL` (khởi động sẽ tự chạy migration + seed vì DB trống; dữ liệu cũ là mô phỏng).
+
