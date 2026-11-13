@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from ..admin import require_admin
@@ -14,10 +14,12 @@ router = APIRouter(prefix="/v1/eta")
 
 
 class TrainIn(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)  # NaN/Infinity → 422 (QA-04)
     drift: float = Field(default=ml.DEFAULT_DRIFT, ge=0.0, le=1.0)  # độ "trôi" mô phỏng ở đoạn cuối; lớn → mô hình bị hạ về luật
 
 
 class PredictIn(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
     depart_at: AwareDatetime
     km: float = Field(default=ml.BASE_KM, gt=0, le=200)
     # tuỳ chọn, chỉ dùng cho model ONNX; bỏ trống → mặc định (KCN_A_ICD, medium, trời khô) và ghi vào `assumed` của kết quả

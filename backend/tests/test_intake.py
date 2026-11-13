@@ -186,7 +186,7 @@ def test_draft_endpoint_never_creates_a_shipment_and_keeps_no_raw_text(client):
 
 
 def test_roles_and_size_limits(client):
-    for user in ("node_c", "dispatch"):
+    for user in ("carrier_b", "node_c", "dispatch"):
         assert client.post("/v1/intake/drafts", json={"text": "5 tấn"}, headers=auth(user)).status_code == 403
     assert client.post("/v1/intake/drafts", json={"text": "x" * 8001}, headers=auth("shipper_a")).status_code == 422
     assert client.post("/v1/intake/drafts", json={"text": ""}, headers=auth("shipper_a")).status_code == 422

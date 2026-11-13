@@ -130,6 +130,38 @@ def _exception(session: Session, prop: m.Proposal, ev: m.Event, exc_type: str, d
                               dedupe_key=f"ev:{ev.id}")
 
 
+def _merge_repeat_report(session: Session, prop: m.Proposal, ev: m.Event, category: str) -> bool:
+    """Báo lặp cùng loại sự cố cho cùng chuyến khi ngoại lệ trước còn MỞ (QA-08): không mở ngoại lệ thứ hai (không nhân đôi playbook/SLA/
+    thông báo), chỉ ghi số lần báo + lần báo gần nhất vào ngoại lệ đang mở. Đã xử lý xong (resolved) thì lần báo sau mở ngoại lệ mới.
+    An toàn khi chạy song song: apply_event đã khoá dòng proposal nên các sự kiện của cùng chuyến được áp tuần tự."""
+    ex = session.execute(select(m.ExceptionRecord).where(
+        m.ExceptionRecord.proposal_id == prop.id, m.ExceptionRecord.exc_type == category, m.ExceptionRecord.status == "open")
+        .order_by(m.ExceptionRecord.created_at).limit(1).with_for_update()).scalar_one_or_none()
+    if ex is None:
+        return False
+    d = dict(ex.detail or {})
+    if d.get("event_id") == str(ev.id) or str(ev.id) in d.get("repeat_event_ids", []):
+        return True  # worker áp lại cùng sự kiện (restart) → không đếm lần nữa
+    p = ev.payload or {}
+    d["repeat_reports"] = int(d.get("repeat_reports", 0)) + 1
+    d["repeat_event_ids"] = [*d.get("repeat_event_ids", []), str(ev.id)][-20:]
+    d["last_reported_at"] = ev.received_at.isoformat()
+    if p.get("note"):
+        d["last_note"] = p["note"]
+    if int(p.get("delay_minutes") or 0) > int(d.get("delay_minutes") or 0):
+        d["delay_minutes"] = int(p["delay_minutes"])  # trễ nặng hơn: giữ số lớn nhất để mức độ phản ánh đúng
+    ex.detail = d  # gán dict mới: cột JSON không theo dõi thay đổi tại chỗ
+    from ..incidents import rules, service as incidents
+    sev = rules.severity_for(category, d)
+    rank = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+    if rank.get(sev, 0) > rank.get(ex.severity, 0):
+        # báo lặp làm mức độ TĂNG (vd kẹt xe 10′ → 180′): nâng mức, rút SLA, báo một lần cho mức mới. Báo lặp không đổi mức → im lặng.
+        due = ev.received_at + timedelta(minutes=rules.SLA_MINUTES[sev])
+        ex.severity, ex.sla_due_at = sev, min(ex.sla_due_at, due) if ex.sla_due_at else due
+        incidents._notify(session, ex, prop, ev.received_at)
+    return True
+
+
 def apply_event(session: Session, event_id: uuid.UUID, now: datetime) -> str:
     ev = session.get(m.Event, event_id)
     if ev is None or ev.quality_status in FINAL_QUALITY:
@@ -186,10 +218,12 @@ def apply_event(session: Session, event_id: uuid.UUID, now: datetime) -> str:
     elif ev.event_type in ("INCIDENT_REPORTED", "CARGO_DAMAGE_REPORTED"):
         p = ev.payload or {}
         if status in ("confirmed", "executing"):
-            if ev.event_type == "INCIDENT_REPORTED":
-                _exception(session, prop, ev, p["kind"], {"delay_minutes": p.get("delay_minutes", 0), "note": p.get("note"), "reported_by": "carrier"})
-            else:
-                _exception(session, prop, ev, "CARGO_DAMAGE", {"note": p.get("note")})
+            category = p["kind"] if ev.event_type == "INCIDENT_REPORTED" else "CARGO_DAMAGE"
+            if not _merge_repeat_report(session, prop, ev, category):
+                if ev.event_type == "INCIDENT_REPORTED":
+                    _exception(session, prop, ev, category, {"delay_minutes": p.get("delay_minutes", 0), "note": p.get("note"), "reported_by": "carrier"})
+                else:
+                    _exception(session, prop, ev, category, {"note": p.get("note")})
             ev.quality_status = "applied"
         else:
             ev.quality_status = "late" if status == "completed" else "invalid"

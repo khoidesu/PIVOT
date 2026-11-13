@@ -93,7 +93,7 @@ def test_daily_limit_is_three_images_per_user_then_429_without_calling_the_model
     assert codes == [200, 200, 200, 429, 429]
     assert post(client, "shipper_a", jpeg()).json()["detail"]["code"] == "IMAGE_QUOTA_USER_DAY"
     assert fake.calls == 3                                                   # hết lượt thì không gọi mô hình
-    assert post(client, "carrier_b", jpeg()).status_code == 200              # người khác có lượt riêng
+    assert post(client, "shipper_a2", jpeg()).status_code == 200             # người khác có lượt riêng
 
 
 def test_burst_is_limited_per_minute(client, fake):
@@ -137,7 +137,8 @@ def test_exif_gps_is_stripped_before_the_image_leaves_the_server(client, fake):
     assert strip_jpeg_metadata(b"\x89PNG....") == b"\x89PNG...."
 
 
-def test_only_shipper_or_carrier_may_use_it_and_it_can_be_disabled(client, fake):
+def test_only_shipper_may_use_it_and_it_can_be_disabled(client, fake):
+    assert post(client, "carrier_b", jpeg()).status_code == 403             # QA-03: chỉ chủ hàng tạo yêu cầu
     assert post(client, "node_c", jpeg()).status_code == 403
     assert post(client, "dispatch", jpeg()).status_code == 403
     app.dependency_overrides[get_image_extractor] = lambda: None

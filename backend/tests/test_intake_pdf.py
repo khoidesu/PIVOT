@@ -138,11 +138,12 @@ def test_images_also_go_through_the_file_endpoint(client, fake):
     assert d["source"]["kind"] == "image" and fake.calls == 1
 
 
-def test_only_shipper_or_carrier_and_audit_keeps_no_document_text(client, fake):
+def test_only_shipper_and_audit_keeps_no_document_text(client, fake):
     from sqlalchemy import select
     from app import models as m
     from app.db import SessionLocal
     assert post(client, make_pdf([TEXT]), key="node_c").status_code == 403
+    assert post(client, make_pdf([TEXT]), key="carrier_b").status_code == 403     # QA-03
     assert post(client, make_pdf([TEXT + ["Gia cuoc: 4.800.000 dong"]])).status_code == 200
     with SessionLocal() as s:
         ev = s.execute(select(m.Event).where(m.Event.event_type == "INTAKE_DRAFT_CREATED")).scalars().one()

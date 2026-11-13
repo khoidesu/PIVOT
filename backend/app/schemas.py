@@ -1,11 +1,35 @@
+import math
 import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 MAX_PRICE_VND = 10 ** 15  # trần hợp lý (1 triệu tỷ ₫) và nằm xa giới hạn BIGINT của DB
+# Trần kích thước một lô (QA-04): rộng hơn nhiều so với xe lớn nhất (đầu kéo ~30 t / ~70 m³) và dữ liệu seed/sandbox (≤ 21 t, ≤ 44 m³)
+# để không chặn lô hợp lệ nào, nhưng chặn số vô lý (1e300…) trước khi vào DB/ghép. Lô vượt tải xe vẫn được tạo và bị hard gate loại.
+MAX_WEIGHT_KG = 100_000.0
+MAX_VOLUME_M3 = 500.0
+
+
+class In(BaseModel):
+    """Gốc cho mọi body ĐẦU VÀO: số thực phải hữu hạn (NaN/Infinity/1e309 → 422, không vào DB — QA-04)."""
+    model_config = ConfigDict(allow_inf_nan=False)
+
+
+def finite_json(v: Any, path: str = "payload") -> Any:
+    """Duyệt dữ liệu JSON tự do (dict/list lồng nhau): từ chối số không hữu hạn ở BẤT KỲ đâu — Postgres JSON không lưu được NaN/Infinity
+    (trước đây → 500) và worker không được nhận số vô nghĩa."""
+    if isinstance(v, float) and not math.isfinite(v):
+        raise ValueError(f"{path} must be a finite number")
+    if isinstance(v, dict):
+        for k, x in v.items():
+            finite_json(x, f"{path}.{k}")
+    elif isinstance(v, list):
+        for i, x in enumerate(v):
+            finite_json(x, f"{path}[{i}]")
+    return v
 
 
 class ORM(BaseModel):
@@ -32,12 +56,12 @@ class MetaOut(BaseModel):
     pdf_intake_enabled: bool = False
 
 
-class ShipmentCreate(BaseModel):
+class ShipmentCreate(In):
     """Yêu cầu hợp lệ: thiếu trường bắt buộc → 422, không tạo lô (DRAFT mục 8/ngày 4)."""
     code: str = Field(min_length=3, max_length=40)
     cargo_type: str = Field(min_length=2, max_length=30)
-    weight_kg: float = Field(gt=0)
-    volume_m3: float = Field(gt=0)
+    weight_kg: float = Field(gt=0, le=MAX_WEIGHT_KG)
+    volume_m3: float = Field(gt=0, le=MAX_VOLUME_M3)
     origin_location_id: uuid.UUID
     dest_location_id: uuid.UUID
     ready_at: AwareDatetime  # bắt buộc có múi giờ (lưu UTC, DRAFT mục 4.1)
@@ -200,7 +224,7 @@ class ProposalOut(BaseModel):
     created_at: datetime
 
 
-class MatchRunIn(BaseModel):
+class MatchRunIn(In):
     shipment_id: uuid.UUID
     node_org_id: uuid.UUID | None = None  # chủ hàng chọn ICD; bỏ trống → luân phiên giữa các ICD có slot đạt
 
@@ -218,11 +242,11 @@ class MatchRunOut(BaseModel):
     eta_method: str
 
 
-class ActionIn(BaseModel):
+class ActionIn(In):
     version: int = Field(ge=1)
 
 
-class EventIn(BaseModel):
+class EventIn(In):
     entity_type: str = Field(default="proposal", pattern="^(proposal|vehicle)$")
     entity_id: uuid.UUID
     event_type: str = Field(min_length=3, max_length=40)
@@ -231,6 +255,11 @@ class EventIn(BaseModel):
     source_event_id: str = Field(min_length=1, max_length=100)
     payload: dict[str, Any] = {}
     correlation_id: str | None = Field(default=None, max_length=64)
+
+    @field_validator("payload")
+    @classmethod
+    def _finite_payload(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return finite_json(v)
 
 
 class EventOut(BaseModel):
@@ -293,7 +322,7 @@ class ReplayOut(BaseModel):
     snapshot_keys: list[str]
 
 
-class ResolveIn(BaseModel):
+class ResolveIn(In):
     resolution: str = Field(pattern="^(accept_delay|request_replan)$")
     note: str | None = Field(default=None, max_length=500)
 
@@ -331,12 +360,12 @@ class BenefitListOut(BaseModel):
     totals: dict[str, dict[str, int]]
 
 
-class ShipmentUpdate(BaseModel):
+class ShipmentUpdate(In):
     """Sửa yêu cầu: chỉ các trường gửi lên được đổi; `version` bắt buộc (khoá lạc quan)."""
     version: int = Field(ge=1)
     cargo_type: str | None = Field(default=None, min_length=2, max_length=30)
-    weight_kg: float | None = Field(default=None, gt=0)
-    volume_m3: float | None = Field(default=None, gt=0)
+    weight_kg: float | None = Field(default=None, gt=0, le=MAX_WEIGHT_KG)
+    volume_m3: float | None = Field(default=None, gt=0, le=MAX_VOLUME_M3)
     origin_location_id: uuid.UUID | None = None
     dest_location_id: uuid.UUID | None = None
     ready_at: AwareDatetime | None = None
@@ -346,7 +375,7 @@ class ShipmentUpdate(BaseModel):
     customer_name: str | None = Field(default=None, max_length=200)
 
 
-class IntakeIn(BaseModel):
+class IntakeIn(In):
     text: str = Field(min_length=1, max_length=8000)
 
 
@@ -358,11 +387,11 @@ class IntakeFieldOut(BaseModel):
     notes: list[str] = []
 
 
-class IntakeImageIn(BaseModel):
+class IntakeImageIn(In):
     image_base64: str = Field(min_length=100, max_length=6_000_000)  # ảnh đã được trình duyệt thu nhỏ; máy chủ vẫn kiểm tra loại + kích thước thật
 
 
-class IntakeFileIn(BaseModel):
+class IntakeFileIn(In):
     file_base64: str = Field(min_length=100, max_length=7_000_000)  # ảnh (đã thu nhỏ) hoặc PDF ≤ 5 MB; máy chủ kiểm tra loại theo nội dung + kích thước thật
 
 

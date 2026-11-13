@@ -67,7 +67,8 @@ def test_new_names_on_the_same_network_share_one_image_quota(client, fake, monke
     monkeypatch.setattr(settings, "llm_image_per_ip_day", 2)
     reset_guards()
     codes = []
-    for key in ("shipper_a", "carrier_b", "shipper_a2"):                                 # ba tài khoản khác nhau, cùng một máy
+    third = client.post("/v1/auth/login", json={"name": "Hạn Mức", "role": "shipper"}).json()["token"].removeprefix("dev:")
+    for key in ("shipper_a", "shipper_a2", third):                                       # ba tài khoản khác nhau, cùng một máy
         r = client.post("/v1/intake/drafts/file", headers=auth(key), json={"file_base64": B64(jpeg())})
         codes.append(r.json()["detail"]["code"] if r.status_code != 200 else 200)
         image_guard(settings)._recent.clear()

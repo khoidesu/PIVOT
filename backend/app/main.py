@@ -1,10 +1,14 @@
 import asyncio
 import logging
+import math
 from contextlib import asynccontextmanager
 
 import os
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -91,6 +95,26 @@ app.include_router(incidents.router)
 app.include_router(docks.router)
 app.include_router(eta.router)
 app.include_router(demo.router)
+
+
+def _json_safe(v):
+    """Đưa chi tiết lỗi validate về dạng JSON chắc chắn serialize được: số không hữu hạn → chuỗi ("nan", "inf"),
+    kiểu lạ (bytes, exception trong ctx…) → chuỗi. Cấu trúc dict/list giữ nguyên."""
+    if isinstance(v, float) and not math.isfinite(v):
+        return str(v)
+    if isinstance(v, dict):
+        return {str(k): _json_safe(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_json_safe(x) for x in v]
+    if v is None or isinstance(v, (str, int, float, bool)):
+        return v
+    return str(v)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    """Giữ đúng định dạng 422 mặc định của FastAPI ({"detail": [...]}) nhưng không bao giờ 500 vì `input` chứa NaN/Infinity (QA-04)."""
+    return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(exc.errors()))})
 
 
 @app.middleware("http")

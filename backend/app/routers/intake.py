@@ -30,6 +30,13 @@ def client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
+def _require_shipper(actor: Actor = Depends(current_actor)) -> None:
+    """Chỉ chủ hàng tạo yêu cầu (CLAUDE.md 12/11, BUG-02) → chỉ chủ hàng dùng nhập liệu. Kiểm tra TRƯỚC khi giải mã/đọc tệp hay tính lượt Gemini
+    (QA-03: nhà vận tải từng gọi được và tiêu lượt trên web công khai). Khai báo là dependency của route nên chạy trước validate body."""
+    if actor.role != "shipper":
+        raise HTTPException(status_code=403, detail="Only shippers can create requests")
+
+
 def get_extractor(request: Request, actor: Actor = Depends(current_actor)):
     return build_extractor(settings, user_key=str(actor.user_id), ip=client_ip(request))
 
@@ -90,22 +97,18 @@ def _file_draft(data: bytes, actor: Actor, session: Session, gemini: GeminiExtra
     return draft
 
 
-@router.post("/drafts/file", response_model=s.IntakeDraftOut)
+@router.post("/drafts/file", response_model=s.IntakeDraftOut, dependencies=[Depends(_require_shipper)])
 def create_file_draft(body: s.IntakeFileIn, request: Request, actor: Actor = Depends(current_actor), session: Session = Depends(get_session),
                       gemini: GeminiExtractor | None = Depends(get_image_extractor), extractor=Depends(get_extractor)):
     """Tệp (PDF hoặc ảnh JPEG/PNG/WebP) → BẢN NHÁP. PDF có chữ đọc trong máy chủ (không cần khoá, không tính lượt ảnh);
     PDF scan và ảnh do Gemini đọc (giới hạn lượt ảnh), mọi trường "cần xem lại". Chưa tạo lô."""
-    if actor.role not in ("shipper", "carrier"):
-        raise HTTPException(status_code=403, detail="Role cannot create requests")
     return _file_draft(_decode(body.file_base64), actor, session, gemini, extractor, client_ip(request))
 
 
-@router.post("/drafts/image", response_model=s.IntakeDraftOut)
+@router.post("/drafts/image", response_model=s.IntakeDraftOut, dependencies=[Depends(_require_shipper)])
 def create_image_draft(body: s.IntakeImageIn, request: Request, actor: Actor = Depends(current_actor), session: Session = Depends(get_session),
                        gemini: GeminiExtractor | None = Depends(get_image_extractor)):
     """Chỉ ảnh (giữ cho tương thích; giao diện dùng /drafts/file). Giới hạn riêng, mặc định 3 ảnh/người/ngày."""
-    if actor.role not in ("shipper", "carrier"):
-        raise HTTPException(status_code=403, detail="Role cannot create requests")
     if gemini is None:
         raise HTTPException(status_code=501, detail={"code": "IMAGE_INTAKE_DISABLED", "message": "Image intake is not enabled on this server"})
     data = _decode(body.image_base64, "BAD_IMAGE", "image_base64")
@@ -116,12 +119,10 @@ def create_image_draft(body: s.IntakeImageIn, request: Request, actor: Actor = D
     return _file_draft(data, actor, session, gemini, None, client_ip(request))
 
 
-@router.post("/drafts", response_model=s.IntakeDraftOut)
+@router.post("/drafts", response_model=s.IntakeDraftOut, dependencies=[Depends(_require_shipper)])
 def create_draft(body: s.IntakeIn, actor: Actor = Depends(current_actor), session: Session = Depends(get_session),
                  extractor=Depends(get_extractor)):
     """Văn bản dán vào → BẢN NHÁP có trích đoạn nguồn từng trường. Chưa tạo lô; người dùng phải duyệt rồi mới tạo."""
-    if actor.role not in ("shipper", "carrier"):
-        raise HTTPException(status_code=403, detail="Role cannot create requests")
     now = datetime.now(timezone.utc)
     locs = _locations(session)
     draft = build_draft(body.text, now, locs, extractor)
