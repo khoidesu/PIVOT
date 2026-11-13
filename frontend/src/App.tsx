@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SimBadge, TopBar } from './components/TopBar'
 import { HeroArt } from './components/HeroArt'
 import { Icon } from './components/Icon'
+import { MagicGlow } from './components/MagicGlow'
 import { useAutoEnter, useNavIndicator } from './motion'
 import { EmbedBridge } from './components/EmbedBridge'
 import { ErrorNote, Loading } from './components/ui'
@@ -59,7 +60,7 @@ function Shell() {
     <div ref={shell}>
       {EMBED && <EmbedBridge />}
       <header className="hero">
-        <HeroArt />
+        <HeroArt scene={role} />
         <div className="hero-top">
           <nav className="nav" aria-label="Menu" ref={navEl}>
             <span className="nav-ind" aria-hidden ref={indEl} />
@@ -94,13 +95,13 @@ function Shell() {
 }
 
 const ENTERED = 'pivot.entered'
-/** Trang ngoài: lần đầu vào tab thấy trang mở đầu; bấm Bắt đầu → khu làm việc (nhớ trong tab). Tab đã có cửa sổ thì vào thẳng. */
+/** Trang ngoài luôn mở landing; bấm Bắt đầu mới vào khu làm việc. */
 function Outer() {
-  const [entered, setEntered] = useState(() => { try { return sessionStorage.getItem(ENTERED) === '1' || !!sessionStorage.getItem('pivot.workspace') } catch { return true } })
+  const [entered, setEntered] = useState(() => { try { return sessionStorage.getItem(ENTERED) === '1' } catch { return false } })
   const set = (v: boolean) => { setEntered(v); try { v ? sessionStorage.setItem(ENTERED, '1') : sessionStorage.removeItem(ENTERED) } catch { /* bỏ qua */ } window.scrollTo(0, 0) }
   return entered ? <Workspace onHome={() => set(false)} /> : <Landing onStart={() => set(true)} />
 }
 
 export default function App() {
-  return <I18nProvider>{EMBED ? <AppProvider><Shell /></AppProvider> : <Outer />}</I18nProvider>
+  return <I18nProvider><MagicGlow />{EMBED ? <AppProvider><Shell /></AppProvider> : <Outer />}</I18nProvider>
 }

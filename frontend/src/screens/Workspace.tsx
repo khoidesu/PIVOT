@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { api, ApiError, getSession, setSession, type Role } from '../api'
 import { Chip, ErrorNote } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -7,14 +8,22 @@ import { Brand } from '../components/TopBar'
 import { gsap, reducedMotion, useAutoEnter, useGSAP } from '../motion'
 import { useI18n } from '../i18n'
 import {
-  addWin, CHAIN, closeWin, EMPTY, focusWin, MAX_WINS, minimizeWin, moveWin, parse, placement, resetSizes, serialize, dragSplit, TEAM, updateToken,
+  addWin, CHAIN, closeWin, EMPTY, focusWin, MAX_WINS, minimizeWin, insertWin, parse, placement, resetSizes, serialize, dragSplit, TEAM, updateToken,
   winId, WsLimitError, type Splitter, type Win, type WsState,
 } from '../workspace'
-import { applyTheme, currentTheme, type Theme } from '../theme'
+import { ACCENT_PRESETS, applyAccent, applyTheme, currentAccent, currentTheme, type Theme } from '../theme'
 import { LoginForm } from './Login'
 
 const KEY = 'pivot.workspace'
+const WINDOW_LAYOUT_KEY = 'pivot.windowLayout'
 const GAP = 10 // px giữa các khung (cũng là bề rộng vùng bắt của thanh kéo)
+type WindowRect = { x: number; y: number; w: number; h: number; max?: boolean }
+const defaultWindowRect = (index: number, total: number): WindowRect => {
+  const cols = total <= 2 ? total : Math.ceil(Math.sqrt(total))
+  const rows = Math.ceil(total / cols)
+  const w = 100 / cols, h = 100 / rows
+  return { x: (index % cols) * w + (index % cols ? 1 : 0), y: Math.floor(index / cols) * h + (index ? 1 : 0), w: w - 1, h: h - 1 }
+}
 /** Chữ viết tắt trong avatar: 2 chữ cái đầu của hai từ cuối ("Nguyễn Văn An" → VA), một từ → chữ đầu + chữ thứ hai. */
 const initials = (name: string) => {
   const w = name.trim().split(/\s+/)
@@ -39,8 +48,17 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const [err, setErr] = useState<ApiError | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [dropSide, setDropSide] = useState<'left' | 'right' | 'top' | 'bottom' | 'center'>('center')
   const [width, setWidth] = useState(1200)
   const [theme, setThemeState] = useState<Theme>(currentTheme)
+  const [accent, setAccentState] = useState(currentAccent)
+  const [accentDraft, setAccentDraft] = useState(accent)
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const [windowRects, setWindowRects] = useState<Record<string, WindowRect>>(() => { try { return JSON.parse(sessionStorage.getItem(WINDOW_LAYOUT_KEY) || '{}') } catch { return {} } })
+  const [snapPreview, setSnapPreview] = useState<WindowRect | null>(null)
+  const [dockTooltip, setDockTooltip] = useState<{ label: string; x: number; y: number } | null>(null)
+  const [snapFlyout, setSnapFlyout] = useState<{ left: number; top: number } | null>(null)
+  const snapTimer = useRef<number | null>(null)
   const [splitting, setSplitting] = useState<'col' | 'row' | null>(null)
   const root = useRef<HTMLDivElement>(null)
   useAutoEnter(root)                                                   // cửa sổ mới / ngăn thêm người hiện lên mượt (GSAP)
@@ -56,9 +74,40 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const frames = useRef(new Map<string, HTMLIFrameElement>())
   const gridEl = useRef<HTMLDivElement | null>(null)
   const popEl = useRef<HTMLDivElement | null>(null)
+  const appearanceEl = useRef<HTMLDivElement | null>(null)
+  const dockRef = useRef<HTMLElement | null>(null)
 
   const commit = useCallback((next: WsState) => { stRef.current = next; setSt(next) }, [])
   useEffect(() => { try { sessionStorage.setItem(KEY, serialize(st)) } catch { /* bỏ qua */ } }, [st])
+  useEffect(() => {
+    setWindowRects((current) => {
+      const next = { ...current }
+      st.wins.filter((w) => w.open).forEach((w, i, all) => { if (!next[w.id]) next[w.id] = defaultWindowRect(i, all.length) })
+      return next
+    })
+  }, [st.wins])
+  useEffect(() => { try { sessionStorage.setItem(WINDOW_LAYOUT_KEY, JSON.stringify(windowRects)) } catch { /* bỏ qua */ } }, [windowRects])
+  useEffect(() => {
+    const dock = dockRef.current
+    if (!dock) return
+    let frame = 0, x = 0
+    const items = () => [...dock.querySelectorAll<HTMLElement>('.ws-node, .ws-add, .ws-appearance')]
+    const move = (e: PointerEvent) => {
+      x = e.clientX
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        items().forEach((el) => {
+          const center = el.getBoundingClientRect().left + el.offsetWidth / 2
+          const influence = Math.max(0, 1 - Math.abs(center - x) / 150)
+          el.style.setProperty('--dock-scale', String(1 + influence * 0.28))
+        })
+      })
+    }
+    const leave = () => { if (frame) cancelAnimationFrame(frame); frame = 0; items().forEach((el) => el.style.setProperty('--dock-scale', '1')) }
+    dock.addEventListener('pointermove', move, { passive: true }); dock.addEventListener('pointerleave', leave)
+    return () => { dock.removeEventListener('pointermove', move); dock.removeEventListener('pointerleave', leave); leave() }
+  }, [])
 
   const sendSession = useCallback((id: string) => {
     const w = stRef.current.wins.find((x) => x.id === id)
@@ -82,14 +131,14 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
       const hit = [...frames.current].find(([, f]) => f.contentWindow === e.source)
       if (!hit) return
       const id = hit[0]
-      if (d.type === 'logection:ready') { sendSession(id); hit[1].contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin) }
+      if (d.type === 'logection:ready') { sendSession(id); hit[1].contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin); hit[1].contentWindow?.postMessage({ type: 'logection:accent', accent }, location.origin) }
       else if (d.type === 'logection:badge') setBadges((b) => (b[id] === d.n ? b : { ...b, [id]: d.n ?? 0 }))
       else if (d.type === 'logection:logout') commit(closeWin(stRef.current, id))
       else if (d.type === 'logection:expired') { const w = stRef.current.wins.find((x) => x.id === id); if (w) void relogin(w) }
     }
     window.addEventListener('message', on)
     return () => window.removeEventListener('message', on)
-  }, [commit, relogin, sendSession, lang, theme])
+  }, [commit, relogin, sendSession, lang, theme, accent])
 
   useEffect(() => { for (const f of frames.current.values()) f.contentWindow?.postMessage({ type: 'logection:lang', lang }, location.origin) }, [lang])
   useEffect(() => { // chế độ sáng/tối: áp dụng cho trang bao ngoài và phát tới mọi cửa sổ nhúng
@@ -97,6 +146,17 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
     for (const f of frames.current.values()) f.contentWindow?.postMessage({ type: 'logection:theme', theme }, location.origin)
   }, [theme])
   const setTheme = (th: Theme) => { applyTheme(th, true); setThemeState(th) }
+  useEffect(() => {
+    applyAccent(accent)
+    setAccentDraft(accent)
+    for (const f of frames.current.values()) f.contentWindow?.postMessage({ type: 'logection:accent', accent }, location.origin)
+  }, [accent])
+  const setAccent = (color: string) => {
+    if (!/^#[\da-f]{6}$/i.test(color)) return
+    applyAccent(color, true)
+    setAccentState(color.toLowerCase())
+    for (const f of frames.current.values()) f.contentWindow?.postMessage({ type: 'logection:accent', accent: color.toLowerCase() }, location.origin)
+  }
 
   useEffect(() => { // bấm vào bên trong một cửa sổ (khung nhúng) → cửa sổ đó thành tiêu điểm
     const on = () => setTimeout(() => {
@@ -124,6 +184,14 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
     return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc) }
   }, [pop])
 
+  useEffect(() => {
+    if (!appearanceOpen) return
+    const out = (e: MouseEvent) => { if (!appearanceEl.current?.contains(e.target as Node)) setAppearanceOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setAppearanceOpen(false) }
+    document.addEventListener('mousedown', out); document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc) }
+  }, [appearanceOpen])
+
   async function enter(name: string, role: Role) {
     const r = await api.login(name, role)
     try { commit(addWin(stRef.current, { id: winId(r.me.user_name, role), name: r.me.user_name, role, token: r.token })) }
@@ -136,6 +204,106 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   async function chain() {
     setErr(null)
     try { for (const p of CHAIN) await enter(p.name, p.role); setPop('closed') } catch (e) { setErr(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) }
+  }
+
+  function startWindowAction(e: React.PointerEvent<HTMLElement>, id: string, action: 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw') {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return
+    const area = gridEl.current
+    if (!area) return
+    e.preventDefault()
+    commit(focusWin(stRef.current, id))
+    const bounds = area.getBoundingClientRect()
+    const initial = windowRects[id] ?? { x: 2, y: 2, w: 48, h: 48 }
+    const sx = e.clientX, sy = e.clientY
+    const startRect = { ...initial }
+    const winEl = [...area.querySelectorAll<HTMLElement>('.ws-win')].find((el) => el.dataset.windowId === id)
+    let dxPx = 0, dyPx = 0
+    let hintKey = ''
+    const boundedDelta = (clientX: number, clientY: number) => {
+      let dx = clientX - sx, dy = clientY - sy
+      const minW = Math.min(100, 280 / bounds.width * 100), minH = Math.min(100, 220 / bounds.height * 100)
+      if (action === 'move') {
+        dx = Math.max(-startRect.x * bounds.width / 100, Math.min((100 - startRect.x - startRect.w) * bounds.width / 100, dx))
+        dy = Math.max(-startRect.y * bounds.height / 100, Math.min((100 - startRect.y - startRect.h) * bounds.height / 100, dy))
+      } else {
+        if (action.includes('e')) dx = Math.max((minW - startRect.w) * bounds.width / 100, Math.min((100 - startRect.x - startRect.w) * bounds.width / 100, dx))
+        if (action.includes('w')) dx = Math.max(-startRect.x * bounds.width / 100, Math.min((startRect.w - minW) * bounds.width / 100, dx))
+        if (action.includes('s')) dy = Math.max((minH - startRect.h) * bounds.height / 100, Math.min((100 - startRect.y - startRect.h) * bounds.height / 100, dy))
+        if (action.includes('n')) dy = Math.max(-startRect.y * bounds.height / 100, Math.min((startRect.h - minH) * bounds.height / 100, dy))
+      }
+      return { dx, dy }
+    }
+    const move = (ev: PointerEvent) => {
+      ;({ dx: dxPx, dy: dyPx } = boundedDelta(ev.clientX, ev.clientY))
+      if (action === 'move') {
+        const px = ev.clientX - bounds.left, py = ev.clientY - bounds.top, edge = 28
+        let hint: WindowRect | null = null
+        if (py < edge && px < edge) hint = { x: 0, y: 0, w: 50, h: 50 }
+        else if (py < edge && px > bounds.width - edge) hint = { x: 50, y: 0, w: 50, h: 50 }
+        else if (py > bounds.height - edge && px < edge) hint = { x: 0, y: 50, w: 50, h: 50 }
+        else if (py > bounds.height - edge && px > bounds.width - edge) hint = { x: 50, y: 50, w: 50, h: 50 }
+        else if (px < edge) hint = { x: 0, y: 0, w: 50, h: 100 }
+        else if (px > bounds.width - edge) hint = { x: 50, y: 0, w: 50, h: 100 }
+        else if (py < edge) hint = { x: 0, y: 0, w: 100, h: 100, max: true }
+        const key = hint ? `${hint.x}:${hint.y}:${hint.w}:${hint.h}` : ''
+        if (key !== hintKey) { hintKey = key; setSnapPreview(hint) }
+      }
+      if (!winEl) return
+      winEl.classList.add('ws-window-live-drag')
+      if (action === 'move') { winEl.style.transform = `translate3d(${dxPx}px, ${dyPx}px, 0)`; return }
+      const dx = dxPx / bounds.width * 100, dy = dyPx / bounds.height * 100
+      const minW = Math.min(100, 280 / bounds.width * 100), minH = Math.min(100, 220 / bounds.height * 100)
+      const nextW = action.includes('e') ? Math.max(minW, Math.min(100 - startRect.x, startRect.w + dx)) : action.includes('w') ? Math.max(minW, startRect.w - dx) : startRect.w
+      const nextH = action.includes('s') ? Math.max(minH, Math.min(100 - startRect.y, startRect.h + dy)) : action.includes('n') ? Math.max(minH, startRect.h - dy) : startRect.h
+      const scaleX = nextW / startRect.w, scaleY = nextH / startRect.h
+      winEl.style.transformOrigin = `${action.includes('w') ? 'right' : 'left'} ${action.includes('n') ? 'bottom' : 'top'}`
+      winEl.style.transform = `scale(${scaleX}, ${scaleY})`
+    }
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up)
+      setSnapPreview(null)
+      ;({ dx: dxPx, dy: dyPx } = boundedDelta(ev.clientX, ev.clientY))
+      const dx = dxPx / bounds.width * 100, dy = dyPx / bounds.height * 100
+      const result = { ...startRect, max: false }
+      if (action === 'move') { result.x = Math.min(100 - result.w, Math.max(0, startRect.x + dx)); result.y = Math.min(100 - result.h, Math.max(0, startRect.y + dy)) }
+      const minW = Math.min(100, 280 / bounds.width * 100), minH = Math.min(100, 220 / bounds.height * 100)
+      if (action.includes('e')) result.w = Math.max(minW, Math.min(100 - startRect.x, startRect.w + dx))
+      if (action.includes('s')) result.h = Math.max(minH, Math.min(100 - startRect.y, startRect.h + dy))
+      if (action.includes('w')) { const w = Math.max(minW, Math.min(startRect.w - dx, startRect.x + startRect.w)); result.x = startRect.x + startRect.w - w; result.w = w }
+      if (action.includes('n')) { const h = Math.max(minH, Math.min(startRect.h - dy, startRect.y + startRect.h)); result.y = startRect.y + startRect.h - h; result.h = h }
+      const edgeX = ev.clientX - bounds.left, edgeY = ev.clientY - bounds.top
+      if (action === 'move' && edgeY < 18 && edgeX < 18) result.x = 0, result.y = 0, result.w = 50, result.h = 50
+      else if (action === 'move' && edgeY < 18 && edgeX > bounds.width - 18) result.x = 50, result.y = 0, result.w = 50, result.h = 50
+      else if (action === 'move' && edgeY > bounds.height - 18 && edgeX < 18) result.x = 0, result.y = 50, result.w = 50, result.h = 50
+      else if (action === 'move' && edgeY > bounds.height - 18 && edgeX > bounds.width - 18) result.x = 50, result.y = 50, result.w = 50, result.h = 50
+      else if (action === 'move' && edgeY < 18) result.x = 0, result.y = 0, result.w = 100, result.h = 100, result.max = true
+      else if (action === 'move' && edgeX < 12) result.x = 0, result.y = 0, result.w = 50, result.h = 100
+      else if (action === 'move' && edgeX > bounds.width - 12) result.x = 50, result.y = 0, result.w = 50, result.h = 100
+      // Clamp after movement, resize and snap so no edge can escape the workspace.
+      result.x = Math.max(0, Math.min(100, result.x))
+      result.y = Math.max(0, Math.min(100, result.y))
+      result.w = Math.max(0, Math.min(result.w, 100 - result.x))
+      result.h = Math.max(0, Math.min(result.h, 100 - result.y))
+      flushSync(() => setWindowRects((all) => ({ ...all, [id]: result })))
+      if (winEl) { winEl.classList.remove('ws-window-live-drag'); winEl.style.transform = ''; winEl.style.transformOrigin = '' }
+      setDragId(null)
+    }
+    setDragId(id)
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up)
+  }
+
+  function applySnapLayout(layout: 'columns' | 'three' | 'quarters' | 'main') {
+    const ids = stRef.current.wins.filter((w) => w.open).map((w) => w.id)
+    const zones: WindowRect[] = layout === 'columns' ? [{ x: 0, y: 0, w: 50, h: 100 }, { x: 50, y: 0, w: 50, h: 100 }]
+      : layout === 'three' ? [{ x: 0, y: 0, w: 33.33, h: 100 }, { x: 33.33, y: 0, w: 33.34, h: 100 }, { x: 66.67, y: 0, w: 33.33, h: 100 }]
+      : layout === 'quarters' ? [{ x: 0, y: 0, w: 50, h: 50 }, { x: 50, y: 0, w: 50, h: 50 }, { x: 0, y: 50, w: 50, h: 50 }, { x: 50, y: 50, w: 50, h: 50 }]
+      : [{ x: 0, y: 0, w: 66, h: 100 }, { x: 66, y: 0, w: 34, h: 50 }, { x: 66, y: 50, w: 34, h: 50 }]
+    setWindowRects((all) => {
+      const next = { ...all }
+      ids.forEach((id, i) => { if (zones[i]) next[id] = zones[i] })
+      return next
+    })
+    setSnapFlyout(null)
   }
 
   /** Kéo thanh chia: đổi tỉ lệ hai khung kề nhau theo quãng chuột đi (tính bằng phần của hàng/vùng). Khung nhúng tạm không nhận chuột để không "nuốt" sự kiện. */
@@ -162,9 +330,11 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const wins = st.wins
   const open = wins.filter((w) => w.open)
   const place = placement(st, width)
-  const narrow = width < 640
+  // Màn hình hẹp luôn là một cửa sổ toàn vùng; chuyển tài khoản qua dock.
+  const narrow = width < 768
   const stable = [...wins].sort((a, b) => (a.id < b.id ? -1 : 1)) // thứ tự DOM cố định (đổi thứ tự DOM sẽ làm khung nhúng tải lại); thứ tự hiển thị dùng CSS `order`
   const focusId = st.focus ?? open[0]?.id
+  const showDockTooltip = (e: React.MouseEvent<HTMLElement>, label: string) => { const r = e.currentTarget.getBoundingClientRect(); setDockTooltip({ label, x: r.left + r.width / 2, y: r.top - 12 }) }
 
   const addMenu = pop === 'form' ? (
     <LoginForm compact onLogin={async (n, r) => { await enter(n, r); setPop('closed') }} />
@@ -189,9 +359,8 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
 
   return (
     <div className="ws" ref={root}>
-      <nav className={`ws-rail${slim ? ' slim' : ''}`} aria-label={t('ws.rail')}>
+      <nav ref={dockRef} className={`ws-rail${slim ? ' slim' : ''}`} aria-label={t('ws.rail')}>
         <div className="ws-rail-h">
-          <button className="brand-btn" aria-label="LOGECTION" onClick={onHome}><Brand /></button>
           <button className="ws-collapse" aria-label={t(slim ? 'ws.expand' : 'ws.collapse')} title={t(slim ? 'ws.expand' : 'ws.collapse')} aria-expanded={!slim}
             onClick={() => { setSlim(!slim); try { localStorage.setItem('pivot.railSlim', slim ? '0' : '1') } catch { /* bỏ qua */ } }}><Icon name={slim ? 'chevronsRight' : 'chevronsLeft'} size={16} /></button>
         </div>
@@ -202,7 +371,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
             const isOpen = w.open
             const label = `${w.name} · ${t(`role.${w.role}`)}`
             return (
-              <button key={w.id} className={`ws-node role-${w.role}${isOpen ? '' : ' bg'}${isOpen && w.id === focusId ? ' foc' : ''}`}
+              <button key={w.id} data-label={label} onMouseEnter={(e) => showDockTooltip(e, label)} onMouseLeave={() => setDockTooltip(null)} className={`ws-node role-${w.role}${isOpen ? '' : ' bg'}${isOpen && w.id === focusId ? ' foc' : ''}`}
                 title={`${label} — ${isOpen ? t('ws.open') : t('ws.bgTip')}`}
                 aria-label={`${w.name}, ${t(`role.${w.role}`)}, ${isOpen ? t('ws.open') : t('ws.bg')}${b ? `, ${t('ws.pending', { n: b })}` : ''}`}
                 onClick={() => commit(focusWin(stRef.current, w.id))}>
@@ -217,11 +386,50 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
           })}
         </div>
         <div className="ws-tools" ref={popEl}>
-          <button className="ws-add" aria-label={t('ws.add')} title={t('ws.add')} aria-expanded={pop !== 'closed'} aria-haspopup="menu" onClick={() => { setErr(null); setPop(pop === 'closed' ? 'list' : 'closed') }}>
+          <button className="ws-add" data-label={t('ws.add')} onMouseEnter={(e) => showDockTooltip(e, t('ws.add'))} onMouseLeave={() => setDockTooltip(null)} aria-label={t('ws.add')} title={t('ws.add')} aria-expanded={pop !== 'closed'} aria-haspopup="menu" onClick={() => { setErr(null); setAppearanceOpen(false); setPop(pop === 'closed' ? 'list' : 'closed') }}>
             <Icon name="plus" size={16} />{!slim && <span>{t('ws.add')}</span>}
           </button>
-          <div className="seg ws-theme" role="group" aria-label={t('theme.label')}>
-            {(['light', 'dark'] as const).map((m) => <button key={m} className="theme-btn" aria-pressed={theme === m} title={t(`theme.${m}`)} aria-label={t(`theme.${m}`)} onClick={() => setTheme(m)}><Icon name={m === 'light' ? 'sun' : 'moon'} size={15} /><span>{t(`theme.${m}`)}</span></button>)}
+          <div className="ws-appearance-wrap" ref={appearanceEl}>
+            <button className="ws-appearance" data-label={t('theme.appearance')} onMouseEnter={(e) => showDockTooltip(e, t('theme.appearance'))} onMouseLeave={() => setDockTooltip(null)} aria-label={t('theme.appearance')} title={t('theme.appearance')} aria-expanded={appearanceOpen} aria-haspopup="dialog"
+              onClick={() => { setPop('closed'); setAppearanceOpen((open) => !open) }}>
+              <Icon name="palette" size={17} />{!slim && <span>{t('theme.label')}</span>}
+            </button>
+            {appearanceOpen && (
+              <section className="ws-appearance-pop" role="dialog" aria-label={t('theme.appearance')}>
+                <h2>{t('theme.appearance')}</h2>
+                <div className="ws-appearance-block">
+                  <span className="ws-appearance-label">{t('theme.mode')}</span>
+                  <div className="ws-mode-options" role="group" aria-label={t('theme.mode')}>
+                    {(['light', 'dark'] as const).map((m) => (
+                      <button key={m} className={theme === m ? 'on' : ''} aria-pressed={theme === m} onClick={() => setTheme(m)}>
+                        <Icon name={m === 'light' ? 'sun' : 'moon'} size={16} /><span>{t(`theme.${m}`)}</span>
+                      </button>))}
+                  </div>
+                </div>
+                <div className="ws-appearance-block">
+                  <span className="ws-appearance-label">{t('theme.accent')}</span>
+                  <div className="ws-color-grid" role="group" aria-label={t('theme.presets')}>
+                    {ACCENT_PRESETS.map((color) => (
+                      <button key={color} className={`ws-color-swatch${accent.toLowerCase() === color.toLowerCase() ? ' selected' : ''}`}
+                        style={{ backgroundColor: color }} aria-label={`${t('theme.accent')} ${color}`} title={color} aria-pressed={accent.toLowerCase() === color.toLowerCase()}
+                        onClick={() => setAccent(color)} />))}
+                  </div>
+                </div>
+                <div className="ws-custom-color">
+                  <span className="ws-appearance-label">{t('theme.custom')}</span>
+                  <label className="ws-color-hex">
+                    <span>{t('theme.hex')}</span>
+                    <input aria-label={t('theme.hex')} value={accentDraft.toUpperCase()} maxLength={7}
+                      onChange={(e) => setAccentDraft(e.target.value)}
+                      onBlur={() => /^#[\da-f]{6}$/i.test(accentDraft) ? setAccent(accentDraft) : setAccentDraft(accent)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }} />
+                  </label>
+                  <label className="ws-color-picker" title={t('theme.colorPicker')}>
+                    <input type="color" aria-label={t('theme.colorPicker')} value={accent} onChange={(e) => setAccent(e.target.value)} />
+                    <span>{t('theme.colorPicker')}</span>
+                  </label>
+                </div>
+              </section>)}
           </div>
           {pop !== 'closed' && (
             <div className="ws-pop" role="menu">
@@ -229,15 +437,17 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
             </div>)}
         </div>
       </nav>
+      {dockTooltip && <div className="ws-dock-tooltip" style={{ left: dockTooltip.x, top: dockTooltip.y }} role="tooltip">{dockTooltip.label}</div>}
 
       <section className="ws-work">
         <div className="ws-bar">
-          <span className="muted">{t('ws.count', { n: open.length })}{wins.length > open.length ? ` · ${t('ws.bgN', { n: wins.length - open.length })}` : ''}</span>
-          <span className="grow" />
-          {st.sizes && <button className="btn sm" onClick={() => commit(resetSizes(stRef.current))}>{t('ws.even')}</button>}
+          <button className="brand-btn ws-top-brand" aria-label="LOGECTION" onClick={onHome}><Brand /></button>
           <div className="seg" role="group" aria-label="Language">
             {(['vi', 'en'] as const).map((l) => <button key={l} aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}
           </div>
+          <span className="muted">{t('ws.count', { n: open.length })}{wins.length > open.length ? ` · ${t('ws.bgN', { n: wins.length - open.length })}` : ''}</span>
+          <span className="grow" />
+          {st.sizes && <button className="btn sm" onClick={() => commit(resetSizes(stRef.current))}>{t('ws.even')}</button>}
         </div>
         <div ref={gridEl} className={`ws-grid${dragId || splitting ? ' dragging' : ''}${splitting ? ` splitting-${splitting}` : ''}`}>
           {!wins.length
@@ -252,21 +462,29 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
                 <div className="ws-start-card" role="menu">{addMenu}</div>
               </div>)
             : !open.length && <div className="ws-none">{t('ws.empty')}</div>}
+          {snapPreview && <div className="ws-snap-preview" style={{ left: `${snapPreview.x}%`, top: `${snapPreview.y}%`, width: `${snapPreview.w}%`, height: `${snapPreview.h}%` }} aria-hidden />}
+          {snapFlyout && <div className="ws-snap-flyout" style={snapFlyout} onMouseEnter={() => { if (snapTimer.current) window.clearTimeout(snapTimer.current) }} onMouseLeave={() => setSnapFlyout(null)}>
+            <button onClick={() => applySnapLayout('columns')} aria-label="Two columns"><i className="snap-mini two"><b /><b /></i></button>
+            <button onClick={() => applySnapLayout('three')} aria-label="Three columns"><i className="snap-mini three"><b /><b /><b /></i></button>
+            <button onClick={() => applySnapLayout('quarters')} aria-label="Four corners"><i className="snap-mini four"><b /><b /><b /><b /></i></button>
+            <button onClick={() => applySnapLayout('main')} aria-label="Large area and two small areas"><i className="snap-mini main"><b /><b /><b /></i></button>
+          </div>}
           {stable.map((w) => {
-            const p = place.items[w.id]
+            const rect = windowRects[w.id] ?? defaultWindowRect(Math.max(0, open.findIndex((x) => x.id === w.id)), Math.max(1, open.length))
             const shown = w.open && (!narrow || w.id === focusId)
             const b = badges[w.id] ?? 0
             return (
-              <div key={w.id} className={`ws-win role-${w.role}${w.id === focusId ? ' foc' : ''}${overId === w.id && dragId !== w.id ? ' over' : ''}`}
-                style={{ display: shown ? undefined : 'none', ...(narrow || !p ? { inset: GAP / 2 } : { left: `calc(${p.left}% + ${GAP / 2}px)`, top: `calc(${p.top}% + ${GAP / 2}px)`, width: `calc(${p.width}% - ${GAP}px)`, height: `calc(${p.height}% - ${GAP}px)` }) }}
-                onDragOver={(e) => { if (dragId) { e.preventDefault(); setOverId(w.id) } }}
-                onDrop={(e) => { e.preventDefault(); if (dragId) commit(moveWin(stRef.current, dragId, w.id)); setDragId(null); setOverId(null) }}>
+              <div key={w.id} data-window-id={w.id} className={`ws-win role-${w.role}${w.id === focusId ? ' foc' : ''}${overId === w.id && dragId !== w.id ? ` over drop-${dropSide}` : ''}${rect.max ? ' maximized' : ''}`}
+                style={{ display: shown ? undefined : 'none', ...(narrow ? { inset: 0, width: '100%', height: '100%', zIndex: w.id === focusId ? 100 : 1 } : { left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%`, zIndex: w.id === focusId ? 100 : Math.max(1, open.findIndex((x) => x.id === w.id) + 1) }) }}
+                onPointerDown={() => { if (stRef.current.focus !== w.id) commit(focusWin(stRef.current, w.id)) }}
+                onDragOver={(e) => { if (dragId && dragId !== w.id) { e.preventDefault(); setOverId(w.id); const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX-r.left)/r.width, y = (e.clientY-r.top)/r.height; const edge = Math.min(x,1-x,y,1-y); setDropSide(edge > .28 ? 'center' : edge === x ? 'left' : edge === 1-x ? 'right' : edge === y ? 'top' : 'bottom') } }}
+                onDrop={(e) => { e.preventDefault(); if (dragId) commit(insertWin(stRef.current, dragId, w.id, dropSide)); setDragId(null); setOverId(null) }}>
                 <div className="ws-stripe" />
-                <div className="ws-wh" draggable title={t('ws.drag')} onClick={() => commit(focusWin(stRef.current, w.id))}
-                  onDragStart={(e) => { setDragId(w.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', w.id) } catch { /* bỏ qua */ } }}
-                  onDragEnd={() => { setDragId(null); setOverId(null) }}>
+                {!narrow && ['n','s','e','w','ne','nw','se','sw'].map((edge) => <div key={edge} className={`ws-resize ws-resize-${edge}`} onPointerDown={(e) => startWindowAction(e, w.id, edge as 'n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw')} />)}
+                <div className="ws-wh" title={t('ws.drag')} onPointerDown={(e) => startWindowAction(e, w.id, 'move')}>
                   <span className="ws-grip" aria-hidden><Icon name="grip" size={14} /></span>
                   <span className="ws-title"><b>{w.name}</b> <span className="muted">· {t(`role.${w.role}`)}</span>{b > 0 && <span className="ws-pend">{t('ws.pending', { n: b })}</span>}</span>
+                  <button className="ws-ib" aria-label="Maximize" title="Maximize" onMouseEnter={(e) => { if (snapTimer.current) window.clearTimeout(snapTimer.current); const grid = gridEl.current?.getBoundingClientRect(), button = e.currentTarget.getBoundingClientRect(); if (!grid) return; const width = 184, height = 148; const left = Math.max(8, Math.min(button.left - grid.left - width / 2, grid.width - width - 8)); const top = Math.max(8, Math.min(button.bottom - grid.top + 8, grid.height - height - 8)); snapTimer.current = window.setTimeout(() => setSnapFlyout({ left, top }), 450) }} onMouseLeave={() => { if (snapTimer.current) window.clearTimeout(snapTimer.current); snapTimer.current = window.setTimeout(() => setSnapFlyout(null), 450) }} onClick={(e) => { e.stopPropagation(); const r = windowRects[w.id] ?? rect; setWindowRects((all) => ({ ...all, [w.id]: r.max ? { ...r, x: 2, y: 2, w: 48, h: 48, max: false } : { x: 0, y: 0, w: 100, h: 100, max: true } })) }}>□</button>
                   <button className="ws-ib" aria-label={`${t('ws.min')} — ${w.name}`} title={t('ws.min')} onClick={(e) => { e.stopPropagation(); commit(minimizeWin(stRef.current, w.id)) }}><Icon name="minus" size={15} /></button>
                   <button className="ws-ib" aria-label={`${t('ws.close')} — ${w.name}`} title={t('ws.close')} onClick={(e) => { e.stopPropagation(); commit(closeWin(stRef.current, w.id)) }}><Icon name="x" size={15} /></button>
                 </div>
@@ -291,6 +509,11 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
                 if (step) { e.preventDefault(); commit(dragSplit(stRef.current, width, sp, step)) }
               }} />))}
         </div>
+        {!!wins.length && <div className="ws-dock" aria-label={t('ws.people')}>
+          {wins.map((w) => <button key={w.id} className={`ws-dock-item${w.id === focusId ? ' active' : ''}`} title={`${w.name} · ${t(`role.${w.role}`)}`} onClick={() => commit(focusWin(stRef.current, w.id))}>
+            <span className={`ws-dock-avatar role-${w.role}`}>{initials(w.name)}</span><i className={w.open ? 'running' : ''} />
+          </button>)}<span className="ws-dock-divider" /><button className="ws-dock-item ws-dock-add" aria-label={t('ws.add')} title={t('ws.add')} onClick={() => { setErr(null); setPop(pop === 'closed' ? 'list' : 'closed') }}><span className="ws-dock-avatar">+</span></button>
+        </div>}
       </section>
     </div>
   )

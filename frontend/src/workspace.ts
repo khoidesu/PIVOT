@@ -60,10 +60,24 @@ export function moveWin(s: WsState, from: string, to: string): WsState {
   return { ...s, wins }
 }
 
+/** Chèn cửa sổ kéo vào trước/sau cửa sổ đích; center đổi chỗ như thao tác cũ. */
+export function insertWin(s: WsState, from: string, to: string, side: 'left' | 'right' | 'top' | 'bottom' | 'center'): WsState {
+  const a = s.wins.findIndex((x) => x.id === from), b = s.wins.findIndex((x) => x.id === to)
+  if (a < 0 || b < 0 || a === b) return s
+  if (side === 'center') return moveWin(s, from, to)
+  const wins = s.wins.slice(), [item] = wins.splice(a, 1)
+  const target = wins.findIndex((x) => x.id === to)
+  wins.splice(target + (side === 'right' || side === 'bottom' ? 1 : 0), 0, item)
+  return { ...s, wins }
+}
+
 /** Số cột mỗi hàng: gần vuông (√n), nhưng không để cửa sổ hẹp hơn MIN_WIN_WIDTH. */
 export function columnsFor(n: number, width: number): number {
   if (n <= 1) return 1
-  return Math.max(1, Math.min(Math.ceil(Math.sqrt(n)), Math.floor(width / MIN_WIN_WIDTH)))
+  const capacity = Math.max(1, Math.floor(width / MIN_WIN_WIDTH))
+  // Ba khung giữ cùng một hàng khi đủ rộng; hữu ích khi thả cửa sổ mới giữa hai tài khoản.
+  if (n === 3 && capacity >= 3) return 3
+  return Math.max(1, Math.min(Math.ceil(Math.sqrt(n)), capacity))
 }
 
 /** Hình dạng bố cục: số cửa sổ ở từng hàng (hàng cuối có thể ít hơn → các cửa sổ đó tự rộng ra). */
