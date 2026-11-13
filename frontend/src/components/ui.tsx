@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ApiError } from '../api'
-import { reasonText, useI18n } from '../i18n'
+import { reasonText, useI18n, tCode } from '../i18n'
 import { fmtTime } from '../fmt'
 
 export const Chip = ({ kind, children, title }: { kind?: string; children: ReactNode; title?: string }) => (
@@ -39,11 +39,11 @@ const FLOW = ['proposed', 'pending_acceptance', 'confirmed', 'executing', 'compl
 export function Stepper({ status }: { status: string }) {
   const { t } = useI18n()
   const idx = FLOW.indexOf(status)
-  if (idx < 0) return <Chip kind="bad">{t(`ps.${status}`)}</Chip>
+  if (idx < 0) return <Chip kind="bad">{tCode(t, 'ps.', status)}</Chip>
   return (
-    <span className="dots" role="img" aria-label={`${t(`ps.${status}`)} (${idx + 1}/${FLOW.length})`}>
+    <span className="dots" role="img" aria-label={`${tCode(t, 'ps.', status)} (${idx + 1}/${FLOW.length})`}>
       <span aria-hidden>{FLOW.map((s, i) => <i key={s} className={i < idx ? 'done' : i === idx ? 'cur' : ''} />)}</span>
-      <b>{t(`ps.${status}`)}</b>
+      <b>{tCode(t, 'ps.', status)}</b>
     </span>
   )
 }

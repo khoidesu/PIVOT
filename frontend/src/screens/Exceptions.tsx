@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { api, ApiError, type ExceptionItem } from '../api'
 import { Chip, ErrorNote, Hint, Loading, Note } from '../components/ui'
 import { fmtTime, nowMs } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
@@ -70,7 +70,7 @@ export function Exceptions({ go }: { go: (to: string) => void }) {
               {trips.map((p) => <option key={p.id} value={p.id}>{p.shipment.code} · {p.vehicle.plate}</option>)}
             </select>
             <select aria-label={t('ex.report')} value={kind || kinds[0]} onChange={(e) => setKind(e.target.value)}>
-              {kinds.map((k) => <option key={k} value={k}>{t(`ex.kind.${k}`)}</option>)}
+              {kinds.map((k) => <option key={k} value={k}>{tCode(t, 'ex.kind.', k)}</option>)}
             </select>
             <input value={note} maxLength={300} placeholder={t('ex.note')} onChange={(e) => setNote(e.target.value)} />
             <button className="btn sm" disabled={!!busy} onClick={report}>{t('ex.report')} · {t('ex.send')}</button>
@@ -80,19 +80,19 @@ export function Exceptions({ go }: { go: (to: string) => void }) {
       {list.map((e) => (
         <article key={e.id} className={`card stack ex ${e.severity}`}>
           <div className="row">
-            <Chip kind={SEV_KIND[e.severity]}>{t(`ex.sev.${e.severity}`)}</Chip>
-            <b>{t(`ex.cat.${e.exc_type}`)}</b>
+            <Chip kind={SEV_KIND[e.severity]}>{tCode(t, 'ex.sev.', e.severity)}</Chip>
+            <b>{tCode(t, 'ex.cat.', e.exc_type)}</b>
             <span className="muted small">{e.shipment_code} · {e.plate}</span>
             {e.status === 'open' && e.sla_due_at && <Chip kind={e.overdue ? 'bad' : ''}>{e.overdue ? t('ex.overdue') : t('ex.sla', { t: dueText(e) })}</Chip>}
             {e.escalated_at && <Chip kind="warn">{t('ex.escalated')}</Chip>}
-            {e.status === 'resolved' && <Chip kind="good">✓ {t(`tl.resolve.${e.detail.resolution ?? 'accept_delay'}`)}</Chip>}
+            {e.status === 'resolved' && <Chip kind="good">✓ {tCode(t, 'tl.resolve.', e.detail.resolution, 'tl.resolve.other')}</Chip>}
           </div>
           {e.detail.note && <div className="muted small">“{e.detail.note}”</div>}
           <ol className="steps">
             {e.tasks.map((k) => (
               <li key={k.id} className={k.status === 'done' ? 'done' : ''}>
-                <span>{k.status === 'done' ? '✓' : '○'} {t(`ex.step.${k.step_key}`)}</span>
-                <span className="muted small">{t(`ex.owner.${k.owner}`)}</span>
+                <span>{k.status === 'done' ? '✓' : '○'} {tCode(t, 'ex.step.', k.step_key)}</span>
+                <span className="muted small">{tCode(t, 'ex.owner.', k.owner)}</span>
                 {k.can_complete && <button className="btn sm" disabled={!!busy} onClick={() => guard(k.id, async () => { await api.completeTask(e.id, k.id) })}>{t('ex.done')}</button>}
               </li>))}
           </ol>

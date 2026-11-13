@@ -3,7 +3,7 @@ import { api, ApiError, type GateItem, type MatchRun, type Proposal, type Reject
 import { Chip, ErrorNote, Loading, More, Note } from '../components/ui'
 import { fmtNum, fmtTime, fmtVnd, nowMs } from '../fmt'
 import { preflight } from '../preflight'
-import { reasonText, useI18n, type TFn } from '../i18n'
+import { reasonText, useI18n, type TFn, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
@@ -26,7 +26,7 @@ function GateRow({ g }: { g: GateItem }) {
   return (
     <div className="gate-item">
       <Chip kind={g.status}>{g.status}</Chip>
-      <span><b>{t(`gate.${g.gate}`)}</b>{g.status !== 'PASS' && <> — {reasonText(g, t, fmtTime)} <span className="code muted">{g.reason_code}</span></>}</span>
+      <span><b>{tCode(t, 'gate.', g.gate)}</b>{g.status !== 'PASS' && <> — {reasonText(g, t, fmtTime)} <span className="code muted">{g.reason_code}</span></>}</span>
     </div>
   )
 }
@@ -77,11 +77,11 @@ function ProposalCard({ p, rank, onHold, busy }: { p: Proposal; rank: number; on
         <div className="stack">
           {(['fit', 'time_margin', 'empty_km_saved'] as const).map((k) => (
             <div className="comp" key={k}>
-              <span>{t(`rec.comp.${k}`)} <span className="muted">× {c.weights[k]}</span></span><b>{c[k].toFixed(2)}</b>
+              <span>{tCode(t, 'rec.comp.', k)} <span className="muted">× {c.weights[k]}</span></span><b>{c[k].toFixed(2)}</b>
               <div className="bar" role="presentation"><i style={{ width: `${Math.round(c[k] * 100)}%` }} /></div>
             </div>))}
           <div className="gate-list"><b>{t('rec.gates')}</b>{p.gates.map((g, i) => <GateRow key={i} g={g} />)}</div>
-          <div className="small"><b>{t('rec.parties')}</b>: {Object.entries(p.parties).map(([k, v]) => `${t(`party.${k}`)} ${v.org_name}`).join(' · ')}</div>
+          <div className="small"><b>{t('rec.parties')}</b>: {Object.entries(p.parties).map(([k, v]) => `${tCode(t, 'party.', k)} ${v.org_name}`).join(' · ')}</div>
           <span className="footnote">{p.shipment.weight_kg != null && `${fmtNum(p.shipment.weight_kg)} / ${fmtNum(p.vehicle.capacity_kg)} kg · `}{t('rec.note')}</span>
           <span className="footnote">{t('rec.versions', { rule: p.rule_version, assume: p.assumption_version, model: p.model_version })}</span>
         </div>
@@ -148,7 +148,7 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
           <div className="row">
             <label className="inline">{t('rec.pick')}
               <select value={lotId} onChange={(e) => setLotId(e.target.value)} disabled={!allowed}>
-                {open.map((s) => <option key={s.id} value={s.id}>{s.code} · {t(`cargo.${s.cargo_type}`)} · {s.weight_kg == null ? '?' : `${fmtNum(s.weight_kg)} kg`}{s.missing_fields.length ? ' (!)' : ''}</option>)}
+                {open.map((s) => <option key={s.id} value={s.id}>{s.code} · {tCode(t, 'cargo.', s.cargo_type)} · {s.weight_kg == null ? '?' : `${fmtNum(s.weight_kg)} kg`}{s.missing_fields.length ? ' (!)' : ''}</option>)}
               </select>
             </label>
             <label className="inline">{t('rec.icd')}
@@ -181,7 +181,7 @@ export function Recommend({ go, query }: { go: (to: string) => void; query: URLS
       {run && (
         <>
           <Note kind={run.status === 'proposals' ? 'ok' : run.status === 'needs_data' ? 'warn' : 'err'}>
-            {t(`rec.s.${run.status}`, { n: run.proposals.length, v: run.evaluated_vehicles })}
+            {tCode(t, 'rec.s.', run.status, undefined, { n: run.proposals.length, v: run.evaluated_vehicles })}
           </Note>
           {run.rejections.length > 0 && (
             <div className="small" aria-label={t('rec.breakdown')}>

@@ -3,7 +3,7 @@ import { api, ApiError, type EtaSignals, type SimMode, type TripTrack } from '..
 import { RouteMap } from '../components/RouteMap'
 import { Chip, ErrorNote, Hint, Loading, More, Note } from '../components/ui'
 import { fmtTime } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { allowedRoute } from '../nav'
 import { useApp } from '../store'
 import { useData } from '../useData'
@@ -49,7 +49,7 @@ function SignalsBlock({ sig }: { sig: EtaSignals }) {
         <Chip>{t('eta.sig.truck', { f: c.truck_factor })}</Chip>
         {c.traffic_kind === 'live'
           ? <Chip kind={c.traffic_factor > 1.15 ? 'warn' : 'teal'} title={t('eta.sig.liveTip')}>{t('eta.sig.live', { f: c.traffic_factor })}</Chip>
-          : <Chip title={t('eta.sig.trafficTip')}>{t('eta.sig.traffic', { band: t(`eta.band.${sig.band ?? 'normal'}`), f: c.traffic_factor })}</Chip>}
+          : <Chip title={t('eta.sig.trafficTip')}>{t('eta.sig.traffic', { band: tCode(t, 'eta.band.', sig.band ?? 'normal'), f: c.traffic_factor })}</Chip>}
         {w
           ? <Chip kind={c.weather_factor > 1 ? 'warn' : ''}>{t(w.precip_mm_h > 0 ? 'eta.sig.weather' : 'eta.sig.dry', { f: c.weather_factor, mm: w.precip_mm_h })}</Chip>
           : <Chip kind="warn">{t('eta.sig.noWeather')}</Chip>}
@@ -71,7 +71,7 @@ function EtaModelCard() {
   return (
     <More label={t('eta.model')}>
       <div className="stack">
-        <div className="row"><Chip kind={m.status === 'promoted' ? 'good' : 'warn'}>{t(`eta.status.${m.status}`)}</Chip>{m.source === 'onnx' && <Chip title={m.sha256 ?? ''}>{m.label}</Chip>}<Chip kind="sim">{t('badge.mock')}</Chip><Hint text={m.note} /></div>
+        <div className="row"><Chip kind={m.status === 'promoted' ? 'good' : 'warn'}>{tCode(t, 'eta.status.', m.status)}</Chip>{m.source === 'onnx' && <Chip title={m.sha256 ?? ''}>{m.label}</Chip>}<Chip kind="sim">{t('badge.mock')}</Chip><Hint text={m.note} /></div>
         {x && (
           <table className="mini"><thead><tr><th /><th>{t('eta.rule')}</th><th>ML</th></tr></thead><tbody>
             <tr><td>MAE</td><td>{x.mae_rule}′</td><td>{x.mae_ml}′</td></tr>
@@ -80,7 +80,7 @@ function EtaModelCard() {
           </tbody></table>)}
         {x && <span className="footnote">{t('eta.gate', { n: x.improvement_pct, min: x.min_improvement_pct })}{m.baseline ? ` ${t('eta.baseline', { name: m.baseline })}` : ''}</span>}
         {err && <ErrorNote error={err} />}
-        {m.reason !== 'ok' && m.status !== 'promoted' && <span className="footnote">{t(t(`eta.reason.${m.reason}`) === `eta.reason.${m.reason}` ? 'eta.reason.model_error' : `eta.reason.${m.reason}`)}</span>}
+        {m.reason !== 'ok' && m.status !== 'promoted' && <span className="footnote">{tCode(t, 'eta.reason.', m.reason, 'eta.reason.model_error')}</span>}
         {m.source !== 'onnx' && <div className="row"><button className="btn sm" disabled={busy} onClick={() => train(0)}>{t('eta.train')}</button>
           <button className="btn sm" disabled={busy} onClick={() => train(0.15)}>{t('eta.trainDrift')}</button></div>}
       </div>
@@ -137,7 +137,7 @@ function WaitingNote() {
       </div>
     )
   }
-  const who = [...new Set(waiting.flatMap((p) => Object.entries(p.parties).filter(([, v]) => !v.accepted).map(([k]) => t(`party.${k}`))))].join(', ')
+  const who = [...new Set(waiting.flatMap((p) => Object.entries(p.parties).filter(([, v]) => !v.accepted).map(([k]) => tCode(t, 'party.', k))))].join(', ')
   return (
     <Note kind="warn">
       <div className="stack">
@@ -197,12 +197,12 @@ export function Tracking({ query }: { query: URLSearchParams }) {
             <div className="row muted small"><Chip kind={trip.route_source === 'osrm' ? 'teal' : ''} title={t('tk.road.tip')}>{t(trip.route_source === 'osrm' ? 'tk.road.osrm' : 'tk.road.sim')}</Chip>
               <span>{t('tk.credit')}</span></div></div>
           <div className="card stack">
-            <div className="row"><b>{trip.shipment_code}</b><Chip>{trip.plate}</Chip><Chip kind="teal">{t(`ps.${trip.status}`)}</Chip></div>
+            <div className="row"><b>{trip.shipment_code}</b><Chip>{trip.plate}</Chip><Chip kind="teal">{tCode(t, 'ps.', trip.status)}</Chip></div>
             <div className="bar" aria-label={`${trip.progress_pct}%`}><i style={{ width: `${trip.progress_pct}%` }} /></div>
             <div className="row muted small"><span>{trip.progress_pct}%</span><span>{t('tk.left', { km: trip.remaining_km })}</span>
               <span>{trip.position?.age_seconds != null ? t('tk.age', { n: trip.position.age_seconds }) : t('tk.nopos')}</span></div>
             <div className="row">
-              {trip.milestones.map((ms) => <Chip key={ms.code} kind={ms.reached ? 'good' : ''}>{ms.reached ? '✓ ' : ''}{t(`tk.ms.${ms.code}`)}</Chip>)}
+              {trip.milestones.map((ms) => <Chip key={ms.code} kind={ms.reached ? 'good' : ''}>{ms.reached ? '✓ ' : ''}{tCode(t, 'tk.ms.', ms.code)}</Chip>)}
             </div>
             <CompleteTrip trip={trip} isCarrier={me?.role === 'carrier'} onDone={async () => { await detail.reload(true); await list.reload(true) }} />
             <EtaBlock trip={trip} />

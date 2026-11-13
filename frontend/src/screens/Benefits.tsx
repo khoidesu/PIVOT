@@ -3,7 +3,7 @@ import { api, ApiError, type Benefit } from '../api'
 import { SandboxCard } from '../components/SandboxCard'
 import { Chip, ErrorNote, Hint, Loading, More, Note } from '../components/ui'
 import { fmtClock, fmtNum, fmtTime, fmtVnd } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
@@ -43,7 +43,7 @@ export function Benefits({ query }: { query: URLSearchParams }) {
         <div className="grid3">
           {STATUSES.map((s) => (
             <div key={s} className="fact">
-              <small><Chip kind={KIND[s]}>{t(`bf.status.${s}`)}</Chip> <Hint text={t(`bf.sub.${s}`)} /> · {t('bf.count', { n: list.data?.totals[s].count ?? 0 })}</small>
+              <small><Chip kind={KIND[s]}>{tCode(t, 'bf.status.', s)}</Chip> <Hint text={tCode(t, 'bf.sub.', s)} /> · {t('bf.count', { n: list.data?.totals[s].count ?? 0 })}</small>
               <b style={{ fontSize: 22 }}>{fmtVnd(list.data?.totals[s].net_vnd ?? 0)}</b>
             </div>))}
         </div>
@@ -62,7 +62,7 @@ export function Benefits({ query }: { query: URLSearchParams }) {
                   <td><b>{b.shipment_code}</b> <span className="mono muted small">{b.vehicle_plate}</span></td>
                   <td className="num nw">{fmtNum(b.quantity_before)} → {fmtNum(b.quantity_after)}</td>
                   <td className="num"><b>{fmtVnd(b.net_vnd)}</b></td>
-                  <td><Chip kind={KIND[b.status]}>{t(`bf.status.${b.status}`)}</Chip></td>
+                  <td><Chip kind={KIND[b.status]}>{tCode(t, 'bf.status.', b.status)}</Chip></td>
                 </tr>))}</tbody>
             </table></div>
           </section>
@@ -71,7 +71,7 @@ export function Benefits({ query }: { query: URLSearchParams }) {
             {error && <ErrorNote error={error} />}
             {!detail ? <span className="muted">{t('bf.select')}</span> : (
               <>
-                <div className="row"><b>{detail.shipment_code}</b> <span className="mono muted">{detail.vehicle_plate}</span><Chip kind={KIND[detail.status]}>{t(`bf.status.${detail.status}`)}</Chip></div>
+                <div className="row"><b>{detail.shipment_code}</b> <span className="mono muted">{detail.vehicle_plate}</span><Chip kind={KIND[detail.status]}>{tCode(t, 'bf.status.', detail.status)}</Chip></div>
                 <div className="fact"><b>{t('bf.formula', { before: fmtNum(detail.formula?.before), after: fmtNum(detail.formula?.after), rate: fmtNum(detail.formula?.rate), net: fmtVnd(detail.net_vnd) })}</b></div>
                 {detail.status === 'verified'
                   ? <Note kind="ok">{t('bf.verified', { who: detail.verifier ?? '' })}</Note>

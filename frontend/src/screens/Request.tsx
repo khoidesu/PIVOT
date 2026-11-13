@@ -5,7 +5,7 @@ import { Icon } from '../components/Icon'
 import { IntakeTile } from '../components/IntakeTile'
 import { acceptFor, isPdf, prepareImage, readPdf } from '../image'
 import { isoToLocalInput, localInputDefault, localInputToIso } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
@@ -171,7 +171,7 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
                 {draft.suspicious_instructions && <Note kind="err">{t('in.suspicious')}</Note>}
                 {draft.looks_like_request === false && <Note kind="warn">{t('in.notRequest')}</Note>}
                 {draft.multiple_shipments && <Note kind="warn">{t('in.multi')}</Note>}
-                {draft.extractor.note && <Note kind="warn">{t(`in.llm.${draft.extractor.note}`)}</Note>}
+                {draft.extractor.note && <Note kind="warn">{tCode(t, 'in.llm.', draft.extractor.note)}</Note>}
                 {imgUrl && draft.transcript && (
                   <div className="img-pair">
                     <img src={imgUrl} alt={t('in.img.alt')} />
@@ -179,7 +179,7 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
                   </div>)}
                 {(() => {
                   const gaps = DRAFT_ORDER.filter((k) => k !== 'price_vnd' && k !== 'customer_name' && draft.fields[k]?.value == null)
-                  return gaps.length > 0 && <Note kind="warn">{t('in.gaps', { list: gaps.map((k) => t(`in.f.${k}`)).join(', ') })}</Note>
+                  return gaps.length > 0 && <Note kind="warn">{t('in.gaps', { list: gaps.map((k) => tCode(t, 'in.f.', k)).join(', ') })}</Note>
                 })()}
                 <div className="table-wrap"><table>
                   <thead><tr><th>{t('in.col.field')}</th><th>{t('in.col.value')}</th><th>{t('in.col.source')}</th><th /></tr></thead>
@@ -190,13 +190,13 @@ export function Request({ go, query }: { go: (to: string) => void; query: URLSea
                     const warn = x.status !== 'ok' && !optionalGap
                     return (
                       <tr key={k}>
-                        <td><b>{t(`in.f.${k}`)}</b></td>
+                        <td><b>{tCode(t, 'in.f.', k)}</b></td>
                         <td>{x.value == null ? <span className="muted">—</span> : x.display}</td>
                         <td>{x.source ? <q className="small">{x.source.quote}</q> : <span className="muted small">{t('in.missing')}</span>}</td>
                         <td>{warn
-                          ? <Chip kind="UNKNOWN" title={x.notes.filter((n) => !n.startsWith('candidates')).map((n) => (t(`in.note.${n}`) === `in.note.${n}` ? n : t(`in.note.${n}`))).join(' ')}><Icon name="alert" size={13} /></Chip>
+                          ? <Chip kind="UNKNOWN" title={x.notes.filter((n) => !n.startsWith('candidates')).map((n) => tCode(t, 'in.note.', n)).join(' ')}><Icon name="alert" size={13} /></Chip>
                           : optionalGap ? <span className="muted small">—</span> : <Chip kind="PASS">✓</Chip>}
-                          {warn && x.notes.filter((n) => !n.startsWith('candidates')).map((n) => <div key={n} className="footnote">{t(`in.note.${n}`) === `in.note.${n}` ? n : t(`in.note.${n}`)}</div>)}</td>
+                          {warn && x.notes.filter((n) => !n.startsWith('candidates')).map((n) => <div key={n} className="footnote">{tCode(t, 'in.note.', n)}</div>)}</td>
                       </tr>)
                   })}</tbody>
                 </table></div>

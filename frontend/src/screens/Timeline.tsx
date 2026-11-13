@@ -3,7 +3,7 @@ import { api, ApiError, type ExceptionItem, type Replay } from '../api'
 import { Chip, ErrorNote, Loading, More, Note, Stepper } from '../components/ui'
 import { Icon, type IconName } from '../components/Icon'
 import { fmtClock } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
@@ -61,7 +61,7 @@ export function Timeline({ query }: { query: URLSearchParams }) {
             <div className="row">
               <label className="inline sr-label" aria-label={t('tl.pick')}>
                 <select value={pid} onChange={(e) => setPid(e.target.value)} aria-label={t('tl.pick')}>
-                  {list.map((p) => <option key={p.id} value={p.id}>{p.shipment.code} → {p.vehicle.plate} · {t(`ps.${p.status}`)}</option>)}
+                  {list.map((p) => <option key={p.id} value={p.id}>{p.shipment.code} → {p.vehicle.plate} · {tCode(t, 'ps.', p.status)}</option>)}
                 </select>
               </label>
               {cur && <Stepper status={cur.status} />}
@@ -79,14 +79,14 @@ export function Timeline({ query }: { query: URLSearchParams }) {
             {tl.loading && !tl.data ? <Loading /> : (
               <ol className="tl">
                 {tl.data?.items.map((i, k) => {
-                  const title = t(`tl.code.${i.code}`) === `tl.code.${i.code}` ? i.code : t(`tl.code.${i.code}`)
-                  const party = typeof i.detail.party === 'string' ? ` (${t(`party.${i.detail.party}`)})` : ''
+                  const title = tCode(t, 'tl.code.', i.code)
+                  const party = typeof i.detail.party === 'string' ? ` (${tCode(t, 'party.', i.detail.party)})` : ''
                   return (
                     <li key={k} className={`tl-item ${i.kind}`}>
                       <span className={`tl-dot ${KIND_COLOR[i.kind]}`} aria-hidden><Icon name={KIND_ICON[i.kind] ?? 'arrows'} size={14} /></span>
                       <div>
                         <div className="row"><b>{title}{party}</b>
-                          {i.quality && ABNORMAL.has(i.quality) && <Chip kind="warn">{t(`tl.q.${i.quality}`)}</Chip>}</div>
+                          {i.quality && ABNORMAL.has(i.quality) && <Chip kind="warn">{tCode(t, 'tl.q.', i.quality)}</Chip>}</div>
                         <div className="small muted">{i.actor ? `${i.actor} · ` : ''}{fmtClock(i.at)}
                           {i.latency_s != null && i.latency_s > 0 && <> · {t('tl.latency', { n: i.latency_s })}</>}
                           {typeof i.detail.delay_minutes === 'number' && <> · +{i.detail.delay_minutes}′</>}</div>
@@ -117,8 +117,8 @@ export function Timeline({ query }: { query: URLSearchParams }) {
                   {myExs.map((e) => (
                     <div key={e.id} className="stack">
                       <Note kind={e.status === 'open' ? 'warn' : 'info'}>
-                        {t(`tl.exc.${e.detail.action ?? 'needs_decision'}`, { n: e.detail.delay_minutes ?? 0 })}
-                        {e.status === 'resolved' && <><br /><b>{t('tl.resolved', { r: t(`tl.resolve.${e.detail.resolution ?? 'accept_delay'}`) })}</b></>}
+                        {tCode(t, 'tl.exc.', e.detail.action ?? 'needs_decision', undefined, { n: e.detail.delay_minutes ?? 0 })}
+                        {e.status === 'resolved' && <><br /><b>{t('tl.resolved', { r: tCode(t, 'tl.resolve.', e.detail.resolution, 'tl.resolve.other') })}</b></>}
                       </Note>
                       {e.status === 'open' && (canDecide ? (
                         <div className="row">

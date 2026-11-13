@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { api, ApiError, type SandboxResult } from '../api'
 import { fmtNum, fmtVnd } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 import { Chip, ErrorNote, Hint, Loading, More } from './ui'
@@ -82,7 +82,7 @@ export function SandboxCard() {
             <thead><tr><th /><th className="num">{t('sbx.km')}</th><th className="num">{t('sbx.vnd')}</th><th className="num">{t('sbx.min')}</th></tr></thead>
             <tbody>{ALTS.map((a) => {
               const x = s.vs[a].saving
-              return <tr key={a}><td>{t(`sbx.vs.${a}`)}</td><td className="num">{f(x.km.mean)} <small className="muted">{Math.round(x.km.win_rate * 100)}%</small></td>
+              return <tr key={a}><td>{tCode(t, 'sbx.vs.', a)}</td><td className="num">{f(x.km.mean)} <small className="muted">{Math.round(x.km.win_rate * 100)}%</small></td>
                 <td className="num">{fmtVnd(Math.round(x.cost_vnd.mean))}</td><td className="num">{f(x.min_to_icd.mean)}′</td></tr>
             })}</tbody>
           </table></div>

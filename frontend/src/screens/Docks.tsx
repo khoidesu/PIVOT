@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { api, ApiError, type DockAppt } from '../api'
 import { Chip, ErrorNote, Hint, Loading, Note } from '../components/ui'
 import { fmtTime, isoToLocalInput, localInputToIso, nowMs } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useData } from '../useData'
 
 const HOUR = 3600_000
@@ -77,7 +77,7 @@ export function Docks() {
           {cur && (
             <>
               <div className="row">
-                <b>{cur.shipment_code}</b><Chip>{cur.plate}</Chip><Chip kind={KIND[cur.status]}>{t(`dk.status.${cur.status}`)}</Chip>
+                <b>{cur.shipment_code}</b><Chip>{cur.plate}</Chip><Chip kind={KIND[cur.status]}>{tCode(t, 'dk.status.', cur.status)}</Chip>
                 <span className="muted small">{cur.dock_code} · {fmtTime(cur.window_start)}–{fmtTime(cur.window_end).slice(-5)}</span>
                 {cur.late_minutes > 0 && <Chip kind="warn">{t('dk.late', { n: cur.late_minutes })}</Chip>}
                 {cur.dwell_minutes != null && <Chip kind="good">{t('dk.dwell')} {t('dk.min', { n: cur.dwell_minutes })}</Chip>}

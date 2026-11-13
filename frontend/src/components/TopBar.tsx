@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useData } from '../useData'
 import { api, ApiError, getAdminKey } from '../api'
 import { ageMinutes } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { Chip, Hint } from './ui'
 import { Icon } from './Icon'
@@ -35,7 +35,7 @@ function Bell() {
           {!items.length && <div className="muted small" style={{ padding: 10 }}>{t('bell.empty')}</div>}
           {items.map((n) => (
             <button key={n.id} role="menuitem" className={`it sev-${n.payload.severity}${n.read ? '' : ' unread'}`} onClick={() => { setOpen(false); window.location.hash = '#/exceptions' }}>
-              <span className="row"><Chip kind={`sev-${n.payload.severity}`}>{t(`ex.sev.${n.payload.severity}`)}</Chip><b>{t(`ex.cat.${n.payload.category}`)}</b></span>
+              <span className="row"><Chip kind={`sev-${n.payload.severity}`}>{tCode(t, 'ex.sev.', n.payload.severity)}</Chip><b>{tCode(t, 'ex.cat.', n.payload.category)}</b></span>
               <span className="muted small">{n.payload.shipment_code} · {n.payload.plate}{n.payload.escalated ? ` · ${t('ex.escalated')}` : ''}</span>
             </button>))}
           {unread > 0 && <button role="menuitem" onClick={() => { void api.readNotifications().then(() => list.reload(true)) }}>{t('bell.read')}</button>}

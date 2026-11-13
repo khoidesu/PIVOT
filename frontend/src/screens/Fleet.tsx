@@ -3,7 +3,7 @@ import { api, ApiError, type Shipment, type Vehicle } from '../api'
 import { Chip, ErrorNote, Loading, Note } from '../components/ui'
 import { Icon } from '../components/Icon'
 import { ageMinutes, fmtNum, fmtTime, fmtVnd } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
@@ -37,7 +37,7 @@ function YardGroups({ list, staleLimit }: { list: Vehicle[]; staleLimit: number 
                   <tr key={v.id}>
                     <td><b className="mono">{v.plate}</b></td>
                     <td className="num">{fmtNum(v.capacity_kg)} kg<div className="muted small">{v.capacity_m3} m³</div></td>
-                    <td><Chip kind={STATE_KIND[st]} title={v.availability?.reason}>{t(`veh.state.${st}`)}</Chip></td>
+                    <td><Chip kind={STATE_KIND[st]} title={v.availability?.reason}>{tCode(t, 'veh.state.', st)}</Chip></td>
                     <td className="num" title={t('fleet.estTip')}>{v.distance_to_target_km == null ? '—' : <>{fmtNum(v.distance_to_target_km)} km<div className="muted small">≈ {v.deadhead_eta?.minutes ?? '?'}′</div></>}</td>
                     <td>{age == null ? '—' : t(age === 0 ? 'common.justNow' : 'common.ago', { n: age })} {stale && <Chip kind="FAIL" title={t('fleet.staleTip', { n: staleLimit })}>{t('fleet.stale')}</Chip>}</td>
                   </tr>)
@@ -111,12 +111,12 @@ export function Fleet({ go }: { go: (to: string) => void }) {
               <thead><tr><th>{t('col.lot')}</th><th className="num">{t('col.load')}</th><th>{t('col.due')}</th>{seesPrice && <th className="num">{t('col.price')}</th>}<th>{t('col.status')}</th><th /></tr></thead>
               <tbody>{visibleLots.map((s) => (
                 <tr key={s.id}>
-                  <td><b>{s.code}</b><div className="muted small">{t(`cargo.${s.cargo_type}`)}</div></td>
+                  <td><b>{s.code}</b><div className="muted small">{tCode(t, 'cargo.', s.cargo_type)}</div></td>
                   <td className="num">{s.weight_kg == null ? '—' : `${fmtNum(s.weight_kg)} kg`}<div className="muted small">{s.volume_m3 == null ? '—' : `${s.volume_m3} m³`}</div></td>
                   <td className="nw">{fmtTime(s.pickup_deadline)}<div className="muted small">{fmtTime(s.cutoff_at)}</div></td>
                   {seesPrice && <td className="num">{s.price_vnd != null ? fmtVnd(s.price_vnd) : '—'}</td>}
                   <td>
-                    <Chip kind={s.status === 'open' ? 'teal' : s.status === 'completed' ? 'good' : undefined}>{t(`status.${s.status}`)}</Chip>
+                    <Chip kind={s.status === 'open' ? 'teal' : s.status === 'completed' ? 'good' : undefined}>{tCode(t, 'status.', s.status)}</Chip>
                     {s.missing_fields.length > 0 && <div><Chip kind="UNKNOWN" title={t('fleet.needsTip', { fields: s.missing_fields.join(', ') })}>{t('fleet.needs')}</Chip></div>}
                   </td>
                   <td className="nw">

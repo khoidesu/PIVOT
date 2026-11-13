@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError, type Proposal } from '../api'
 import { Chip, ErrorNote, Loading, More, Note } from '../components/ui'
 import { ageMinutes, fmtTime, nowMs } from '../fmt'
-import { useI18n } from '../i18n'
+import { useI18n, tCode } from '../i18n'
 import { useApp } from '../store'
 import { useData } from '../useData'
 
@@ -32,7 +32,7 @@ function ProposalRow({ p, onDone }: { p: Proposal; onDone: () => void }) {
   }
   const a = p.my_actions
   const entries = Object.entries(p.parties)
-  const waiting = entries.filter(([, v]) => !v.accepted).map(([k]) => t(`party.${k}`))
+  const waiting = entries.filter(([, v]) => !v.accepted).map(([k]) => tCode(t, 'party.', k))
   const settled = ['confirmed', 'executing', 'completed'].includes(p.status)
 
   return (
@@ -44,8 +44,8 @@ function ProposalRow({ p, onDone }: { p: Proposal; onDone: () => void }) {
       <ul className="parties" aria-label={t('rec.parties')}>
         {entries.map(([k, v]) => (
           <li key={k} className={v.accepted ? 'done' : ''}>
-            <span className="pa" aria-hidden>{(v.org_name ?? t(`party.${k}`)).charAt(0).toUpperCase()}</span>
-            <span className="grow"><b>{t(`party.${k}`)}</b>{v.org_name && <span className="muted"> · {v.org_name}</span>}</span>
+            <span className="pa" aria-hidden>{(v.org_name ?? tCode(t, 'party.', k)).charAt(0).toUpperCase()}</span>
+            <span className="grow"><b>{tCode(t, 'party.', k)}</b>{v.org_name && <span className="muted"> · {v.org_name}</span>}</span>
             <span className={v.accepted ? 'st ok' : 'st'}>{v.accepted ? `✓ ${t('cf.state.done')}` : pending ? t('cf.state.wait') : settled ? '' : t('cf.state.idle')}</span>
           </li>))}
       </ul>

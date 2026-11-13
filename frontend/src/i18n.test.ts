@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { dictionaries, reasonText, translate } from './i18n'
+import { dictionaries, reasonText, tCode, translate } from './i18n'
 import { allowedRoute, defaultRoute, navFor } from './nav'
 
 const REASON_CODES = ['CAPACITY_EXCEEDED', 'CARGO_INCOMPATIBLE', 'DATA_STALE', 'PICKUP_WINDOW_MISSED', 'CUTOFF_RISK',
@@ -81,6 +81,31 @@ describe('i18n', () => {
         expect(dictionaries[lang][`rd.${r}`], `${lang}:rd.${r}`).toBeTruthy()
       }
   })
+  it('QA-02: mọi giá trị resolution backend có thể ghi đều có chữ ở cả vi và en; giá trị lạ không lộ khoá thô', () => {
+    // backend/app/booking/audit.py RESOLUTIONS + backend/app/incidents/service.py ("playbook_completed", "replanned")
+    for (const lang of ['vi', 'en'] as const) {
+      const t = (k: string, p?: Record<string, string | number>) => translate(lang, k, p)
+      for (const r of ['accept_delay', 'request_replan', 'replanned', 'playbook_completed']) {
+        expect(dictionaries[lang][`tl.resolve.${r}`], `${lang}:${r}`).toBeTruthy()
+        expect(tCode(t, 'tl.resolve.', r, 'tl.resolve.other')).toBe(dictionaries[lang][`tl.resolve.${r}`])
+      }
+      for (const r of ['something_new', undefined, '']) expect(tCode(t, 'tl.resolve.', r, 'tl.resolve.other')).toBe(dictionaries[lang]['tl.resolve.other'])
+      expect(tCode(t, 'ex.cat.', 'NEW_CATEGORY')).toBe('NEW_CATEGORY') // không có câu dự phòng → hiện mã, không hiện "ex.cat.NEW_CATEGORY"
+    }
+    expect(dictionaries.vi['tl.resolve.replanned']).toBe('Đã ghép lại')
+    expect(dictionaries.en['tl.resolve.replanned']).toBe('Rematched')
+  })
+  it('không màn hình nào ghép khoá i18n từ giá trị backend mà không có dự phòng (dùng tCode)', () => {
+    // khoá động chỉ còn được dựng bằng t(`…${x}`) khi x do frontend kiểm soát (vai trò, tab, ngôn ngữ, mục menu, bước hướng dẫn)
+    const FRONTEND_ONLY = ['role.', 'rd.', 'theme.', 'land.', 'cf.ok.', 'fleet.tab.', 'nav.fleet.', 'guide.route.', 'demo.s.', 'tk.mode.', 'nav.',
+      'err.', 'reason.'] // hai tiền tố cuối đã có dự phòng riêng: ErrorNote (components/ui.tsx) và reasonText (i18n.ts)
+    const files = walk(SRC).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
+    // mọi template `tiền_tố.${…}` có tiền tố trùng khoá i18n (kể cả nằm trong biểu thức điều kiện) — tCode dùng chuỗi thường nên không bị bắt
+    const keys = Object.keys(dictionaries.vi)
+    const bad = files.flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/`([a-z][\w.]*\.)\$\{/g)].map((m) => m[1])
+      .filter((pre) => keys.some((k) => k.startsWith(pre)) && !FRONTEND_ONLY.includes(pre)).map((pre) => `${f}: ${pre}`))
+    expect(bad).toEqual([])
+  })
   it('mã lỗi không biết vẫn hiển thị được (không vỡ UI)', () => {
     const t = (k: string, p?: Record<string, string | number>) => translate('vi', k, p)
     expect(reasonText({ gate: 'x', status: 'FAIL', reason_code: 'NEW_CODE', detail: {} }, t, (s) => s)).toContain('x')
@@ -92,13 +117,14 @@ const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).fl
 const wordsOf = (lang: 'vi' | 'en') => Object.values(dictionaries[lang]).reduce((n, v) => n + v.split(/\s+/).filter(Boolean).length, 0)
 
 describe('giao diện gọn chữ', () => {
-  it('ngân sách chữ tiếng Việt không phình lại (2.750 từ sau khi giải thích mô hình nhà xe; nới lên 3.000 để có hướng dẫn prototype 6 bước, tên thao tác và giải nghĩa ETA/ICD)', () => {
-    expect(wordsOf('vi')).toBeLessThanOrEqual(3000)
+  it('ngân sách chữ tiếng Việt không phình lại (3.000 cho hướng dẫn prototype 6 bước; 13/11 QA-09: walkthrough ~25 bước đã rút gọn 3.664 → 3.081 từ, mỗi bước ≤ 1 câu — nới lên 3.100)', () => {
+    expect(wordsOf('vi')).toBeLessThanOrEqual(3100)
   })
   it('mọi khoá i18n đều được mã nguồn dùng (không để chuỗi chết)', () => {
     const code = walk(SRC).filter((f) => /\.(tsx?)$/.test(f) && !/i18n(\.test)?\.ts$/.test(f)).map((f) => readFileSync(f, 'utf8')).join('\n')
     const dynamic = ['status.', 'ps.', 'cargo.', 'role.', 'rd.', 'party.', 'gate.', 'reason.', 'tl.code.', 'tl.q.', 'tl.resolve.', 'tl.exc.', 'in.note.', 'in.f.', 'err.',
-      'demo.s.', 'rec.comp.', 'rec.s.', 'bf.status.', 'bf.sub.', 'nav.', 'fleet.tab.', 'cf.ok.', 'tk.ms.', 'tk.mode.', 'ex.sev.', 'ex.cat.', 'ex.step.', 'ex.owner.', 'ex.kind.', 'dk.status.', 'eta.status.', 'eta.reason.', 'eta.band.', 'veh.state.', 'sbx.vs.', 'ws.layout.', 'theme.', 'in.llm.', 'in.img.', 'land.g']
+      'demo.s.', 'rec.comp.', 'rec.s.', 'bf.status.', 'bf.sub.', 'nav.', 'fleet.tab.', 'cf.ok.', 'tk.ms.', 'tk.mode.', 'ex.sev.', 'ex.cat.', 'ex.step.', 'ex.owner.', 'ex.kind.', 'dk.status.', 'eta.status.', 'eta.reason.', 'eta.band.', 'veh.state.', 'sbx.vs.', 'ws.layout.', 'theme.', 'in.llm.', 'in.img.', 'land.g',
+      'guide.route.'] // App.tsx dựng khoá bằng t(`guide.route.${r}`) theo từng mục menu — khoá động, không phải chuỗi chết (QA-09)
     const dead = Object.keys(dictionaries.vi).filter((k) => !dynamic.some((p) => k.startsWith(p)) && !code.includes(`'${k}'`) && !code.includes(`\`${k}\``))
     expect(dead).toEqual([])
   })

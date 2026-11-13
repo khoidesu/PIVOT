@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
 import { api, ApiError, getSession, setSession, type Role } from '../api'
 import { Chip, ErrorNote } from '../components/ui'
 import { Icon } from '../components/Icon'
@@ -16,15 +15,8 @@ import { ACCENT_PRESETS, applyAccent, applyTheme, currentAccent, currentTheme, t
 import { LoginForm } from './Login'
 
 const KEY = 'pivot.workspace'
-const WINDOW_LAYOUT_KEY = 'pivot.windowLayout'
+const OLD_LAYOUT_KEY = 'pivot.windowLayout' // vị trí cửa sổ nổi của bản 58e5309 — không dùng nữa, chỉ dọn
 const GAP = 10 // px giữa các khung (cũng là bề rộng vùng bắt của thanh kéo)
-type WindowRect = { x: number; y: number; w: number; h: number; max?: boolean }
-const defaultWindowRect = (index: number, total: number): WindowRect => {
-  const cols = total <= 2 ? total : Math.ceil(Math.sqrt(total))
-  const rows = Math.ceil(total / cols)
-  const w = 100 / cols, h = 100 / rows
-  return { x: (index % cols) * w + (index % cols ? 1 : 0), y: Math.floor(index / cols) * h + (index ? 1 : 0), w: w - 1, h: h - 1 }
-}
 /** Chữ viết tắt trong avatar: 2 chữ cái đầu của hai từ cuối ("Nguyễn Văn An" → VA), một từ → chữ đầu + chữ thứ hai. */
 const initials = (name: string) => {
   const w = name.trim().split(/\s+/)
@@ -56,11 +48,8 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const [accentDraft, setAccentDraft] = useState(accent)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [walkthroughOpen, setWalkthroughOpen] = useState(false)
-  const [windowRects, setWindowRects] = useState<Record<string, WindowRect>>(() => { try { return JSON.parse(sessionStorage.getItem(WINDOW_LAYOUT_KEY) || '{}') } catch { return {} } })
-  const [snapPreview, setSnapPreview] = useState<WindowRect | null>(null)
+  const [maxId, setMaxId] = useState<string | null>(null) // cửa sổ đang phóng to (phủ vùng làm việc); bỏ phóng to → về đúng ô của nó trong lưới
   const [dockTooltip, setDockTooltip] = useState<{ label: string; x: number; y: number } | null>(null)
-  const [snapFlyout, setSnapFlyout] = useState<{ left: number; top: number } | null>(null)
-  const snapTimer = useRef<number | null>(null)
   const [splitting, setSplitting] = useState<'col' | 'row' | null>(null)
   const root = useRef<HTMLDivElement>(null)
   useAutoEnter(root)                                                   // cửa sổ mới / ngăn thêm người hiện lên mượt (GSAP)
@@ -81,14 +70,12 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
 
   const commit = useCallback((next: WsState) => { stRef.current = next; setSt(next) }, [])
   useEffect(() => { try { sessionStorage.setItem(KEY, serialize(st)) } catch { /* bỏ qua */ } }, [st])
-  useEffect(() => {
-    setWindowRects((current) => {
-      const next = { ...current }
-      st.wins.filter((w) => w.open).forEach((w, i, all) => { if (!next[w.id]) next[w.id] = defaultWindowRect(i, all.length) })
-      return next
-    })
-  }, [st.wins])
-  useEffect(() => { try { sessionStorage.setItem(WINDOW_LAYOUT_KEY, JSON.stringify(windowRects)) } catch { /* bỏ qua */ } }, [windowRects])
+  useEffect(() => { try { sessionStorage.removeItem(OLD_LAYOUT_KEY) } catch { /* bỏ qua */ } }, [])
+  useEffect(() => { // cửa sổ phóng to bị thu nhỏ/đóng → bỏ phóng to (mở lại thì về đúng ô của nó, không tự phóng to lại)
+    if (maxId && !st.wins.some((w) => w.id === maxId && w.open)) setMaxId(null)
+  }, [st.wins, maxId])
+  /** Chọn một người ở thanh bên/dock: đang có cửa sổ phóng to thì chuyển phóng to sang người vừa chọn (không bị che). */
+  const pick = (id: string) => { commit(focusWin(stRef.current, id)); setMaxId((m) => (m && m !== id ? id : m)) }
   useEffect(() => {
     const dock = dockRef.current
     if (!dock) return
@@ -208,106 +195,6 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
     try { for (const p of CHAIN) await enter(p.name, p.role); setPop('closed') } catch (e) { setErr(e instanceof ApiError ? e : new ApiError(0, 'UNKNOWN', String(e))) }
   }
 
-  function startWindowAction(e: React.PointerEvent<HTMLElement>, id: string, action: 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw') {
-    if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return
-    const area = gridEl.current
-    if (!area) return
-    e.preventDefault()
-    commit(focusWin(stRef.current, id))
-    const bounds = area.getBoundingClientRect()
-    const initial = windowRects[id] ?? { x: 2, y: 2, w: 48, h: 48 }
-    const sx = e.clientX, sy = e.clientY
-    const startRect = { ...initial }
-    const winEl = [...area.querySelectorAll<HTMLElement>('.ws-win')].find((el) => el.dataset.windowId === id)
-    let dxPx = 0, dyPx = 0
-    let hintKey = ''
-    const boundedDelta = (clientX: number, clientY: number) => {
-      let dx = clientX - sx, dy = clientY - sy
-      const minW = Math.min(100, 280 / bounds.width * 100), minH = Math.min(100, 220 / bounds.height * 100)
-      if (action === 'move') {
-        dx = Math.max(-startRect.x * bounds.width / 100, Math.min((100 - startRect.x - startRect.w) * bounds.width / 100, dx))
-        dy = Math.max(-startRect.y * bounds.height / 100, Math.min((100 - startRect.y - startRect.h) * bounds.height / 100, dy))
-      } else {
-        if (action.includes('e')) dx = Math.max((minW - startRect.w) * bounds.width / 100, Math.min((100 - startRect.x - startRect.w) * bounds.width / 100, dx))
-        if (action.includes('w')) dx = Math.max(-startRect.x * bounds.width / 100, Math.min((startRect.w - minW) * bounds.width / 100, dx))
-        if (action.includes('s')) dy = Math.max((minH - startRect.h) * bounds.height / 100, Math.min((100 - startRect.y - startRect.h) * bounds.height / 100, dy))
-        if (action.includes('n')) dy = Math.max(-startRect.y * bounds.height / 100, Math.min((startRect.h - minH) * bounds.height / 100, dy))
-      }
-      return { dx, dy }
-    }
-    const move = (ev: PointerEvent) => {
-      ;({ dx: dxPx, dy: dyPx } = boundedDelta(ev.clientX, ev.clientY))
-      if (action === 'move') {
-        const px = ev.clientX - bounds.left, py = ev.clientY - bounds.top, edge = 28
-        let hint: WindowRect | null = null
-        if (py < edge && px < edge) hint = { x: 0, y: 0, w: 50, h: 50 }
-        else if (py < edge && px > bounds.width - edge) hint = { x: 50, y: 0, w: 50, h: 50 }
-        else if (py > bounds.height - edge && px < edge) hint = { x: 0, y: 50, w: 50, h: 50 }
-        else if (py > bounds.height - edge && px > bounds.width - edge) hint = { x: 50, y: 50, w: 50, h: 50 }
-        else if (px < edge) hint = { x: 0, y: 0, w: 50, h: 100 }
-        else if (px > bounds.width - edge) hint = { x: 50, y: 0, w: 50, h: 100 }
-        else if (py < edge) hint = { x: 0, y: 0, w: 100, h: 100, max: true }
-        const key = hint ? `${hint.x}:${hint.y}:${hint.w}:${hint.h}` : ''
-        if (key !== hintKey) { hintKey = key; setSnapPreview(hint) }
-      }
-      if (!winEl) return
-      winEl.classList.add('ws-window-live-drag')
-      if (action === 'move') { winEl.style.transform = `translate3d(${dxPx}px, ${dyPx}px, 0)`; return }
-      const dx = dxPx / bounds.width * 100, dy = dyPx / bounds.height * 100
-      const minW = Math.min(100, 280 / bounds.width * 100), minH = Math.min(100, 220 / bounds.height * 100)
-      const nextW = action.includes('e') ? Math.max(minW, Math.min(100 - startRect.x, startRect.w + dx)) : action.includes('w') ? Math.max(minW, startRect.w - dx) : startRect.w
-      const nextH = action.includes('s') ? Math.max(minH, Math.min(100 - startRect.y, startRect.h + dy)) : action.includes('n') ? Math.max(minH, startRect.h - dy) : startRect.h
-      const scaleX = nextW / startRect.w, scaleY = nextH / startRect.h
-      winEl.style.transformOrigin = `${action.includes('w') ? 'right' : 'left'} ${action.includes('n') ? 'bottom' : 'top'}`
-      winEl.style.transform = `scale(${scaleX}, ${scaleY})`
-    }
-    const up = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up)
-      setSnapPreview(null)
-      ;({ dx: dxPx, dy: dyPx } = boundedDelta(ev.clientX, ev.clientY))
-      const dx = dxPx / bounds.width * 100, dy = dyPx / bounds.height * 100
-      const result = { ...startRect, max: false }
-      if (action === 'move') { result.x = Math.min(100 - result.w, Math.max(0, startRect.x + dx)); result.y = Math.min(100 - result.h, Math.max(0, startRect.y + dy)) }
-      const minW = Math.min(100, 280 / bounds.width * 100), minH = Math.min(100, 220 / bounds.height * 100)
-      if (action.includes('e')) result.w = Math.max(minW, Math.min(100 - startRect.x, startRect.w + dx))
-      if (action.includes('s')) result.h = Math.max(minH, Math.min(100 - startRect.y, startRect.h + dy))
-      if (action.includes('w')) { const w = Math.max(minW, Math.min(startRect.w - dx, startRect.x + startRect.w)); result.x = startRect.x + startRect.w - w; result.w = w }
-      if (action.includes('n')) { const h = Math.max(minH, Math.min(startRect.h - dy, startRect.y + startRect.h)); result.y = startRect.y + startRect.h - h; result.h = h }
-      const edgeX = ev.clientX - bounds.left, edgeY = ev.clientY - bounds.top
-      if (action === 'move' && edgeY < 18 && edgeX < 18) result.x = 0, result.y = 0, result.w = 50, result.h = 50
-      else if (action === 'move' && edgeY < 18 && edgeX > bounds.width - 18) result.x = 50, result.y = 0, result.w = 50, result.h = 50
-      else if (action === 'move' && edgeY > bounds.height - 18 && edgeX < 18) result.x = 0, result.y = 50, result.w = 50, result.h = 50
-      else if (action === 'move' && edgeY > bounds.height - 18 && edgeX > bounds.width - 18) result.x = 50, result.y = 50, result.w = 50, result.h = 50
-      else if (action === 'move' && edgeY < 18) result.x = 0, result.y = 0, result.w = 100, result.h = 100, result.max = true
-      else if (action === 'move' && edgeX < 12) result.x = 0, result.y = 0, result.w = 50, result.h = 100
-      else if (action === 'move' && edgeX > bounds.width - 12) result.x = 50, result.y = 0, result.w = 50, result.h = 100
-      // Clamp after movement, resize and snap so no edge can escape the workspace.
-      result.x = Math.max(0, Math.min(100, result.x))
-      result.y = Math.max(0, Math.min(100, result.y))
-      result.w = Math.max(0, Math.min(result.w, 100 - result.x))
-      result.h = Math.max(0, Math.min(result.h, 100 - result.y))
-      flushSync(() => setWindowRects((all) => ({ ...all, [id]: result })))
-      if (winEl) { winEl.classList.remove('ws-window-live-drag'); winEl.style.transform = ''; winEl.style.transformOrigin = '' }
-      setDragId(null)
-    }
-    setDragId(id)
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up)
-  }
-
-  function applySnapLayout(layout: 'columns' | 'three' | 'quarters' | 'main') {
-    const ids = stRef.current.wins.filter((w) => w.open).map((w) => w.id)
-    const zones: WindowRect[] = layout === 'columns' ? [{ x: 0, y: 0, w: 50, h: 100 }, { x: 50, y: 0, w: 50, h: 100 }]
-      : layout === 'three' ? [{ x: 0, y: 0, w: 33.33, h: 100 }, { x: 33.33, y: 0, w: 33.34, h: 100 }, { x: 66.67, y: 0, w: 33.33, h: 100 }]
-      : layout === 'quarters' ? [{ x: 0, y: 0, w: 50, h: 50 }, { x: 50, y: 0, w: 50, h: 50 }, { x: 0, y: 50, w: 50, h: 50 }, { x: 50, y: 50, w: 50, h: 50 }]
-      : [{ x: 0, y: 0, w: 66, h: 100 }, { x: 66, y: 0, w: 34, h: 50 }, { x: 66, y: 50, w: 34, h: 50 }]
-    setWindowRects((all) => {
-      const next = { ...all }
-      ids.forEach((id, i) => { if (zones[i]) next[id] = zones[i] })
-      return next
-    })
-    setSnapFlyout(null)
-  }
-
   /** Kéo thanh chia: đổi tỉ lệ hai khung kề nhau theo quãng chuột đi (tính bằng phần của hàng/vùng). Khung nhúng tạm không nhận chuột để không "nuốt" sự kiện. */
   function startSplit(e: React.PointerEvent<HTMLDivElement>, sp: Splitter) {
     const el = gridEl.current
@@ -336,6 +223,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
   const narrow = width < 768
   const stable = [...wins].sort((a, b) => (a.id < b.id ? -1 : 1)) // thứ tự DOM cố định (đổi thứ tự DOM sẽ làm khung nhúng tải lại); thứ tự hiển thị dùng CSS `order`
   const focusId = st.focus ?? open[0]?.id
+  const maxed = !narrow && maxId && open.some((w) => w.id === maxId) ? maxId : null // cửa sổ phóng to đã bị đóng/thu nhỏ → coi như hết phóng to
   const showDockTooltip = (e: React.MouseEvent<HTMLElement>, label: string) => { const r = e.currentTarget.getBoundingClientRect(); setDockTooltip({ label, x: r.left + r.width / 2, y: r.top - 12 }) }
 
   const walkthroughSteps: WalkthroughStep[] = [
@@ -344,8 +232,8 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
     ...(!wins.length ? [{ target: '.ws-start-card', title: t('guide.workspace.roles.title'), body: t('guide.workspace.roles.body') }] : []),
     ...(open.length ? [
       { target: '.ws-win.foc .ws-wh', title: t('guide.workspace.move.title'), body: t('guide.workspace.move.body') },
-      ...(!narrow ? [{ target: '.ws-win.foc .ws-ib[aria-label="Maximize"]', title: t('guide.workspace.snap.title'), body: t(open.length > 1 ? 'guide.workspace.snap.body' : 'guide.workspace.snap.single') }] : []),
-      ...(!narrow && place.splitters.length ? [{ target: '.ws-split', title: t('guide.workspace.resize.title'), body: t('guide.workspace.resize.body') }] : []),
+      ...(!narrow ? [{ target: '.ws-win.foc .ws-ib.max', title: t('guide.workspace.snap.title'), body: t('guide.workspace.snap.body') }] : []),
+      ...(!narrow && !maxed && place.splitters.length ? [{ target: '.ws-split', title: t('guide.workspace.resize.title'), body: t('guide.workspace.resize.body') }] : []),
       { target: narrow ? '.ws-nodes' : '.ws-dock', title: t('guide.workspace.switch.title'), body: t(narrow ? 'guide.workspace.switch.mobile' : 'guide.workspace.switch.body') },
       { target: '.ws-win.foc .ws-frame', title: t('guide.workspace.app.title'), body: t('guide.workspace.app.body') },
     ] : []),
@@ -390,7 +278,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
               <button key={w.id} data-label={label} onMouseEnter={(e) => showDockTooltip(e, label)} onMouseLeave={() => setDockTooltip(null)} className={`ws-node role-${w.role}${isOpen ? '' : ' bg'}${isOpen && w.id === focusId ? ' foc' : ''}`}
                 title={`${label} — ${isOpen ? t('ws.open') : t('ws.bgTip')}`}
                 aria-label={`${w.name}, ${t(`role.${w.role}`)}, ${isOpen ? t('ws.open') : t('ws.bg')}${b ? `, ${t('ws.pending', { n: b })}` : ''}`}
-                onClick={() => commit(focusWin(stRef.current, w.id))}>
+                onClick={() => pick(w.id)}>
                 <span className="ws-ava" aria-hidden>{initials(w.name)}{b > 0 && slim && <span className="ws-bd">{b > 9 ? '9+' : b}</span>}</span>
                 {!slim && (
                   <span className="ws-meta">
@@ -479,29 +367,27 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
                 <div className="ws-start-card" role="menu">{addMenu}</div>
               </div>)
             : !open.length && <div className="ws-none">{t('ws.empty')}</div>}
-          {snapPreview && <div className="ws-snap-preview" style={{ left: `${snapPreview.x}%`, top: `${snapPreview.y}%`, width: `${snapPreview.w}%`, height: `${snapPreview.h}%` }} aria-hidden />}
-          {snapFlyout && <div className="ws-snap-flyout" style={snapFlyout} onMouseEnter={() => { if (snapTimer.current) window.clearTimeout(snapTimer.current) }} onMouseLeave={() => setSnapFlyout(null)}>
-            <button onClick={() => applySnapLayout('columns')} aria-label="Two columns"><i className="snap-mini two"><b /><b /></i></button>
-            <button onClick={() => applySnapLayout('three')} aria-label="Three columns"><i className="snap-mini three"><b /><b /><b /></i></button>
-            <button onClick={() => applySnapLayout('quarters')} aria-label="Four corners"><i className="snap-mini four"><b /><b /><b /><b /></i></button>
-            <button onClick={() => applySnapLayout('main')} aria-label="Large area and two small areas"><i className="snap-mini main"><b /><b /><b /></i></button>
-          </div>}
           {stable.map((w) => {
-            const rect = windowRects[w.id] ?? defaultWindowRect(Math.max(0, open.findIndex((x) => x.id === w.id)), Math.max(1, open.length))
+            const p = place.items[w.id] // ô của cửa sổ trong lưới (chỉ có khi đang mở)
+            const isMax = w.id === maxed
             const shown = w.open && (!narrow || w.id === focusId)
             const b = badges[w.id] ?? 0
             return (
-              <div key={w.id} data-window-id={w.id} className={`ws-win role-${w.role}${w.id === focusId ? ' foc' : ''}${overId === w.id && dragId !== w.id ? ` over drop-${dropSide}` : ''}${rect.max ? ' maximized' : ''}`}
-                style={{ display: shown ? undefined : 'none', ...(narrow ? { inset: 0, width: '100%', height: '100%', zIndex: w.id === focusId ? 100 : 1 } : { left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%`, zIndex: w.id === focusId ? 100 : Math.max(1, open.findIndex((x) => x.id === w.id) + 1) }) }}
+              <div key={w.id} data-window-id={w.id} className={`ws-win role-${w.role}${w.id === focusId ? ' foc' : ''}${overId === w.id && dragId !== w.id ? ` over drop-${dropSide}` : ''}${isMax ? ' maximized' : ''}`}
+                style={{ display: shown ? undefined : 'none', ...(narrow || isMax || !p
+                  ? { inset: GAP / 2, zIndex: isMax || w.id === focusId ? 20 : 1 }
+                  : { left: `calc(${p.left}% + ${GAP / 2}px)`, top: `calc(${p.top}% + ${GAP / 2}px)`, width: `calc(${p.width}% - ${GAP}px)`, height: `calc(${p.height}% - ${GAP}px)` }) }}
                 onPointerDown={() => { if (stRef.current.focus !== w.id) commit(focusWin(stRef.current, w.id)) }}
                 onDragOver={(e) => { if (dragId && dragId !== w.id) { e.preventDefault(); setOverId(w.id); const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX-r.left)/r.width, y = (e.clientY-r.top)/r.height; const edge = Math.min(x,1-x,y,1-y); setDropSide(edge > .28 ? 'center' : edge === x ? 'left' : edge === 1-x ? 'right' : edge === y ? 'top' : 'bottom') } }}
                 onDrop={(e) => { e.preventDefault(); if (dragId) commit(insertWin(stRef.current, dragId, w.id, dropSide)); setDragId(null); setOverId(null) }}>
                 <div className="ws-stripe" />
-                {!narrow && ['n','s','e','w','ne','nw','se','sw'].map((edge) => <div key={edge} className={`ws-resize ws-resize-${edge}`} onPointerDown={(e) => startWindowAction(e, w.id, edge as 'n'|'s'|'e'|'w'|'ne'|'nw'|'se'|'sw')} />)}
-                <div className="ws-wh" title={t('ws.drag')} onPointerDown={(e) => startWindowAction(e, w.id, 'move')}>
+                <div className="ws-wh" draggable={!narrow && !isMax} title={t('ws.drag')} onClick={() => commit(focusWin(stRef.current, w.id))}
+                  onDragStart={(e) => { setDragId(w.id); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', w.id) } catch { /* bỏ qua */ } }}
+                  onDragEnd={() => { setDragId(null); setOverId(null) }}>
                   <span className="ws-grip" aria-hidden><Icon name="grip" size={14} /></span>
                   <span className="ws-title"><b>{w.name}</b> <span className="muted">· {t(`role.${w.role}`)}</span>{b > 0 && <span className="ws-pend">{t('ws.pending', { n: b })}</span>}</span>
-                  <button className="ws-ib" aria-label="Maximize" title="Maximize" onMouseEnter={(e) => { if (snapTimer.current) window.clearTimeout(snapTimer.current); const grid = gridEl.current?.getBoundingClientRect(), button = e.currentTarget.getBoundingClientRect(); if (!grid) return; const width = 184, height = 148; const left = Math.max(8, Math.min(button.left - grid.left - width / 2, grid.width - width - 8)); const top = Math.max(8, Math.min(button.bottom - grid.top + 8, grid.height - height - 8)); snapTimer.current = window.setTimeout(() => setSnapFlyout({ left, top }), 450) }} onMouseLeave={() => { if (snapTimer.current) window.clearTimeout(snapTimer.current); snapTimer.current = window.setTimeout(() => setSnapFlyout(null), 450) }} onClick={(e) => { e.stopPropagation(); const r = windowRects[w.id] ?? rect; setWindowRects((all) => ({ ...all, [w.id]: r.max ? { ...r, x: 2, y: 2, w: 48, h: 48, max: false } : { x: 0, y: 0, w: 100, h: 100, max: true } })) }}>□</button>
+                  <button className="ws-ib max" aria-label={`${t(isMax ? 'ws.restore' : 'ws.max')} — ${w.name}`} title={t(isMax ? 'ws.restore' : 'ws.max')} aria-pressed={isMax}
+                    onClick={(e) => { e.stopPropagation(); commit(focusWin(stRef.current, w.id)); setMaxId(isMax ? null : w.id) }}><span className={`ws-max-ico${isMax ? ' on' : ''}`} aria-hidden /></button>
                   <button className="ws-ib" aria-label={`${t('ws.min')} — ${w.name}`} title={t('ws.min')} onClick={(e) => { e.stopPropagation(); commit(minimizeWin(stRef.current, w.id)) }}><Icon name="minus" size={15} /></button>
                   <button className="ws-ib" aria-label={`${t('ws.close')} — ${w.name}`} title={t('ws.close')} onClick={(e) => { e.stopPropagation(); commit(closeWin(stRef.current, w.id)) }}><Icon name="x" size={15} /></button>
                 </div>
@@ -515,7 +401,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
                 </div>
               </div>)
           })}
-          {!narrow && place.splitters.map((sp) => (
+          {!narrow && !maxed && place.splitters.map((sp) => (
             <div key={`${sp.kind}-${sp.row}-${sp.index}`} className={`ws-split ${sp.kind}`} role="separator" tabIndex={0}
               aria-orientation={sp.kind === 'col' ? 'vertical' : 'horizontal'} aria-valuenow={sp.value} aria-valuemin={12} aria-valuemax={88} aria-label={t('ws.resize')} title={t('ws.resize')}
               style={sp.kind === 'col' ? { left: `calc(${sp.left}% - ${GAP / 2}px)`, top: `calc(${sp.top}% + ${GAP / 2}px)`, height: `calc(${sp.height}% - ${GAP}px)`, width: GAP } : { top: `calc(${sp.top}% - ${GAP / 2}px)`, left: GAP / 2, right: GAP / 2, height: GAP }}
@@ -527,7 +413,7 @@ export function Workspace({ onHome }: { onHome?: () => void }) {
               }} />))}
         </div>
         {!!wins.length && <div className="ws-dock" aria-label={t('ws.people')}>
-          {wins.map((w) => <button key={w.id} className={`ws-dock-item${w.id === focusId ? ' active' : ''}`} title={`${w.name} · ${t(`role.${w.role}`)}`} onClick={() => commit(focusWin(stRef.current, w.id))}>
+          {wins.map((w) => <button key={w.id} className={`ws-dock-item${w.id === focusId ? ' active' : ''}`} title={`${w.name} · ${t(`role.${w.role}`)}`} onClick={() => pick(w.id)}>
             <span className={`ws-dock-avatar role-${w.role}`}>{initials(w.name)}</span><i className={w.open ? 'running' : ''} />
           </button>)}<span className="ws-dock-divider" /><button className="ws-dock-item ws-dock-add" aria-label={t('ws.add')} title={t('ws.add')} onClick={() => { setErr(null); setPop(pop === 'closed' ? 'list' : 'closed') }}><span className="ws-dock-avatar">+</span></button>
         </div>}
